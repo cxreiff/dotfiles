@@ -9,5 +9,13 @@ autoload -Uz compinit
 compinit
 # End of lines added by compinstall
 
+alias zrc='vim ~/.zshrc'
+alias vrc='vim ~/.vimrc'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
+
+alias vim-plug-init='curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
+
+# helps putty render 256 colors
+if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
