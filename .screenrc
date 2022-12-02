@@ -1,0 +1,8 @@
+# Turn off the welcome message
+startup_message off
+
+# Disable visual bell
+vbell off
+
+# gnu screen scroll fix
+termcapinfo xterm* ti@:te@
