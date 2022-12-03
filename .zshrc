@@ -19,3 +19,11 @@ alias vim-plug-init='curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 # helps putty render 256 colors
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
+export FZF_DEFAULT_COMMAND='rg --files --hidden --smart-case --glob "!.git/*"'
+
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+    export PROMPT='%F{cyan}%n@cloud %f%1~ %# '
+else
+    export PROMPT='%F{magenta}%n@local %f%1~ %# '
+fi
+
