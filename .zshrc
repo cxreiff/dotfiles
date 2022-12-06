@@ -20,6 +20,7 @@ alias vim-plug-init='curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
 export FZF_DEFAULT_COMMAND='rg --files --hidden --smart-case --glob "!.git/*"'
+export PATH="$HOME/.cargo/bin:$PATH"
 
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
     export PROMPT='%F{cyan}%n@cloud %f%1~ %# '

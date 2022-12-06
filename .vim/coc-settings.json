@@ -2,4 +2,5 @@
  "diagnostic.checkCurrentLine": true,
  "diagnostic.virtualText": true,
  "diagnostic.virtualTextCurrentLineOnly": false,
+ "suggest.autoTrigger": "none",
 }
