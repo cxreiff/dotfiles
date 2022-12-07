@@ -6,3 +6,8 @@ vbell off
 
 # gnu screen scroll fix
 termcapinfo xterm* ti@:te@
+
+# vim fixes
+defbce on
+defc1 off
+maptimeout 5
