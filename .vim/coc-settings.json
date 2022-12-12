@@ -2,6 +2,6 @@
  "diagnostic.checkCurrentLine": true,
  "diagnostic.virtualText": true,
  "diagnostic.virtualTextCurrentLineOnly": false,
- "rust-analyzer.inlayHints.chainingHints": true,
+ "inlayHint.display": false,
  "suggest.autoTrigger": "none",
 }
