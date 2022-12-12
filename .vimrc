@@ -9,7 +9,6 @@ Plug 'tpope/vim-commentary'
 Plug 'mhinz/vim-signify'
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'rust-lang/rust.vim'
-Plug 'RRethy/vim-hexokinase', {'do': 'make hexokinase'}
 Plug 'junegunn/fzf.vim'
 Plug 'junegunn/fzf', {'do': { -> fzf#install() }}
 Plug 'junegunn/goyo.vim'
