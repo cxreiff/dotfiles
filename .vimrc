@@ -23,7 +23,7 @@ call plug#end()
 
 syntax enable
 set background=dark
-colorscheme miramare
+colorscheme alduin
 
 set number
 set shm+=I

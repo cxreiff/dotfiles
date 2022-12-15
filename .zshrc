@@ -28,3 +28,6 @@ else
     export PROMPT='%F{magenta}%n@local %f%1~ %# '
 fi
 
+# add homebrew bin to PATH
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
