@@ -42,15 +42,7 @@ return require('packer').startup(function(use)
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
   
-  use {
-    'numToStr/FTerm.nvim',
-    config = function()
-      vim.api.nvim_create_user_command('FTermToggle', require('FTerm').toggle, { bang = true })
-      vim.keymap.set('n', '<leader>t', ':FTermToggle<CR>', { noremap = true, silent = true })
-      vim.keymap.set('n', '<C-t>', ':FTermToggle<CR>', { noremap = true, silent = true })
-      vim.keymap.set('t', '<ESC>', '<C-n><cmd>:FTermToggle<CR>', { noremap = true, silent = true })
-    end,
-  }
+  use 'numToStr/FTerm.nvim'
 
   -- zen mode
   use {
