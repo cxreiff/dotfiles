@@ -5,6 +5,7 @@ vim.keymap.set('n', '<leader>h', '<<', { noremap = true, silent = true })
 vim.keymap.set('n', '<leader>l', '>>', { noremap = true, silent = true })
 vim.keymap.set('n', '<leader>m', ':t.<CR>', { noremap = true, silent = true })
 vim.keymap.set('n', '<leader>f', ':Format<CR>', { noremap = true, silent = true })
+vim.keymap.set('n', '<leader>sv', ':source $MYVIMRC<CR>', { noremap = true })
 
 -- focus mode
 vim.keymap.set('n', '<leader>g', ':TZAtaraxis<CR>', { noremap = true, silent = true })
