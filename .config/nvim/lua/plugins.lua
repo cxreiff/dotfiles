@@ -20,7 +20,7 @@ vim.cmd([[
 ]])
 
 return require('packer').startup(function(use)
-	use 'wbthomason/packer.nvim'
+  use 'wbthomason/packer.nvim'
 
   use 'lewis6991/impatient.nvim'
 
@@ -41,13 +41,19 @@ return require('packer').startup(function(use)
   use 'tpope/vim-fugitive'
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
-  use 'numToStr/FTerm.nvim'
+  
+  use {
+    'numToStr/FTerm.nvim',
+    config = function()
+      vim.api.nvim_create_user_command('FTermToggle', require('FTerm').toggle, { bang = true })
+    end,
+  }
 
   -- zen mode
   use {
-	  'Pocco81/true-zen.nvim',
-	  config = function()
-		  require('true-zen').setup {
+    'Pocco81/true-zen.nvim',
+    config = function()
+      require('true-zen').setup {
         integrations = {
           lualine = true
         }
@@ -158,25 +164,26 @@ return require('packer').startup(function(use)
           { name = 'calc'},                               -- source for math calculation
         },
         window = {
-            completion = cmp.config.window.bordered(),
-            documentation = cmp.config.window.bordered(),
+          completion = cmp.config.window.bordered(),
+          documentation = cmp.config.window.bordered(),
         },
         formatting = {
-            fields = {'menu', 'abbr', 'kind'},
-            format = function(entry, item)
-                local menu_icon ={
-                    nvim_lsp = 'λ',
-                    vsnip = '⋗',
-                    buffer = 'Ω',
-                    path = '/',
-                }
-                item.menu = menu_icon[entry.source.name]
-                return item
-            end,
+          fields = {'menu', 'abbr', 'kind'},
+          format = function(entry, item)
+            local menu_icon ={
+              nvim_lsp = 'λ',
+              vsnip = '⋗',
+              buffer = 'Ω',
+              path = '/',
+            }
+            item.menu = menu_icon[entry.source.name]
+            return item
+          end,
         },
       })
     end
   }
+  
   use 'hrsh7th/cmp-nvim-lsp'
   use 'hrsh7th/cmp-nvim-lua'
   use 'hrsh7th/cmp-nvim-lsp-signature-help'
@@ -184,6 +191,7 @@ return require('packer').startup(function(use)
   use 'hrsh7th/cmp-path'                              
   use 'hrsh7th/cmp-buffer'                            
   use 'hrsh7th/vim-vsnip'
+  
   use {
     'folke/trouble.nvim',
     config = function()
@@ -231,16 +239,17 @@ return require('packer').startup(function(use)
     end
   }
 	
-	-- color schemes
-	use 'sainnhe/everforest'
-	use 'w0ng/vim-hybrid'
-	use 'AlessandroYorba/Alduin'
-	use 'AlessandroYorba/Sierra'
+  -- color schemes
+  use 'sainnhe/everforest'
+  use 'w0ng/vim-hybrid'
+  use 'AlessandroYorba/Alduin'
+  use 'AlessandroYorba/Sierra'
   use 'frenzyexists/aquarium-vim'
   use 'kvrohit/rasmus.nvim'
+  use 'bcicen/vim-vice'
 
-	-- packer setup
-	if packer_bootstrap then
+  -- packer setup
+  if packer_bootstrap then
     require('packer').sync()
   end
 end)

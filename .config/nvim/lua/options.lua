@@ -1,19 +1,16 @@
-vim.cmd [[
 
-set termguicolors
-set noshowmode
-set splitright
-set splitbelow
-set signcolumn=yes
+vim.cmd [[set termguicolors]]
+vim.cmd [[set noshowmode]]
+vim.cmd [[set splitright]]
+vim.cmd [[set splitbelow]]
+vim.cmd [[set signcolumn=yes]]
 
-set expandtab
-set tabstop=2
-set softtabstop=2
-set shiftwidth=2
+vim.cmd [[set expandtab]]
+vim.cmd [[set tabstop=2]]
+vim.cmd [[set softtabstop=2]]
+vim.cmd [[set shiftwidth=2]]
 
-autocmd BufWritePre <buffer> lua vim.lsp.buf.formatting_sync()
-
-]]
+vim.cmd [[autocmd BufWritePre <buffer> lua vim.lsp.buf.formatting_sync()]]
 
 -- diagnostic icons
 local sign = function(opts)

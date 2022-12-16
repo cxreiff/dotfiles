@@ -9,15 +9,12 @@ autoload -Uz compinit
 compinit
 # End of lines added by compinstall
 
-alias zrc='vim ~/.zshrc'
-alias vrc='vim ~/.vimrc'
+alias zrc='nvim ~/.zshrc'
+alias vrc='nvim ~/.vimrc'
 alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 
 alias dev='ssh jaxreiff@143.244.208.149'
-
-alias vim-plug-init='curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
-    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
 
 # helps putty render 256 colors
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
@@ -32,5 +29,5 @@ else
 fi
 
 # add homebrew bin to PATH
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
