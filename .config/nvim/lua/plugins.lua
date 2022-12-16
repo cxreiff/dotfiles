@@ -19,6 +19,7 @@ vim.cmd([[
   augroup end
 ]])
 
+-- install plugins
 return require('packer').startup(function(use)
   use 'wbthomason/packer.nvim'
 
@@ -43,6 +44,13 @@ return require('packer').startup(function(use)
   use 'tpope/vim-commentary'
   
   use 'numToStr/FTerm.nvim'
+
+  use {
+    'windwp/nvim-autopairs',
+    config = function()
+      require('nvim-autopairs').setup {}
+    end,
+  }
 
   -- zen mode
   use {
@@ -86,13 +94,11 @@ return require('packer').startup(function(use)
     end,
     config = function()
       require('nvim-treesitter.configs').setup {
-        ensure_installed = { "lua", "rust", "toml" },
+        ensure_installed = { "rust", "toml" },
         auto_install = true,
         highlight = {
-          enable = true,
-          additional_vim_regex_highlighting=false,
+          disable = { "lua" },
         },
-        ident = { enable = true }, 
         rainbow = {
           enable = true,
           extended_mode = true,
@@ -103,90 +109,36 @@ return require('packer').startup(function(use)
   }
   
 	-- lsp setup
-  use 'neovim/nvim-lspconfig'
-  
   use {
-    'williamboman/mason.nvim',
+    'VonHeikemen/lsp-zero.nvim',
+    requires = {
+      -- LSP Support
+      {'neovim/nvim-lspconfig'},
+      {'williamboman/mason.nvim'},
+      {'williamboman/mason-lspconfig.nvim'},
+
+      -- Autocompletion
+      {'hrsh7th/nvim-cmp'},
+      {'hrsh7th/cmp-buffer'},
+      {'hrsh7th/cmp-path'},
+      {'saadparwaiz1/cmp_luasnip'},
+      {'hrsh7th/cmp-nvim-lsp'},
+      {'hrsh7th/cmp-nvim-lua'},
+
+      -- Snippets
+      {'L3MON4D3/LuaSnip'},
+      {'rafamadriz/friendly-snippets'},
+    },
     config = function()
-      require('mason').setup {}
+      local lsp = require('lsp-zero')
+      lsp.preset('recommended')
+      lsp.setup_nvim_cmp({
+        completion = { autocomplete = false }
+      })
+      lsp.setup()
     end,
   }
-  
-  use {
-    'williamboman/mason-lspconfig.nvim',
-    config = function()
-      require('mason-lspconfig').setup {
-          ensure_installed = { 'rust_analyzer' }
-      }
-    end
-  }
-  
-  use {
-    'hrsh7th/nvim-cmp',
-    config = function()
-      local cmp = require('cmp')
-      cmp.setup({
-        completion = {
-          autocomplete = false,
-        },
-        snippet = {
-          expand = function(args)
-              vim.fn["vsnip#anonymous"](args.body)
-          end,
-        },
-        mapping = {
-          ['<C-p>'] = cmp.mapping.select_prev_item(),
-          ['<C-n>'] = cmp.mapping.select_next_item(),
-          ['<S-Tab>'] = cmp.mapping.select_prev_item(),
-          ['<Tab>'] = cmp.mapping.select_next_item(),
-          ['<C-S-f>'] = cmp.mapping.scroll_docs(-4),
-          ['<C-f>'] = cmp.mapping.scroll_docs(4),
-          ['<C-Space>'] = cmp.mapping.complete(),
-          ['<C-e>'] = cmp.mapping.close(),
-          ['<CR>'] = cmp.mapping.confirm({
-            behavior = cmp.ConfirmBehavior.Insert,
-            select = true,
-          })
-        },
-        -- Installed sources:
-        sources = {
-          { name = 'path' },                              -- file paths
-          { name = 'nvim_lsp', keyword_length = 3 },      -- from language server
-          { name = 'nvim_lsp_signature_help'},            -- display function signatures with current parameter emphasized
-          { name = 'nvim_lua', keyword_length = 2},       -- complete neovim's Lua runtime API such vim.lsp.*
-          { name = 'buffer', keyword_length = 2 },        -- source current buffer
-          { name = 'vsnip', keyword_length = 2 },         -- nvim-cmp source for vim-vsnip 
-          { name = 'calc'},                               -- source for math calculation
-        },
-        window = {
-          completion = cmp.config.window.bordered(),
-          documentation = cmp.config.window.bordered(),
-        },
-        formatting = {
-          fields = {'menu', 'abbr', 'kind'},
-          format = function(entry, item)
-            local menu_icon ={
-              nvim_lsp = 'λ',
-              vsnip = '⋗',
-              buffer = 'Ω',
-              path = '/',
-            }
-            item.menu = menu_icon[entry.source.name]
-            return item
-          end,
-        },
-      })
-    end
-  }
-  
-  use 'hrsh7th/cmp-nvim-lsp'
-  use 'hrsh7th/cmp-nvim-lua'
-  use 'hrsh7th/cmp-nvim-lsp-signature-help'
-  use 'hrsh7th/cmp-vsnip'                             
-  use 'hrsh7th/cmp-path'                              
-  use 'hrsh7th/cmp-buffer'                            
-  use 'hrsh7th/vim-vsnip'
-  
+
   use {
     'folke/trouble.nvim',
     config = function()
