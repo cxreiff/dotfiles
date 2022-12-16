@@ -11,6 +11,7 @@ compinit
 
 alias zrc='vim ~/.zshrc'
 alias vrc='vim ~/.vimrc'
+alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 
 alias vim-plug-init='curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
