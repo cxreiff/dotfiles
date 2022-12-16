@@ -19,6 +19,7 @@ vim.keymap.set('n', '<leader>b', ':Telescope buffers<CR>', { noremap = true, sil
 vim.keymap.set('n', '<leader>i', ':TroubleToggle<CR>', { noremap = true, silent = true })
 
 -- terminal toggle
+vim.api.nvim_create_user_command('FTermToggle', require('FTerm').toggle, { bang = true })
 vim.keymap.set('n', '<leader>t', ':FTermToggle<CR>', { noremap = true, silent = true })
 vim.keymap.set('n', '<C-t>', ':FTermToggle<CR>', { noremap = true, silent = true })
 vim.keymap.set('t', '<ESC>', '<C-n><cmd>:FTermToggle<CR>', { noremap = true, silent = true })
