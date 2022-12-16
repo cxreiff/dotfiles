@@ -14,6 +14,8 @@ alias vrc='vim ~/.vimrc'
 alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 
+alias dev='ssh jaxreiff@143.244.208.149'
+
 alias vim-plug-init='curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
 
