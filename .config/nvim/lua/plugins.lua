@@ -42,7 +42,7 @@ return require('packer').startup(function(use)
   use 'tpope/vim-fugitive'
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
-  
+
   use 'numToStr/FTerm.nvim'
 
   use {
@@ -72,7 +72,7 @@ return require('packer').startup(function(use)
       require('todo-comments').setup {}
     end
   }
-  
+
   -- fuzzy finder
   use {
     'nvim-telescope/telescope.nvim', tag = '0.1.0',
@@ -84,7 +84,7 @@ return require('packer').startup(function(use)
       require('telescope').load_extension('fzf')
     end,
   }
-  
+
   -- treesitter
   use {
     'nvim-treesitter/nvim-treesitter',
@@ -107,27 +107,30 @@ return require('packer').startup(function(use)
       }
     end,
   }
-  
+
 	-- lsp setup
   use {
     'VonHeikemen/lsp-zero.nvim',
     requires = {
       -- LSP Support
-      {'neovim/nvim-lspconfig'},
-      {'williamboman/mason.nvim'},
-      {'williamboman/mason-lspconfig.nvim'},
+      'neovim/nvim-lspconfig',
+      'williamboman/mason.nvim',
+      'williamboman/mason-lspconfig.nvim',
 
       -- Autocompletion
-      {'hrsh7th/nvim-cmp'},
-      {'hrsh7th/cmp-buffer'},
-      {'hrsh7th/cmp-path'},
-      {'saadparwaiz1/cmp_luasnip'},
-      {'hrsh7th/cmp-nvim-lsp'},
-      {'hrsh7th/cmp-nvim-lua'},
+      'hrsh7th/nvim-cmp',
+      'hrsh7th/cmp-buffer',
+      'hrsh7th/cmp-path',
+      'saadparwaiz1/cmp_luasnip',
+      'hrsh7th/cmp-nvim-lsp',
+      'hrsh7th/cmp-nvim-lua',
 
       -- Snippets
-      {'L3MON4D3/LuaSnip'},
-      {'rafamadriz/friendly-snippets'},
+      'L3MON4D3/LuaSnip',
+      'rafamadriz/friendly-snippets',
+
+      -- Languages
+      'simrat39/rust-tools.nvim',
     },
     config = function()
       local lsp = require('lsp-zero')
@@ -145,7 +148,37 @@ return require('packer').startup(function(use)
         completion = { autocomplete = false }
       })
 
+      local rust_tools = require('rust-tools')
+      local rust_lsp = lsp.build_options('rust_analyzer', {
+        on_attach = function(_, bufnr)
+          vim.keymap.set("n", "<C-space>", rust_tools.hover_actions.hover_actions, { buffer = bufnr })
+          vim.g.rust_hints_enabled = false
+            function RustToggleInlayHints()
+              if (vim.g.rust_hints_enabled) then
+                rust_tools.inlay_hints.disable()
+                vim.g.rust_hints_enabled = false
+              else
+                rust_tools.inlay_hints.enable()
+                vim.g.rust_hints_enabled = true
+              end
+            end
+            vim.api.nvim_create_user_command('RustToggleInlayHints', RustToggleInlayHints, { bang = true })
+            vim.keymap.set({'n', 'v'}, '<leader>u', ':RustToggleInlayHints<CR>', { noremap = true })
+        end,
+      })
+
+      lsp.nvim_workspace()
+
       lsp.setup()
+
+      rust_tools.setup({
+        server = rust_lsp,
+        tools = {
+          inlay_hints = {
+            auto = false,
+          }
+        },
+      })
     end,
   }
 
@@ -164,38 +197,7 @@ return require('packer').startup(function(use)
 
   -- languages
   use 'rust-lang/rust.vim'
-  
-  use {
-    'simrat39/rust-tools.nvim',
-    config = function()
-      local rt = require('rust-tools')
-      rt.setup {
-        server = {
-          on_attach = function(_, bufnr)
-            vim.keymap.set("n", "<C-space>", rt.hover_actions.hover_actions, { buffer = bufnr })
-            vim.g.rust_hints_enabled = false
-            function RustToggleInlayHints()
-              if (vim.g.rust_hints_enabled) then
-                require('rust-tools').inlay_hints.disable()
-                vim.g.rust_hints_enabled = false
-              else
-                require('rust-tools').inlay_hints.enable()
-                vim.g.rust_hints_enabled = true
-              end
-            end
-            vim.api.nvim_create_user_command('RustToggleInlayHints', RustToggleInlayHints, { bang = true })
-            vim.keymap.set({'n', 'v'}, '<leader>u', ':RustToggleInlayHints<CR>', { noremap = true })
-          end,
-        },
-        tools = {
-          inlay_hints = {
-            auto = false,
-          }
-        }
-      }
-    end
-  }
-	
+
   -- color schemes
   use 'sainnhe/everforest'
   use 'w0ng/vim-hybrid'
