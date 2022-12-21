@@ -1,3 +1,12 @@
 tap "homebrew/bundle"
 tap "homebrew/core"
+
 brew "neovim"
+brew "irssi"
+brew "ripgrep"
+
+cask "firefox"
+cask "1password"
+cask "iterm2"
+cask "dwarf-fortress"
+
