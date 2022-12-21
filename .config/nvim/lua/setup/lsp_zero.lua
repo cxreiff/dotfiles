@@ -27,30 +27,9 @@ return function(use)
       lsp.preset('recommended')
 
       local cmp = require('cmp')
-      -- local luasnip = require('luasnip')
       local cmp_mappings = lsp.defaults.cmp_mappings({
         ['<C-Space>'] = cmp.mapping.complete(),
         ['<C-e>'] = cmp.mapping.abort(),
-
-        -- ['<Tab>'] = cmp.mapping(function(fallback)
-        --   if cmp.visible() then
-        --     cmp.select_next_item()
-        --   elseif luasnip.expand_or_jumpable() then
-        --     luasnip.expand_or_jump()
-        --   else
-        --     fallback()
-        --   end
-        -- end, { 'i', 's' }),
-
-        -- ['<S-Tab>'] = cmp.mapping(function(fallback)
-        --   if cmp.visible() then
-        --     cmp.select_prev_item()
-        --   elseif luasnip.jumpable(-1) then
-        --     luasnip.jump(-1)
-        --   else
-        --     fallback()
-        --   end
-        -- end, { 'i', 's' }),
       })
 
       lsp.setup_nvim_cmp({
@@ -86,8 +65,8 @@ return function(use)
         tools = {
           inlay_hints = {
             auto = false,
-            parameter_hints_prefix = "<- ",
-            other_hints_prefix = "--> ",
+            parameter_hints_prefix = "<-- ",
+            other_hints_prefix = "==> ",
             max_len_align = true,
           }
         },
