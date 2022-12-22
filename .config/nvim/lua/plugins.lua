@@ -11,7 +11,7 @@ packer.startup(function(use)
   use 'tpope/vim-fugitive'
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
-  use 'numToStr/FTerm.nvim'
+  use 'tpope/vim-obsession'
 
   require('setup/lualine')(use)
   require('setup/nvim_autopairs')(use)
@@ -21,6 +21,8 @@ packer.startup(function(use)
   require('setup/trouble')(use)
   require('setup/todo_comments')(use)
   require('setup/zen_mode')(use)
+  require('setup/fidget')(use)
+  require('setup/toggleterm')(use)
 
   -- languages
   use 'rust-lang/rust.vim'
@@ -33,6 +35,18 @@ packer.startup(function(use)
   use 'frenzyexists/aquarium-vim'
   use 'kvrohit/rasmus.nvim'
   use 'bcicen/vim-vice'
+  use 'rafamadriz/neon'
+  use 'sainnhe/sonokai'
+  use 'savq/melange'
+  use 'fenetikm/falcon'
+  use 'shaunsingh/nord.nvim'
+  use 'kdheepak/monochrome.nvim'
+  use 'rose-pine/neovim'
+  use 'yazeed1s/oh-lucy.nvim'
+  use {
+    'ramojus/mellifluous.nvim',
+    requires = {'rktjmp/lush.nvim'}
+  }
 
   -- packer setup
   if packer_bootstrap then
