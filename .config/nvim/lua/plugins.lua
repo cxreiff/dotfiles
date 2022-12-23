@@ -11,7 +11,6 @@ packer.startup(function(use)
   use 'tpope/vim-fugitive'
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
-  use 'tpope/vim-obsession'
 
   require('setup/lualine')(use)
   require('setup/nvim_autopairs')(use)
@@ -23,6 +22,7 @@ packer.startup(function(use)
   require('setup/zen_mode')(use)
   require('setup/fidget')(use)
   require('setup/toggleterm')(use)
+  require('setup/neovim_session_manager')(use)
 
   -- languages
   use 'rust-lang/rust.vim'

@@ -16,8 +16,6 @@ alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 
 alias dev='ssh jaxreiff@143.244.208.149'
 
-nvims() { nvim -S "~/.config/session${1:-1}.vim"; }
-
 # helps putty render 256 colors
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
