@@ -15,3 +15,8 @@ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 # initialize nvim
 nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
 
+# install irssi plugins
+curl https://scripts.irssi.org/scripts/adv_windowlist.pl --create-dirs -o ~/.irssi/scripts/autorun/adv_windowlist.pl
+curl https://scripts.irssi.org/scripts/nickcolor.pl --create-dirs -o ~/.irssi/scripts/autorun/nickcolor.pl
+curl https://scripts.irssi.org/scripts/usercount.pl --create-dirs -o ~/.irssi/scripts/autorun/usercount.pl
+
