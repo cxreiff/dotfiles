@@ -4,6 +4,7 @@ vim.cmd [[set splitright]]
 vim.cmd [[set splitbelow]]
 vim.cmd [[set signcolumn=yes]]
 vim.cmd [[set number]]
+vim.cmd [[set shm+=I]]
 
 vim.cmd [[set expandtab]]
 vim.cmd [[set tabstop=2]]

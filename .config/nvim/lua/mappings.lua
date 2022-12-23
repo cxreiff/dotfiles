@@ -14,7 +14,6 @@ vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-l>', [[<Cmd>wincmd l<CR>]], default_o
 
 -- lsp
 vim.keymap.set('n', '<leader>f', ':LspZeroFormat!<CR>', default_opts)
-vim.keymap.set('n', '<leader>a', ':lua vim.lsp.buf.code_action()<CR>', default_opts)
 vim.keymap.set('n', '<leader>r', ':RustRunnables<CR>', default_opts)
 
 -- focus mode
@@ -25,6 +24,7 @@ vim.keymap.set('n', '<leader>p', ':Telescope find_files<CR>', default_opts)
 vim.keymap.set('n', '<leader>o', ':Telescope live_grep<CR>', default_opts)
 vim.keymap.set('n', '<leader>h', ':Telescope help_tags<CR>', default_opts)
 vim.keymap.set('n', '<leader>b', ':Telescope buffers<CR>', default_opts)
+vim.keymap.set('n', '<leader>c', ':Telescope colorscheme<CR>', default_opts)
 
 -- trouble drawer
 vim.keymap.set('n', '<leader>i', ':TroubleToggle<CR>', default_opts)
@@ -32,6 +32,7 @@ vim.keymap.set('n', '<leader>i', ':TroubleToggle<CR>', default_opts)
 -- sessions
 vim.keymap.set('n', '<leader>w', ':SessionManager save_current_session<CR>', { noremap = true })
 vim.keymap.set('n', '<leader>e', ':SessionManager load_session<CR>', default_opts)
+vim.keymap.set('n', '<leader>q', ':SessionManager delete_session<CR>', default_opts)
 
 -- terminal toggle
 vim.cmd [[
@@ -54,5 +55,5 @@ function _G.set_terminal_keymaps()
   vim.keymap.set('t', '<C-k>', [[<Cmd>wincmd k<CR>]], term_opts)
   vim.keymap.set('t', '<C-l>', [[<Cmd>wincmd l<CR>]], term_opts)
 end
-vim.cmd('autocmd! TermOpen term://* lua set_terminal_keymaps()')
 
+vim.cmd('autocmd! TermOpen term://* lua set_terminal_keymaps()')

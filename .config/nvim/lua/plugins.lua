@@ -7,10 +7,13 @@ packer.startup(function(use)
   use 'wbthomason/packer.nvim'
   use 'lewis6991/impatient.nvim'
 
+  use { 'dstein64/vim-startuptime', cmd = 'StartupTime' }
+
   use 'tpope/vim-surround'
   use 'tpope/vim-fugitive'
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
+  use 'sickill/vim-pasta'
 
   require('setup/lualine')(use)
   require('setup/nvim_autopairs')(use)
@@ -23,6 +26,7 @@ packer.startup(function(use)
   require('setup/fidget')(use)
   require('setup/toggleterm')(use)
   require('setup/neovim_session_manager')(use)
+  require('setup/actions_preview')(use)
 
   -- languages
   use 'rust-lang/rust.vim'

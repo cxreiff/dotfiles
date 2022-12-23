@@ -8,7 +8,16 @@ return function(use)
     },
     config = function()
       local telescope = require('telescope')
-      require('telescope.themes').get_cursor()
+      local actions = require('telescope.actions')
+      telescope.setup {
+        defaults = {
+          mappings = {
+            i = {
+              ["<ESC>"] = actions.close,
+            },
+          },
+        },
+      }
       telescope.load_extension('fzf')
       telescope.load_extension('ui-select')
     end,
