@@ -5,10 +5,10 @@ vim.keymap.set('n', '<leader>l', '>>', { noremap = true, silent = true })
 vim.keymap.set('n', '<leader>m', ':t.<CR>', { noremap = true, silent = true })
 
 -- window navigation
-vim.keymap.set({'n', 'i', 't', 'v'}, '<C-h>', [[<Cmd>wincmd h<CR>]], { noremap = true, silent = true })
-vim.keymap.set({'n', 'i', 't', 'v'}, '<C-j>', [[<Cmd>wincmd j<CR>]], { noremap = true, silent = true })
-vim.keymap.set({'n', 'i', 't', 'v'}, '<C-k>', [[<Cmd>wincmd k<CR>]], { noremap = true, silent = true })
-vim.keymap.set({'n', 'i', 't', 'v'}, '<C-l>', [[<Cmd>wincmd l<CR>]], { noremap = true, silent = true })
+vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-h>', [[<Cmd>wincmd h<CR>]], { noremap = true, silent = true })
+vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-j>', [[<Cmd>wincmd j<CR>]], { noremap = true, silent = true })
+vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-k>', [[<Cmd>wincmd k<CR>]], { noremap = true, silent = true })
+vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-l>', [[<Cmd>wincmd l<CR>]], { noremap = true, silent = true })
 
 -- lsp
 vim.keymap.set('n', '<leader>f', ':LspZeroFormat!<CR>', { noremap = true, silent = true })
@@ -26,6 +26,10 @@ vim.keymap.set('n', '<leader>b', ':Telescope buffers<CR>', { noremap = true, sil
 
 -- trouble drawer
 vim.keymap.set('n', '<leader>i', ':TroubleToggle<CR>', { noremap = true, silent = true })
+
+-- sessions
+vim.cmd [[ command! -count=1 ObsessionCount Obsession ~/.config/session<count>.vim ]]
+vim.keymap.set('n', '<leader>w', ':ObsessionCount<CR>', { noremap = true, silent = true })
 
 -- terminal toggle
 vim.cmd [[
@@ -48,5 +52,5 @@ function _G.set_terminal_keymaps()
   vim.keymap.set('t', '<C-k>', [[<Cmd>wincmd k<CR>]], opts)
   vim.keymap.set('t', '<C-l>', [[<Cmd>wincmd l<CR>]], opts)
 end
-vim.cmd('autocmd! TermOpen term://* lua set_terminal_keymaps()')
 
+vim.cmd('autocmd! TermOpen term://* lua set_terminal_keymaps()')

@@ -1,7 +1,0 @@
-{
- "diagnostic.checkCurrentLine": true,
- "diagnostic.virtualText": true,
- "diagnostic.virtualTextCurrentLineOnly": false,
- "inlayHint.display": false,
- "suggest.autoTrigger": "none",
-}
