@@ -39,6 +39,13 @@ return function(use)
 
       local rust_tools = require('rust-tools')
       local rust_lsp = lsp.build_options('rust_analyzer', {
+        settings = {
+          ['rust-analyzer'] = {
+            checkOnSave = {
+              command = 'clippy'
+            }
+          }
+        },
         on_attach = function(_, bufnr)
           vim.keymap.set("n", "<C-space>", rust_tools.hover_actions.hover_actions, { buffer = bufnr })
           vim.g.rust_hints_enabled = false
