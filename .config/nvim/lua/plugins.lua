@@ -27,6 +27,7 @@ packer.startup(function(use)
   require('setup/toggleterm')(use)
   require('setup/neovim_session_manager')(use)
   require('setup/actions_preview')(use)
+  require('setup/bufferline')(use)
 
   -- languages
   use 'rust-lang/rust.vim'

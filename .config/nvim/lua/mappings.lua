@@ -25,6 +25,7 @@ vim.keymap.set('n', '<leader>o', ':Telescope live_grep<CR>', default_opts)
 vim.keymap.set('n', '<leader>h', ':Telescope help_tags<CR>', default_opts)
 vim.keymap.set('n', '<leader>b', ':Telescope buffers<CR>', default_opts)
 vim.keymap.set('n', '<leader>c', ':Telescope colorscheme<CR>', default_opts)
+vim.keymap.set('n', '<leader>v', ':Telescope termfinder<CR>', default_opts)
 
 -- trouble drawer
 vim.keymap.set('n', '<leader>i', ':TroubleToggle<CR>', default_opts)
