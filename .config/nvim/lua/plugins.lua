@@ -13,21 +13,22 @@ packer.startup(function(use)
   use 'tpope/vim-fugitive'
   use 'tpope/vim-vinegar'
   use 'tpope/vim-commentary'
+  use 'tpope/vim-sleuth'
   use 'sickill/vim-pasta'
 
   require('setup/lualine')(use)
-  require('setup/nvim_autopairs')(use)
-  require('setup/lsp_zero')(use)
-  require('setup/nvim_treesitter')(use)
+  require('setup/bufferline')(use)
   require('setup/telescope')(use)
-  require('setup/trouble')(use)
-  require('setup/todo_comments')(use)
-  require('setup/zen_mode')(use)
+  require('setup/nvim_treesitter')(use)
+  require('setup/lsp_zero')(use)
   require('setup/fidget')(use)
   require('setup/toggleterm')(use)
-  require('setup/neovim_session_manager')(use)
   require('setup/actions_preview')(use)
-  require('setup/bufferline')(use)
+  require('setup/neovim_session_manager')(use)
+  require('setup/trouble')(use)
+  require('setup/todo_comments')(use)
+  require('setup/nvim_autopairs')(use)
+  require('setup/zen_mode')(use)
 
   -- languages
   use 'rust-lang/rust.vim'

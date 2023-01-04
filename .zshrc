@@ -19,7 +19,6 @@ alias dev='ssh jaxreiff@143.244.208.149'
 # helps putty render 256 colors
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
-export FZF_DEFAULT_COMMAND='rg --files --hidden --smart-case --glob "!.git/*"'
 export PATH="$HOME/.cargo/bin:$PATH"
 
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
