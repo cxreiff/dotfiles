@@ -20,6 +20,7 @@ alias dev='ssh jaxreiff@143.244.208.149'
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
 export EDITOR=/home/linuxbrew/.linuxbrew/bin/nvim
+export LANG=en_US.UTF-8
 
 export PATH="$HOME/.cargo/bin:$PATH"
 

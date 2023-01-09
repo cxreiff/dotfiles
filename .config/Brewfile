@@ -5,6 +5,7 @@ tap "1password/tap"
 brew "neovim"
 brew "irssi"
 brew "ripgrep"
+brew "fd"
 
 cask "firefox"
 cask "1password"
