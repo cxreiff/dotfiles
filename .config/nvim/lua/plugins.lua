@@ -1,62 +1,95 @@
 
-local packer_bootstrap = require('setup/packer_bootstrap')()
+local lazy_config = require('setup/lazy_config')
 
--- install plugins
-local packer = require('packer')
-packer.startup(function(use)
-  use 'wbthomason/packer.nvim'
-  use 'lewis6991/impatient.nvim'
+require('lazy').setup({
+  'tpope/vim-surround',
+  'tpope/vim-vinegar',
+  'tpope/vim-fugitive',
+  'tpope/vim-commentary',
+  'tpope/vim-sleuth',
 
-  use { 'dstein64/vim-startuptime', cmd = 'StartupTime' }
+  { 'folke/which-key.nvim', config = require('setup/which_key') },
+  { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
+  { 'windwp/nvim-autopairs', config = true },
+  { 'j-hui/fidget.nvim', config = true },
+  { 'dstein64/vim-startuptime', cmd = "StartupTime" },
 
-  use 'tpope/vim-surround'
-  use 'tpope/vim-fugitive'
-  use 'tpope/vim-vinegar'
-  use 'tpope/vim-commentary'
-  use 'tpope/vim-sleuth'
-  use 'sickill/vim-pasta'
+  { 'nvim-lualine/lualine.nvim', config = require('setup/lualine') },
+  { 'akinsho/bufferline.nvim', version = 'v3.*', config = require('setup/bufferline') },
+  { 'akinsho/toggleterm.nvim', config = require('setup/toggleterm') },
+  { 'aznhe21/actions-preview.nvim', config = require('setup/actions_preview') },
+  { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
+  {
+    'Shatur/neovim-session-manager',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    config = require('setup/neovim_session_manager'),
+    cmd = 'SessionManager',
+  },
+  {
+    'nvim-treesitter/nvim-treesitter',
+    build = require('setup/nvim_treesitter').build,
+    config = require('setup/nvim_treesitter').config,
+  },
+  {
+    'nvim-telescope/telescope.nvim',
+    version = '0.1.0',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-telescope/telescope-ui-select.nvim',
+      'tknightz/telescope-termfinder.nvim',
+      { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+    },
+    config = require('setup/telescope'),
+  },
+  {
+    'VonHeikemen/lsp-zero.nvim',
+    dependencies = {
+      -- lsp support
+      'neovim/nvim-lspconfig',
+      'williamboman/mason.nvim',
+      'williamboman/mason-lspconfig.nvim',
 
-  require('setup/lualine')(use)
-  require('setup/bufferline')(use)
-  require('setup/telescope')(use)
-  require('setup/nvim_treesitter')(use)
-  require('setup/lsp_zero')(use)
-  require('setup/fidget')(use)
-  require('setup/toggleterm')(use)
-  require('setup/actions_preview')(use)
-  require('setup/neovim_session_manager')(use)
-  require('setup/trouble')(use)
-  require('setup/todo_comments')(use)
-  require('setup/nvim_autopairs')(use)
-  require('setup/zen_mode')(use)
+      -- autocompletion
+      'hrsh7th/nvim-cmp',
+      'hrsh7th/cmp-buffer',
+      'hrsh7th/cmp-path',
+      'hrsh7th/cmp-nvim-lsp',
+      'hrsh7th/cmp-nvim-lua',
+      'saadparwaiz1/cmp_luasnip',
+
+      -- snippets
+      'L3MON4D3/LuaSnip',
+      'rafamadriz/friendly-snippets',
+
+      -- languages
+      'simrat39/rust-tools.nvim',
+    },
+    config = require('setup/lsp_zero'),
+  },
 
   -- languages
-  use 'rust-lang/rust.vim'
+  { 'rust-lang/rust.vim', ft = 'rust' },
 
   -- color schemes
-  use 'sainnhe/everforest'
-  use 'w0ng/vim-hybrid'
-  use 'AlessandroYorba/Alduin'
-  use 'AlessandroYorba/Sierra'
-  use 'frenzyexists/aquarium-vim'
-  use 'kvrohit/rasmus.nvim'
-  use 'bcicen/vim-vice'
-  use 'rafamadriz/neon'
-  use 'sainnhe/sonokai'
-  use 'savq/melange'
-  use 'fenetikm/falcon'
-  use 'shaunsingh/nord.nvim'
-  use 'kdheepak/monochrome.nvim'
-  use 'rose-pine/neovim'
-  use 'yazeed1s/oh-lucy.nvim'
-  use {
-    'ramojus/mellifluous.nvim',
-    requires = {'rktjmp/lush.nvim'}
-  }
-
-  -- packer setup
-  if packer_bootstrap then
-    packer.sync()
-  end
-end)
+  {
+    'fenetikm/falcon',
+    lazy = false,
+    priority = 1000,
+  },
+  'sainnhe/everforest',
+  'w0ng/vim-hybrid',
+  'AlessandroYorba/Alduin',
+  'AlessandroYorba/Sierra',
+  'frenzyexists/aquarium-vim',
+  'kvrohit/rasmus.nvim',
+  'bcicen/vim-vice',
+  'rafamadriz/neon',
+  'sainnhe/sonokai',
+  'savq/melange',
+  'shaunsingh/nord.nvim',
+  'kdheepak/monochrome.nvim',
+  'rose-pine/neovim',
+  'yazeed1s/oh-lucy.nvim',
+  { 'ramojus/mellifluous.nvim', dependencies = { 'rktjmp/lush.nvim' } },
+}, lazy_config)
 

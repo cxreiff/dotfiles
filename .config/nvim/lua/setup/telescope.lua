@@ -1,27 +1,30 @@
-return function(use)
-  use {
-    'nvim-telescope/telescope.nvim', tag = '0.1.0',
-    requires = {
-      { 'nvim-lua/plenary.nvim' },
-      { 'nvim-telescope/telescope-fzf-native.nvim', run = 'make' },
-      { 'nvim-telescope/telescope-ui-select.nvim' },
-      { 'tknightz/telescope-termfinder.nvim' },
+return function()
+  local telescope = require('telescope')
+  local actions = require('telescope.actions')
+  telescope.setup {
+    defaults = {
+      file_ignore_patterns = {
+        'node_modules',
+        'build',
+      },
+      mappings = {
+        i = {
+          ['<ESC>'] = actions.close,
+        },
+      },
     },
-    config = function()
-      local telescope = require('telescope')
-      local actions = require('telescope.actions')
-      telescope.setup {
-        defaults = {
-          mappings = {
-            i = {
-              ["<ESC>"] = actions.close,
-            },
+    pickers = {
+      buffers = {
+        mappings = {
+          i = {
+            ['<C-d>'] = 'delete_buffer',
           },
         },
-      }
-      telescope.load_extension('fzf')
-      telescope.load_extension('ui-select')
-      telescope.load_extension('termfinder')
-    end,
+      },
+    },
   }
+  telescope.load_extension('fzf')
+  telescope.load_extension('ui-select')
+  telescope.load_extension('termfinder')
 end
+

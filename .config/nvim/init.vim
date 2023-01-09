@@ -1,10 +1,8 @@
 
 let mapleader = ' '
+let g:colorscheme = 'falcon'
 
-lua require('impatient')
 lua require('plugins')
 lua require('options')
 lua require('mappings')
-
-colorscheme rasmus
 

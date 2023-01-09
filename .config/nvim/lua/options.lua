@@ -1,3 +1,6 @@
+
+vim.cmd [[ execute 'colorscheme ' .. g:colorscheme ]]
+
 vim.opt.showmode = false
 vim.opt.splitright = true
 vim.opt.splitbelow = true
