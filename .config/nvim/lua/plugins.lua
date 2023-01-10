@@ -18,6 +18,7 @@ require('lazy').setup({
   { 'akinsho/bufferline.nvim', version = 'v3.*', config = require('setup/bufferline') },
   { 'akinsho/toggleterm.nvim', config = require('setup/toggleterm') },
   { 'aznhe21/actions-preview.nvim', config = require('setup/actions_preview') },
+  { 'kevinhwang91/nvim-bqf', ft = 'qf', config = require('setup/nvim_bqf') },
   { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
   {
     'Shatur/neovim-session-manager',
@@ -33,6 +34,7 @@ require('lazy').setup({
   {
     'nvim-telescope/telescope.nvim',
     version = '0.1.0',
+    event = 'VeryLazy',
     dependencies = {
       'nvim-lua/plenary.nvim',
       'nvim-telescope/telescope-ui-select.nvim',
@@ -43,6 +45,7 @@ require('lazy').setup({
   },
   {
     'VonHeikemen/lsp-zero.nvim',
+    event = 'VeryLazy',
     dependencies = {
       -- lsp support
       'neovim/nvim-lspconfig',
@@ -71,11 +74,7 @@ require('lazy').setup({
   { 'rust-lang/rust.vim', ft = 'rust' },
 
   -- color schemes
-  {
-    'fenetikm/falcon',
-    lazy = false,
-    priority = 1000,
-  },
+  'fenetikm/falcon',
   'sainnhe/everforest',
   'w0ng/vim-hybrid',
   'AlessandroYorba/Alduin',
@@ -90,6 +89,8 @@ require('lazy').setup({
   'kdheepak/monochrome.nvim',
   'rose-pine/neovim',
   'yazeed1s/oh-lucy.nvim',
+  'EdenEast/nightfox.nvim',
+  'catppuccin/nvim',
   { 'ramojus/mellifluous.nvim', dependencies = { 'rktjmp/lush.nvim' } },
 }, lazy_config)
 

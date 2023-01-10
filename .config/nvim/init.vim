@@ -1,6 +1,6 @@
 
 let mapleader = ' '
-let g:colorscheme = 'falcon'
+let g:colorscheme = 'nightfox'
 
 lua require('plugins')
 lua require('options')

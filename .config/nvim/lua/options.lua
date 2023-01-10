@@ -10,6 +10,8 @@ vim.opt.number = true
 vim.opt.shm:append('I')
 vim.opt.expandtab = true
 
+vim.g.markdown_fenced_languages = {'rust', 'typescript', 'tsx=typescript', 'scss'}
+
 -- hide default fonts from tab completion
 vim.opt.wildignore:append("\z
   blue.vim,darkblue.vim,default.vim,delek.vim,desert.vim,elflord.vim,\z
@@ -17,7 +19,17 @@ vim.opt.wildignore:append("\z
   peachpuff.vim,ron.vim,shine.vim,slate.vim,torte.vim,zellner.vim\z
 ")
 
-vim.cmd [[autocmd BufWritePre <buffer> lua vim.lsp.buf.formatting_sync()]]
+-- format on save
+vim.api.nvim_create_autocmd('BufWritePre', {
+  callback = vim.lsp.buf.format,
+})
+
+-- close netrw on selection
+vim.g.netrw_fastbrowse = 0
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'netrw',
+  command = [[ setl bufhidden=wipe ]],
+})
 
 -- diagnostic icons
 local sign = function(opts)

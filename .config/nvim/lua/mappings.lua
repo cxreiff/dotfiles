@@ -10,8 +10,8 @@ vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-j>', [[<Cmd>wincmd j<CR>]], default_o
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-k>', [[<Cmd>wincmd k<CR>]], default_opts)
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-l>', [[<Cmd>wincmd l<CR>]], default_opts)
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-t>', ':tabnew<CR>', default_opts)
-vim.keymap.set('n', '<leader>t', ':tabnew<CR>', default_opts)
-vim.keymap.set('n', '<leader>s', ':vsplit<CR>', default_opts)
+vim.keymap.set('n', '<leader>t', ':enew<CR>', default_opts)
+vim.keymap.set('n', '<leader>r', ':vnew<CR>', default_opts)
 
 -- hopword
 vim.keymap.set('n', '<leader><Space>', ':HopWord<CR>', default_opts)
@@ -32,7 +32,7 @@ vim.keymap.set('n', '<leader>c', ':Telescope colorscheme<CR>', default_opts)
 vim.keymap.set('n', '<leader>v', ':Telescope termfinder<CR>', default_opts)
 vim.keymap.set('n', '<leader>g', ':Telescope diagnostics<CR>', default_opts)
 vim.keymap.set('n', '<leader>d', ':Telescope lsp_definitions<CR>', default_opts)
-vim.keymap.set('n', '<leader>r', ':Telescope lsp_references<CR>', default_opts)
+vim.keymap.set('n', '<leader>s', ':Telescope lsp_references<CR>', default_opts)
 vim.keymap.set('n', '<leader>h', ':Telescope lsp_dynamic_workspace_symbols<CR>', default_opts)
 
 -- sessions
