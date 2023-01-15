@@ -1,6 +1,4 @@
 
-vim.cmd [[ execute 'colorscheme ' .. g:colorscheme ]]
-
 vim.opt.showmode = false
 vim.opt.splitright = true
 vim.opt.splitbelow = true
@@ -10,7 +8,13 @@ vim.opt.number = true
 vim.opt.shm:append('I')
 vim.opt.expandtab = true
 
-vim.g.markdown_fenced_languages = {'rust', 'typescript', 'tsx=typescript', 'scss'}
+vim.g.markdown_fenced_languages = {
+  'rust',
+  'typescript',
+  'typescriptreact',
+  'tsx=typescriptreact',
+  'scss',
+}
 
 -- hide default fonts from tab completion
 vim.opt.wildignore:append("\z
@@ -29,6 +33,12 @@ vim.g.netrw_fastbrowse = 0
 vim.api.nvim_create_autocmd('FileType', {
   pattern = 'netrw',
   command = [[ setl bufhidden=wipe ]],
+})
+
+-- auto reload buffer
+vim.api.nvim_create_autocmd({'FocusGained', 'BufEnter'}, {
+  pattern = '*',
+  command = 'checktime',
 })
 
 -- diagnostic icons

@@ -12,9 +12,6 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 return {
-  --install = {
-  --  colorscheme = { vim.g.colorscheme },
-  --},
   ui = {
     icons = {
       cmd = "⌘",
