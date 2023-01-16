@@ -41,11 +41,19 @@ vim.keymap.set('n', '<leader>e', ':SessionManager load_session<CR>', default_opt
 vim.keymap.set('n', '<leader>q', ':SessionManager delete_session<CR>', default_opts)
 
 -- terminal toggle
+function _G.term_exec_from_input(count)
+  local input = vim.fn.input("cmd: ")
+  if input == "" then
+    return
+  else
+    require('toggleterm').exec(input, count, 100, nil, "vertical")
+  end
+end
 vim.cmd [[
-command! -count=1 TermCommand lua require('toggleterm').exec(vim.fn.input("cmd: "), <count>, 90, nil, "vertical")
+command! -count=1 TermCommand lua term_exec_from_input(<count>)
 command! -count=1 TermFloat <count>ToggleTerm direction="float"<CR>
-command! -count=1 TermSplit <count>ToggleTerm direction="vertical" size=90<CR>
-command! -nargs=1 -count=1 Sh <count>TermExec direction="vertical" size=90 cmd=<q-args>
+command! -count=1 TermSplit <count>ToggleTerm direction="vertical" size=100<CR>
+command! -nargs=1 -count=1 Sh <count>TermExec direction="vertical" size=100 cmd=<q-args>
 cnoreabbrev sh Sh
 ]]
 vim.keymap.set('n', '<leader>n', ':TermCommand<CR>', default_opts)

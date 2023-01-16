@@ -7,6 +7,11 @@ zstyle :compinstall filename '/home/jaxreiff/.zshrc'
 
 autoload -Uz compinit
 compinit
+
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt appendhistory
 # End of lines added by compinstall
 
 alias zrc='nvim ~/.zshrc'
