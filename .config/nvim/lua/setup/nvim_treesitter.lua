@@ -5,10 +5,10 @@ return {
   end,
   config = function()
     require('nvim-treesitter.configs').setup {
-      ensure_installed = { "rust", "toml" },
+      ensure_installed = { 'rust', 'toml' },
       auto_install = true,
       highlight = {
-        disable = { "lua" },
+        disable = { 'lua' },
       },
       rainbow = {
         enable = true,

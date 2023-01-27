@@ -1,8 +1,14 @@
 local default_opts = { noremap = true, silent = true }
 
-vim.keymap.set('n', '<leader>j', ':m+<CR>', default_opts)
-vim.keymap.set('n', '<leader>k', ':m-2<CR>', default_opts)
-vim.keymap.set('n', '<leader>m', ':t.<CR>', default_opts)
+vim.keymap.set('n', '<A-j>', ':MoveLine(1)<CR>', default_opts)
+vim.keymap.set('n', '<A-k>', ':MoveLine(-1)<CR>', default_opts)
+vim.keymap.set('v', '<A-j>', ':MoveBlock(1)<CR>', default_opts)
+vim.keymap.set('v', '<A-k>', ':MoveBlock(-1)<CR>', default_opts)
+vim.keymap.set('n', '<leader>j', ':MoveLine(1)<CR>', default_opts)
+vim.keymap.set('n', '<leader>k', ':MoveLine(-1)<CR>', default_opts)
+vim.keymap.set('v', '<leader>j', ':MoveBlock(1)<CR>', default_opts)
+vim.keymap.set('v', '<leader>k', ':MoveBlock(-1)<CR>', default_opts)
+vim.keymap.set({'n', 'v'}, '<leader>m', ':t.<CR>', default_opts)
 
 -- window navigation
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-h>', [[<Cmd>wincmd h<CR>]], default_opts)

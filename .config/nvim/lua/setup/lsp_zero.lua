@@ -13,7 +13,7 @@ return function()
     completion = { autocomplete = false }
   })
 
-  vim.keymap.set("n", "<C-Space>", vim.lsp.buf.hover, { silent = true, noremap = true })
+  vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, { silent = true, noremap = true })
 
   local rust_tools = require('rust-tools')
   local rust_lsp = lsp.build_options('rust_analyzer', {
@@ -25,7 +25,7 @@ return function()
       }
     },
     on_attach = function(_, bufnr)
-      vim.keymap.set("n", "<C-Space>", rust_tools.hover_actions.hover_actions, { buffer = bufnr })
+      vim.keymap.set('n', '<C-Space>', rust_tools.hover_actions.hover_actions, { buffer = bufnr })
       vim.g.rust_hints_enabled = false
         function RustToggleInlayHints()
           if (vim.g.rust_hints_enabled) then
@@ -44,7 +44,7 @@ return function()
 
   -- filtering out *.d.ts files from jump-to-definition
   local function filter(arr, fn)
-    if type(arr) ~= "table" then
+    if type(arr) ~= 'table' then
       return arr
     end
     local filtered = {}
@@ -79,8 +79,8 @@ return function()
     tools = {
       inlay_hints = {
         auto = false,
-        parameter_hints_prefix = "<-- ",
-        other_hints_prefix = "==> ",
+        parameter_hints_prefix = '<-- ',
+        other_hints_prefix = '==> ',
         max_len_align = true,
       }
     },

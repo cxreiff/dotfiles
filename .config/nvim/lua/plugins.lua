@@ -7,12 +7,12 @@ require('lazy').setup({
   'tpope/vim-fugitive',
   'tpope/vim-commentary',
   'tpope/vim-sleuth',
+  'fedepujol/move.nvim',
 
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
-  { 'j-hui/fidget.nvim', config = true },
-  { 'dstein64/vim-startuptime', cmd = "StartupTime" },
+  { 'j-hui/fidget.nvim', config = true, event = 'VeryLazy' },
 
   { 'nvim-lualine/lualine.nvim', config = require('setup/lualine') },
   { 'akinsho/bufferline.nvim', version = 'v3.*', config = require('setup/bufferline') },
@@ -28,6 +28,7 @@ require('lazy').setup({
   },
   {
     'nvim-treesitter/nvim-treesitter',
+    event = 'VeryLazy',
     build = require('setup/nvim_treesitter').build,
     config = require('setup/nvim_treesitter').config,
   },
