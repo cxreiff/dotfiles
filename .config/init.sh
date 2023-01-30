@@ -12,9 +12,6 @@ brew bundle --file ~/.config/Brewfile
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 
-# initialize nvim
-nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
-
 # install irssi plugins
 curl https://scripts.irssi.org/scripts/adv_windowlist.pl --create-dirs -o ~/.irssi/scripts/autorun/adv_windowlist.pl
 curl https://scripts.irssi.org/scripts/nickcolor.pl --create-dirs -o ~/.irssi/scripts/autorun/nickcolor.pl

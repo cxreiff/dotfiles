@@ -24,7 +24,7 @@ alias dev='ssh jaxreiff@143.244.208.149'
 # helps putty render 256 colors
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
-export EDITOR=/home/linuxbrew/.linuxbrew/bin/nvim
+export EDITOR=nvim
 export LANG=en_US.UTF-8
 
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -35,6 +35,8 @@ else
     export PROMPT='%F{magenta}%n@local %f%1~ %# '
 fi
 
-# add homebrew bin to PATH
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-
+if [[ $(uname) = "Darwin" ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ $(uname) = "Linux" ]]; then
+    eval "$(/home/linuxbrew/bin/brew shellenv)"
+fi
