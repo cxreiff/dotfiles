@@ -18,6 +18,7 @@ alias zrc='nvim ~/.zshrc'
 alias vrc='nvim ~/.vimrc'
 alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
+alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 
 alias dev='ssh jaxreiff@143.244.208.149'
 
@@ -26,8 +27,6 @@ if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
 export EDITOR=nvim
 export LANG=en_US.UTF-8
-
-export PATH="$HOME/.cargo/bin:$PATH"
 
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
     export PROMPT='%F{cyan}%n@cloud %f%1~ %# '
@@ -41,3 +40,10 @@ if [[ $(uname) = "Darwin" ]]; then
 elif [[ $(uname) = "Linux" ]]; then
     eval "$(/home/linuxbrew/bin/brew shellenv)"
 fi
+
+export PATH="$HOME/.cargo/bin:$PATH"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
