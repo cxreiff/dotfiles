@@ -37,6 +37,7 @@ fi
 
 if [[ $(uname) = "Darwin" ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
+    alias wrk='cd ~/Documents'
 elif [[ $(uname) = "Linux" ]]; then
     eval "$(/home/linuxbrew/bin/brew shellenv)"
 fi

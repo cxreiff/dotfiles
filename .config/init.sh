@@ -16,4 +16,5 @@ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 curl https://scripts.irssi.org/scripts/adv_windowlist.pl --create-dirs -o ~/.irssi/scripts/autorun/adv_windowlist.pl
 curl https://scripts.irssi.org/scripts/nickcolor.pl --create-dirs -o ~/.irssi/scripts/autorun/nickcolor.pl
 curl https://scripts.irssi.org/scripts/usercount.pl --create-dirs -o ~/.irssi/scripts/autorun/usercount.pl
+curl https://scripts.irssi.org/scripts/mouse.pl --create-dirs -o ~/.irssi/scripts/autorun/mouse.pl
 
