@@ -5,8 +5,11 @@ vim.opt.splitbelow = true
 vim.opt.signcolumn = 'yes'
 vim.opt.termguicolors = true
 vim.opt.number = true
-vim.opt.shm:append('I')
 vim.opt.expandtab = true
+vim.opt.tabstop = 2
+vim.opt.shiftwidth = 2
+vim.opt.shm:append('I')
+vim.opt.clipboard:append('unnamedplus')
 
 vim.g.markdown_fenced_languages = {
   'rust',
@@ -68,3 +71,4 @@ vim.diagnostic.config({
     prefix = '',
   },
 })
+

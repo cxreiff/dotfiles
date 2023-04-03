@@ -9,12 +9,10 @@ vim.keymap.set('n', '<leader>k', ':MoveLine(-1)<CR>', default_opts)
 vim.keymap.set('v', '<leader>j', ':MoveBlock(1)<CR>', default_opts)
 vim.keymap.set('v', '<leader>k', ':MoveBlock(-1)<CR>', default_opts)
 vim.keymap.set({'n', 'v'}, '<leader>m', ':t.<CR>', default_opts)
+vim.keymap.set({'n', 'v'}, '<leader>;', ':', default_opts)
+vim.keymap.set('t', '<S-space', '<space><CR>', default_opts)
 
 -- window navigation
-vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-h>', [[<Cmd>wincmd h<CR>]], default_opts)
-vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-j>', [[<Cmd>wincmd j<CR>]], default_opts)
-vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-k>', [[<Cmd>wincmd k<CR>]], default_opts)
-vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-l>', [[<Cmd>wincmd l<CR>]], default_opts)
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-t>', ':tabnew<CR>', default_opts)
 vim.keymap.set('n', '<leader>t', ':enew<CR>', default_opts)
 vim.keymap.set('n', '<leader>r', ':vnew<CR>', default_opts)
@@ -29,8 +27,8 @@ vim.keymap.set('n', '<leader>f', ':LspZeroFormat!<CR>', default_opts)
 vim.keymap.set('n', '<leader>z', ':TZAtaraxis<CR>', default_opts)
 
 -- fuzzy finder
-vim.keymap.set('n', '<leader>p', ':Telescope find_files<CR>', default_opts)
-vim.keymap.set('n', '<leader>o', ':Telescope live_grep<CR>', default_opts)
+vim.keymap.set('n', '<leader>p', ':Telescope find_files hidden=true<CR>', default_opts)
+vim.keymap.set('n', '<leader>o', ':Telescope live_grep hidden=true<CR>', default_opts)
 vim.keymap.set('n', '<leader>?', ':Telescope help_tags<CR>', default_opts)
 vim.keymap.set('n', '<leader>b', ':Telescope buffers<CR>', default_opts)
 vim.keymap.set('n', '<leader>x', ':Telescope commands<CR>', default_opts)
@@ -76,4 +74,13 @@ function _G.set_terminal_keymaps()
   vim.keymap.set('t', '<C-l>', [[<Cmd>wincmd l<CR>]], term_opts)
 end
 vim.cmd('autocmd! TermOpen term://* lua set_terminal_keymaps()')
+
+if vim.g.neovide then
+  -- Allow clipboard copy paste in neovide
+  vim.g.neovide_input_use_logo = 1
+  vim.keymap.set('', '<D-v>', '<C-R><C-P>*', default_opts)
+  vim.keymap.set('!', '<D-v>', '<C-R><C-P>*', default_opts)
+  vim.keymap.set('t', '<D-v>', '<C-R><C-P>*', default_opts)
+  vim.keymap.set('v', '<D-v>', '<C-R><C-P>*', default_opts)
+end
 

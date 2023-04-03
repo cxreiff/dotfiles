@@ -8,6 +8,7 @@ require('lazy').setup({
   'tpope/vim-commentary',
   'tpope/vim-sleuth',
   'fedepujol/move.nvim',
+  'christoomey/vim-tmux-navigator',
 
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },

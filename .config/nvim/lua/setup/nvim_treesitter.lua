@@ -10,6 +10,9 @@ return {
       highlight = {
         disable = { 'lua' },
       },
+      indent = {
+        enable = true,
+      },
       rainbow = {
         enable = true,
         extended_mode = true,

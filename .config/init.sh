@@ -28,10 +28,18 @@ latest_version_number=$(git_latest_version "nvm-sh/nvm");
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${latest_version_number}/install.sh | bash
 nvm install node
 
+echo "\n=== installing pnpm ===\n"
+
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+
 echo "\n=== installing vim-plug ===\n"
 
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+
+echo "\n=== installing tmux plugin manager ===\n"
+
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 
 echo "\n=== installing irssi plugins ===\n"
 

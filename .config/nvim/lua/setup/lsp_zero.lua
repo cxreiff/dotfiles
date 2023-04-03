@@ -15,14 +15,34 @@ return function()
 
   vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, { silent = true, noremap = true })
 
+  lsp.on_attach(function(_, bufnr)
+    lsp.default_keymaps({buffer = bufnr})
+    local opts = { noremap = true, silent = true }
+    vim.keymap.set('n', 'gl', vim.diagnostic.open_float, opts)
+    vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
+    vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
+    vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
+    vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, opts)
+    vim.keymap.set('n', 'gp', vim.diagnostic.setloclist, opts)
+  end)
+
   local rust_tools = require('rust-tools')
   local rust_lsp = lsp.build_options('rust_analyzer', {
     settings = {
       ['rust-analyzer'] = {
+        procMacro = {
+          enable = true,
+        },
         checkOnSave = {
-          command = 'clippy'
-        }
-      }
+          command = 'clippy',
+        },
+        diagnostics = {
+          enabled = true,
+          disabled = { "unresolved-proc-macro" },
+          enableExperimental = true,
+          warningsAsHint = {},
+        },
+      },
     },
     on_attach = function(_, bufnr)
       vim.keymap.set('n', '<C-Space>', rust_tools.hover_actions.hover_actions, { buffer = bufnr })
