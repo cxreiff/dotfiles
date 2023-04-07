@@ -49,10 +49,10 @@ eval "$(fnm env --use-on-cd)"
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.bin:$PATH"
 
-export PNPM_HOME="/Users/jaxreiff/Library/pnpm"
+export PNPM_HOME="$HOME/Library/pnpm"
 export PATH="$PNPM_HOME:$PATH"
 
 ### LOCAL
 
-[[ -f $HOME/.zshrc.local ]] && source $HOME/zshrc.local 
+[[ -f $HOME/.zshrc.local ]] && source $HOME/.zshrc.local 
 
