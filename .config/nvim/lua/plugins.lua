@@ -14,10 +14,9 @@ require('lazy').setup({
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
   { 'j-hui/fidget.nvim', config = true, event = 'VeryLazy' },
-
   { 'nvim-lualine/lualine.nvim', config = require('setup/lualine') },
   { 'akinsho/bufferline.nvim', version = 'v3.*', config = require('setup/bufferline') },
-  { 'akinsho/toggleterm.nvim', config = require('setup/toggleterm') },
+  { 'akinsho/toggleterm.nvim', version = "*", config = true },
   { 'aznhe21/actions-preview.nvim', config = require('setup/actions_preview') },
   { 'kevinhwang91/nvim-bqf', ft = 'qf', config = require('setup/nvim_bqf') },
   { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
