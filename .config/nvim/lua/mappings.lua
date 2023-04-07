@@ -39,11 +39,6 @@ vim.keymap.set('n', '<leader>d', ':Telescope lsp_definitions<CR>', default_opts)
 vim.keymap.set('n', '<leader>s', ':Telescope lsp_references<CR>', default_opts)
 vim.keymap.set('n', '<leader>h', ':Telescope lsp_dynamic_workspace_symbols<CR>', default_opts)
 
--- sessions
-vim.keymap.set('n', '<leader>w', ':SessionManager save_current_session<CR>', { noremap = true })
-vim.keymap.set('n', '<leader>e', ':SessionManager load_session<CR>', default_opts)
-vim.keymap.set('n', '<leader>q', ':SessionManager delete_session<CR>', default_opts)
-
 -- terminal toggle
 function _G.term_exec_from_input(count)
   local input = vim.fn.input("cmd: ")

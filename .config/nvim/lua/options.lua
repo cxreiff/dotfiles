@@ -22,12 +22,6 @@ vim.g.markdown_fenced_languages = {
   'scss',
 }
 
--- terminals always open in insert mode
-vim.api.nvim_create_autocmd('BufEnter', {
-  pattern = '*',
-  command = 'if &buftype ==# "terminal" | startinsert! | endif',
-})
-
 -- close netrw on selection
 vim.g.netrw_browse_split = 0
 vim.g.netrw_winsize = 30
@@ -40,6 +34,12 @@ vim.opt.wildignore:append("\z
   peachpuff.vim,ron.vim,shine.vim,slate.vim,torte.vim,zellner.vim\z
 ")
 
+-- terminals always open in insert mode
+vim.api.nvim_create_autocmd('BufEnter', {
+  pattern = '*',
+  command = 'if &buftype ==# "terminal" | startinsert! | endif',
+})
+
 -- format on save
 vim.api.nvim_create_autocmd('BufWritePre', {
   callback = vim.lsp.buf.format,
@@ -49,33 +49,5 @@ vim.api.nvim_create_autocmd('BufWritePre', {
 vim.api.nvim_create_autocmd({'FocusGained', 'BufEnter'}, {
   pattern = '*',
   command = 'checktime',
-})
-
--- diagnostic icons
-local sign = function(opts)
-  vim.fn.sign_define(opts.name, {
-    texthl = opts.name,
-    text = opts.text,
-    numhl = ''
-  })
-end
-sign({ name = 'DiagnosticSignError', text = '!' })
-sign({ name = 'DiagnosticSignWarn', text = '?' })
-sign({ name = 'DiagnosticSignHint', text = 'h' })
-sign({ name = 'DiagnosticSignInfo', text = 'i' })
-
--- diagnostic config
-vim.diagnostic.config({
-  virtual_text = false,
-  signs = true,
-  update_in_insert = true,
-  underline = true,
-  severity_sort = false,
-  float = {
-    border = 'rounded',
-    source = 'always',
-    header = '',
-    prefix = '',
-  },
 })
 

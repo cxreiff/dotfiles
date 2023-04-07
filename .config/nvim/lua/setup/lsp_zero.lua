@@ -1,5 +1,6 @@
 return function()
   local lsp = require('lsp-zero')
+  local lspconfig = require('lspconfig')
   lsp.preset('recommended')
 
   local cmp = require('cmp')
@@ -13,11 +14,10 @@ return function()
     completion = { autocomplete = false }
   })
 
-  vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, { silent = true, noremap = true })
-
   lsp.on_attach(function(_, bufnr)
     lsp.default_keymaps({buffer = bufnr})
     local opts = { noremap = true, silent = true }
+    vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, opts)
     vim.keymap.set('n', 'gl', vim.diagnostic.open_float, opts)
     vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
     vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
@@ -26,8 +26,7 @@ return function()
     vim.keymap.set('n', 'gp', vim.diagnostic.setloclist, opts)
   end)
 
-  local rust_tools = require('rust-tools')
-  local rust_lsp = lsp.build_options('rust_analyzer', {
+  lspconfig.rust_analyzer.setup {
     settings = {
       ['rust-analyzer'] = {
         procMacro = {
@@ -44,23 +43,7 @@ return function()
         },
       },
     },
-    on_attach = function(_, bufnr)
-      vim.keymap.set('n', '<C-Space>', rust_tools.hover_actions.hover_actions, { buffer = bufnr })
-      vim.g.rust_hints_enabled = false
-        function RustToggleInlayHints()
-          if (vim.g.rust_hints_enabled) then
-            rust_tools.inlay_hints.disable()
-            vim.g.rust_hints_enabled = false
-          else
-            rust_tools.inlay_hints.enable()
-            vim.g.rust_hints_enabled = true
-          end
-        end
-        vim.api.nvim_create_user_command('RustToggleInlayHints', RustToggleInlayHints, { bang = true })
-        vim.keymap.set({'n'}, '<leader>i', ':RustToggleInlayHints<CR>', { noremap = true })
-        vim.keymap.set({'n'}, '<leader>l', ':RustRunnables<CR>', { noremap = true, silent = true })
-    end,
-  })
+  }
 
   -- filtering out *.d.ts files from jump-to-definition
   local function filter(arr, fn)
@@ -91,19 +74,6 @@ return function()
   })
 
   lsp.nvim_workspace()
-
   lsp.setup()
-
-  rust_tools.setup({
-    server = rust_lsp,
-    tools = {
-      inlay_hints = {
-        auto = false,
-        parameter_hints_prefix = '<-- ',
-        other_hints_prefix = '==> ',
-        max_len_align = true,
-      }
-    },
-  })
 end
 

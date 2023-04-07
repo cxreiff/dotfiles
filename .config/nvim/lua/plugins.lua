@@ -21,12 +21,6 @@ require('lazy').setup({
   { 'kevinhwang91/nvim-bqf', ft = 'qf', config = require('setup/nvim_bqf') },
   { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
   {
-    'Shatur/neovim-session-manager',
-    dependencies = { 'nvim-lua/plenary.nvim' },
-    config = require('setup/neovim_session_manager'),
-    cmd = 'SessionManager',
-  },
-  {
     'nvim-treesitter/nvim-treesitter',
     event = 'VeryLazy',
     build = require('setup/nvim_treesitter').build,
@@ -64,9 +58,6 @@ require('lazy').setup({
       -- snippets
       'L3MON4D3/LuaSnip',
       'rafamadriz/friendly-snippets',
-
-      -- languages
-      'simrat39/rust-tools.nvim',
     },
     config = require('setup/lsp_zero'),
   },
