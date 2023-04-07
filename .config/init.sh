@@ -18,15 +18,23 @@ echo "\n=== installing brews ===\n"
 
 brew bundle --file ~/.config/Brewfile
 
+echo "\n=== configuring iterm ===\n"
+
+defaults write com.googlecode.iterm2.plist PrefsCustomFolder -string "~/.config/iterm2"
+defaults write com.googlecode.iterm2.plist LoadPrefsFromCustomFolder -bool true
+
 echo "\n=== installing rust ===\n"
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-echo "\n=== installing nvm ===\n"
+echo "\n=== installing fnm ===\n"
 
-latest_version_number=$(git_latest_version "nvm-sh/nvm");
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${latest_version_number}/install.sh | bash
-nvm install node
+curl -fsSL https://fnm.vercel.app/install | bash
+
+echo "\n=== installing node ===\n"
+
+fnm install
+fnm use
 
 echo "\n=== installing pnpm ===\n"
 
