@@ -27,14 +27,9 @@ echo "\n=== installing rust ===\n"
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-echo "\n=== installing fnm ===\n"
-
-curl -fsSL https://fnm.vercel.app/install | bash
-
 echo "\n=== installing node ===\n"
 
-fnm install
-fnm use
+fnm install --lts
 
 echo "\n=== installing pnpm ===\n"
 
