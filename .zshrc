@@ -3,7 +3,7 @@
 unsetopt beep
 bindkey -e
 
-zstyle :compinstall filename '/home/jaxreiff/.zshrc'
+zstyle :compinstall filename "$HOME/.zshrc"
 autoload -Uz compinit
 compinit
 
@@ -31,8 +31,6 @@ alias vrc='nvim ~/.vimrc'
 alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
-
-alias dev='ssh jaxreiff@143.244.208.149'
 
 if [[ $(uname) = "Darwin" ]]; then
     alias wrk='cd ~/Documents'
