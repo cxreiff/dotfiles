@@ -9,6 +9,9 @@ require('lazy').setup({
   'tpope/vim-sleuth',
   'fedepujol/move.nvim',
   'christoomey/vim-tmux-navigator',
+  'famiu/bufdelete.nvim',
+
+  'github/copilot.vim',
 
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
@@ -20,11 +23,14 @@ require('lazy').setup({
   { 'aznhe21/actions-preview.nvim', config = require('setup/actions_preview') },
   { 'kevinhwang91/nvim-bqf', ft = 'qf', config = require('setup/nvim_bqf') },
   { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
+  { 'NvChad/nvim-colorizer.lua', event = 'BufEnter', config = true },
+  { 'lewis6991/gitsigns.nvim', event = 'BufEnter', config = true },
+  { 'nmac427/guess-indent.nvim', cmd = 'GuessIndent', config = true },
   {
     'nvim-treesitter/nvim-treesitter',
     event = 'VeryLazy',
-    build = require('setup/nvim_treesitter').build,
-    config = require('setup/nvim_treesitter').config,
+    build = ':TSUpdate',
+    config = require('setup/nvim_treesitter'),
   },
   {
     'nvim-telescope/telescope.nvim',
@@ -58,6 +64,14 @@ require('lazy').setup({
       -- snippets
       'L3MON4D3/LuaSnip',
       'rafamadriz/friendly-snippets',
+
+      -- dap
+      'mfussenegger/nvim-dap',
+      'jay-babu/mason-nvim-dap.nvim',
+
+      -- null_ls
+      'jay-babu/mason-null-ls.nvim',
+      'jose-elias-alvarez/null-ls.nvim',
     },
     config = require('setup/lsp_zero'),
   },

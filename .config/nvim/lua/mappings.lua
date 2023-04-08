@@ -16,6 +16,7 @@ vim.keymap.set('t', '<S-space', '<space><CR>', default_opts)
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-t>', ':tabnew<CR>', default_opts)
 vim.keymap.set('n', '<leader>t', ':enew<CR>', default_opts)
 vim.keymap.set('n', '<leader>r', ':vnew<CR>', default_opts)
+vim.keymap.set('n', '<leader>w', ':Bdelete<CR>', default_opts)
 
 -- hopword
 vim.keymap.set('n', '<leader><Space>', ':HopWord<CR>', default_opts)

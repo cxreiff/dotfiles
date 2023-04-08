@@ -75,5 +75,17 @@ return function()
 
   lsp.nvim_workspace()
   lsp.setup()
+
+  require('null-ls').setup()
+  require('mason-null-ls').setup({
+    ensure_installed = nil,
+    automatic_installation = false,
+    automatic_setup = true,
+  })
+  require('mason-null-ls').setup_handlers()
+  require('mason-nvim-dap').setup({
+    automatic_setup = true,
+  })
+  require('mason-nvim-dap').setup_handlers()
 end
 

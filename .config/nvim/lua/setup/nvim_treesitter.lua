@@ -1,25 +1,22 @@
-return {
-  build = function()
-    local ts_update = require('nvim-treesitter.install').update({ with_sync = true })
-    ts_update()
-  end,
-  config = function()
-    require('nvim-treesitter.configs').setup {
-      ensure_installed = { 'rust', 'toml' },
-      auto_install = true,
-      highlight = {
-        disable = { 'lua' },
-        additional_vim_regex_highlighting = false,
-      },
-      indent = {
-        enable = true,
-      },
-      rainbow = {
-        enable = true,
-        extended_mode = true,
-        max_file_lines = nil,
-      }
-    }
-  end,
-}
-
+return function()
+  require('nvim-treesitter.configs').setup {
+    auto_install = true,
+    ensure_installed = { 'rust', 'toml' },
+    highlight = {
+      enable = true,
+      additional_vim_regex_highlighting = false,
+    },
+    incremental_selection = { enable = true },
+    indent = { enable = true },
+    autotag = { enable = true },
+    rainbow = {
+      enable = true,
+      extended_mode = true,
+      max_file_lines = nil,
+    },
+    context_commentstring = {
+      enable = true,
+      enable_autocmd = false,
+    },
+  }
+end
