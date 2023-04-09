@@ -5,6 +5,7 @@ vim.opt.splitbelow = true
 vim.opt.signcolumn = 'yes'
 vim.opt.termguicolors = true
 vim.opt.number = true
+vim.opt.ruler = false
 vim.opt.expandtab = true
 vim.opt.tabstop = 4
 vim.opt.softtabstop = 4

@@ -15,15 +15,17 @@ return function()
   })
 
   lsp.on_attach(function(_, bufnr)
-    lsp.default_keymaps({buffer = bufnr})
+    lsp.default_keymaps({ buffer = bufnr })
     local opts = { noremap = true, silent = true }
     vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, opts)
     vim.keymap.set('n', 'gl', vim.diagnostic.open_float, opts)
+    vim.keymap.set('n', 'gp', vim.diagnostic.setloclist, opts)
     vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
     vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
-    vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
     vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, opts)
-    vim.keymap.set('n', 'gp', vim.diagnostic.setloclist, opts)
+    vim.keymap.set('n', 'gr', function()
+      vim.lsp.buf.references { includeDeclaration = false }
+    end, opts)
   end)
 
   lspconfig.rust_analyzer.setup {
@@ -78,14 +80,9 @@ return function()
 
   require('null-ls').setup()
   require('mason-null-ls').setup({
-    ensure_installed = nil,
-    automatic_installation = false,
-    automatic_setup = true,
+    handlers = {},
   })
-  require('mason-null-ls').setup_handlers()
   require('mason-nvim-dap').setup({
-    automatic_setup = true,
+    handlers = {},
   })
-  require('mason-nvim-dap').setup_handlers()
 end
-
