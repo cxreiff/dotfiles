@@ -1,24 +1,15 @@
 return function()
-  local lsp = require('lsp-zero')
+  local lsp = require('lsp-zero').preset('recommended')
   local lspconfig = require('lspconfig')
-  lsp.preset('recommended')
-
   local cmp = require('cmp')
-  local cmp_mappings = lsp.defaults.cmp_mappings({
-    ['<C-Space>'] = cmp.mapping.complete(),
-    ['<C-e>'] = cmp.mapping.abort(),
-  })
-
-  lsp.setup_nvim_cmp({
-    mapping = cmp_mappings,
-    completion = { autocomplete = false }
-  })
 
   lsp.on_attach(function(_, bufnr)
     lsp.default_keymaps({ buffer = bufnr })
     local opts = { noremap = true, silent = true }
     vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, opts)
-    vim.keymap.set('n', 'gl', vim.diagnostic.open_float, opts)
+    vim.keymap.set('n', 'gl', function()
+      vim.diagnostic.open_float(0, { alwaysSource = true })
+    end, opts)
     vim.keymap.set('n', 'gp', vim.diagnostic.setloclist, opts)
     vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, opts)
     vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
@@ -63,7 +54,7 @@ return function()
   local function filterReactDTS(value)
     return string.match(value.targetUri, '%.d.ts') == nil
   end
-  lsp.configure('tsserver', {
+  lspconfig.tsserver.setup {
     handlers = {
       ['textDocument/definition'] = function(err, result, method, ...)
         if vim.tbl_islist(result) and #result > 1 then
@@ -73,10 +64,49 @@ return function()
         vim.lsp.handlers['textDocument/definition'](err, result, method, ...)
       end
     }
+  }
+
+  lspconfig.lua_ls.setup(lsp.nvim_lua_ls())
+
+  lsp.setup()
+
+  vim.diagnostic.config({
+    virtual_text = false,
+    float = {
+      source = 'always',
+      header = {},
+      padding = true,
+      pad_top = 1,
+      pad_bottom = 1,
+    },
   })
 
-  lsp.nvim_workspace()
-  lsp.setup()
+  require('copilot').setup({
+    suggestion = { enabled = false },
+    panel = { enabled = false },
+  })
+  require('copilot_cmp').setup()
+
+  cmp.setup {
+    completion = {
+      autocomplete = false,
+    },
+    mapping = {
+      ['<CR>'] = cmp.mapping.confirm({ select = false }),
+      ['<Esc>'] = cmp.mapping.close(),
+      ['<C-Space>'] = cmp.mapping.complete(),
+    },
+    sources = {
+      { name = 'path', group_index = 1 },
+      { name = 'nvim_lsp', group_index = 1 },
+      { name = 'copilot', group_index = 1 },
+      { name = 'luasnip', keyword_length = 2, group_index = 2 },
+      { name = 'buffer',  keyword_length = 3, group_index = 3 },
+    },
+    experimental = {
+      ghost_text = true,
+    },
+  }
 
   require('null-ls').setup()
   require('mason-null-ls').setup({

@@ -11,8 +11,6 @@ require('lazy').setup({
   'christoomey/vim-tmux-navigator',
   'famiu/bufdelete.nvim',
 
-  'github/copilot.vim',
-
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
@@ -46,24 +44,27 @@ require('lazy').setup({
   },
   {
     'VonHeikemen/lsp-zero.nvim',
-    event = 'VeryLazy',
+    branch = 'v2.x',
     dependencies = {
       -- lsp support
       'neovim/nvim-lspconfig',
-      'williamboman/mason.nvim',
+      {
+        'williamboman/mason.nvim',
+        build = function()
+          pcall(vim.cmd, 'MasonUpdate')
+        end,
+      },
       'williamboman/mason-lspconfig.nvim',
 
       -- autocompletion
       'hrsh7th/nvim-cmp',
+      'hrsh7th/cmp-nvim-lsp',
       'hrsh7th/cmp-buffer',
       'hrsh7th/cmp-path',
-      'hrsh7th/cmp-nvim-lsp',
-      'hrsh7th/cmp-nvim-lua',
       'saadparwaiz1/cmp_luasnip',
 
       -- snippets
       'L3MON4D3/LuaSnip',
-      'rafamadriz/friendly-snippets',
 
       -- dap
       'mfussenegger/nvim-dap',
@@ -72,6 +73,14 @@ require('lazy').setup({
       -- null_ls
       'jay-babu/mason-null-ls.nvim',
       'jose-elias-alvarez/null-ls.nvim',
+
+      -- copilot
+      'zbirenbaum/copilot-cmp',
+      {
+        'zbirenbaum/copilot.lua',
+        cmd = 'Copilot',
+        event = 'InsertEnter',
+      },
     },
     config = require('setup/lsp_zero'),
   },
