@@ -88,12 +88,18 @@ return function()
   require('copilot_cmp').setup()
 
   cmp.setup {
+    preselect = cmp.PreselectMode.Item,
     completion = {
       autocomplete = false,
+      completeopt = 'menu,menuone,noinsert',
     },
     mapping = {
-      ['<CR>'] = cmp.mapping.confirm({ select = false }),
-      ['<Esc>'] = cmp.mapping.close(),
+      -- ['<CR>'] = cmp.mapping.confirm({ select = false }),
+      ['<CR>'] = cmp.mapping.confirm({
+        behavior = cmp.ConfirmBehavior.Replace,
+        select = false,
+      }),
+      ['<Esc>'] = cmp.mapping.abort(),
       ['<C-Space>'] = cmp.mapping.complete(),
     },
     sources = {
