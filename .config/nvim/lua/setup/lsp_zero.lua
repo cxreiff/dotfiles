@@ -94,7 +94,6 @@ return function()
       completeopt = 'menu,menuone,noinsert',
     },
     mapping = {
-      -- ['<CR>'] = cmp.mapping.confirm({ select = false }),
       ['<CR>'] = cmp.mapping.confirm({
         behavior = cmp.ConfirmBehavior.Replace,
         select = false,
