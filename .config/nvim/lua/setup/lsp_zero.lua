@@ -98,7 +98,17 @@ return function()
         behavior = cmp.ConfirmBehavior.Replace,
         select = false,
       }),
-      ['<Esc>'] = cmp.mapping.abort(),
+      ['<Esc>'] = cmp.mapping(
+        function(fallback)
+          if cmp.visible() then
+            cmp.abort()
+            cmp.core:reset()
+          else
+            fallback()
+          end
+        end,
+        {'i', 's'}
+      ),
       ['<C-Space>'] = cmp.mapping.complete(),
     },
     sources = {
