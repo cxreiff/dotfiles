@@ -10,6 +10,7 @@ require('lazy').setup({
   'fedepujol/move.nvim',
   'christoomey/vim-tmux-navigator',
   'famiu/bufdelete.nvim',
+  'maxmellon/vim-jsx-pretty',
 
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
@@ -21,7 +22,7 @@ require('lazy').setup({
   { 'aznhe21/actions-preview.nvim', config = require('setup/actions_preview') },
   { 'kevinhwang91/nvim-bqf', ft = 'qf', config = require('setup/nvim_bqf') },
   { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
-  { 'NvChad/nvim-colorizer.lua', event = 'BufEnter', config = true },
+  { 'NvChad/nvim-colorizer.lua', event = 'BufEnter', config = require('setup/nvim_colorizer') },
   { 'lewis6991/gitsigns.nvim', event = 'BufEnter', config = true },
   { 'nmac427/guess-indent.nvim', cmd = 'GuessIndent', config = true },
   {
@@ -75,11 +76,11 @@ require('lazy').setup({
       'jose-elias-alvarez/null-ls.nvim',
 
       -- copilot
-      'zbirenbaum/copilot-cmp',
+      { 'zbirenbaum/copilot-cmp', cmd = 'Copilot' },
       {
         'zbirenbaum/copilot.lua',
         cmd = 'Copilot',
-        event = 'InsertEnter',
+        -- event = 'InsertEnter',
       },
     },
     config = require('setup/lsp_zero'),
@@ -87,6 +88,18 @@ require('lazy').setup({
 
   -- languages
   { 'rust-lang/rust.vim', ft = 'rust' },
+  {
+    'tikhomirov/vim-glsl',
+    ft = {
+      'glsl',
+      'vert',
+      'frag',
+      'geom',
+      'comp',
+      'tesc',
+      'tese',
+    },
+  },
 
   -- color schemes
   'fenetikm/falcon',
