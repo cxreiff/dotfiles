@@ -11,6 +11,9 @@ vim.keymap.set('v', '<leader>k', ':MoveBlock(-1)<CR>', opts)
 vim.keymap.set({ 'n', 'v' }, '<leader>m', ':t.<CR>', opts)
 vim.keymap.set({ 'n', 'v' }, '<leader>;', ':', opts)
 vim.keymap.set('t', '<S-space', '<space><CR>', opts)
+vim.keymap.set({ 'n', 'v', 't' }, '<s-space>', '<space>', opts)
+
+vim.keymap.set({ 'n', 'v', 't' }, '-', ':Oil<CR>', opts)
 
 -- window navigation
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-t>', ':tabnew<CR>', opts)

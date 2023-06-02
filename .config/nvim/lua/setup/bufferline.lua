@@ -5,6 +5,8 @@ return function()
       always_show_bufferline = false,
       custom_filter = function(buf)
         if vim.bo[buf].filetype == 'qf' then return false end
+        if vim.bo[buf].filetype == 'oil' then return false end
+        if vim.bo[buf].filetype == '' then return false end
         return true
       end,
     },
