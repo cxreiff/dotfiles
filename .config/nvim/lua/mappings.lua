@@ -20,6 +20,7 @@ vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-t>', ':tabnew<CR>', opts)
 vim.keymap.set('n', '<leader>t', ':enew<CR>', opts)
 vim.keymap.set('n', '<leader>s', ':vnew<CR>', opts)
 vim.keymap.set('n', '<leader>w', ':Bdelete<CR>', opts)
+vim.keymap.set('n', '<leader>q', ':close<CR>', opts)
 
 -- hopword
 vim.keymap.set({ 'n', 'v' }, '<leader><Space>', require('hop').hint_words, opts)
