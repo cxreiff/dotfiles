@@ -27,7 +27,7 @@ require('lazy').setup({
   {
     'stevearc/oil.nvim',
     dependencies = { 'nvim-tree/nvim-web-devicons' },
-    config = true,
+    opts = { win_options = { concealcursor = "nciv" }},
   },
   {
     'nvim-treesitter/nvim-treesitter',
