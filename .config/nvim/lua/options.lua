@@ -11,7 +11,7 @@ vim.opt.tabstop = 4
 vim.opt.softtabstop = 4
 vim.opt.shiftwidth = 4
 vim.opt.smartindent = true
-vim.opt.scrolloff = 8
+vim.opt.scrolloff = 4
 vim.opt.shm:append('I')
 vim.opt.clipboard:append('unnamedplus')
 

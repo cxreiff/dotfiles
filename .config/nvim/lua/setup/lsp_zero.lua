@@ -2,6 +2,7 @@ return function()
   local lsp = require('lsp-zero').preset('recommended')
   local lspconfig = require('lspconfig')
   local cmp = require('cmp')
+  local luasnip = require('luasnip')
 
   lsp.on_attach(function(_, bufnr)
     lsp.default_keymaps({ buffer = bufnr })
@@ -81,32 +82,32 @@ return function()
     },
   })
 
-  require('copilot').setup({
-    suggestion = {
-      enabled = true,
-      auto_trigger = false,
-      keymap = {
-        accept = '<C-Tab>',
-        dismiss = '<C-Esc>',
-      },
-    },
-    panel = { enabled = false },
-  })
-  require('copilot_cmp').setup()
+  -- require('copilot').setup({
+  --   suggestion = {
+  --     enabled = true,
+  --     auto_trigger = false,
+  --     keymap = {
+  --       accept = '<C-Tab>',
+  --       dismiss = '<C-Esc>',
+  --     },
+  --   },
+  --   panel = { enabled = false },
+  -- })
+  -- require('copilot_cmp').setup()
 
-  vim.keymap.set(
-    'n',
-    '<leader>l',
-    function()
-      if vim.b.copilot_suggestion_auto_trigger then
-        print('Copilot disabled')
-      else
-        print('Copilot enabled')
-      end
-      require('copilot.suggestion').toggle_auto_trigger()
-    end,
-    { noremap = true }
-  )
+  -- vim.keymap.set(
+  --   'n',
+  --   '<leader>l',
+  --   function()
+  --     if vim.b.copilot_suggestion_auto_trigger then
+  --       print('Copilot disabled')
+  --     else
+  --       print('Copilot enabled')
+  --     end
+  --     require('copilot.suggestion').toggle_auto_trigger()
+  --   end,
+  --   { noremap = true }
+  -- )
 
   cmp.setup {
     preselect = cmp.PreselectMode.Item,
@@ -115,10 +116,19 @@ return function()
       completeopt = 'menu,menuone,noinsert',
     },
     mapping = {
+      ['<C-Tab>'] = cmp.mapping(function(fallback)
+        if luasnip.expand_or_locally_jumpable() then
+          luasnip.expand_or_jump()
+        else
+          fallback()
+        end
+      end, { 'i', 's' }),
+
       ['<CR>'] = cmp.mapping.confirm({
         behavior = cmp.ConfirmBehavior.Replace,
         select = false,
       }),
+
       ['<Esc>'] = cmp.mapping(
         function(fallback)
           if cmp.visible() then
@@ -130,6 +140,7 @@ return function()
         end,
         { 'i', 's' }
       ),
+
       ['<C-Space>'] = cmp.mapping.complete(),
     },
     sources = {

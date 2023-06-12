@@ -13,7 +13,7 @@ vim.keymap.set({ 'n', 'v' }, '<leader>;', ':', opts)
 vim.keymap.set('t', '<S-space', '<space><CR>', opts)
 vim.keymap.set({ 'n', 'v', 't' }, '<s-space>', '<space>', opts)
 
-vim.keymap.set({ 'n', 'v' }, '-', ':Oil<CR>', opts)
+vim.keymap.set('n', '-', ':Oil<CR>', opts)
 
 -- window navigation
 vim.keymap.set({ 'n', 'i', 't', 'v' }, '<C-t>', ':tabnew<CR>', opts)

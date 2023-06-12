@@ -27,7 +27,7 @@ require('lazy').setup({
   {
     'stevearc/oil.nvim',
     dependencies = { 'nvim-tree/nvim-web-devicons' },
-    opts = { win_options = { concealcursor = "nciv" }},
+    config = require('setup/oil')
   },
   {
     'nvim-treesitter/nvim-treesitter',
@@ -81,11 +81,7 @@ require('lazy').setup({
 
       -- copilot
       { 'zbirenbaum/copilot-cmp', cmd = 'Copilot' },
-      {
-        'zbirenbaum/copilot.lua',
-        cmd = 'Copilot',
-        -- event = 'InsertEnter',
-      },
+      { 'zbirenbaum/copilot.lua', cmd = 'Copilot' },
     },
     config = require('setup/lsp_zero'),
   },
