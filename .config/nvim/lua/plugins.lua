@@ -14,7 +14,7 @@ require('lazy').setup({
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
-  { 'j-hui/fidget.nvim', config = true, event = 'VeryLazy' },
+  { 'j-hui/fidget.nvim', tag = 'legacy', config = true, event = 'VeryLazy' },
   { 'nvim-lualine/lualine.nvim', config = require('setup/lualine') },
   { 'akinsho/bufferline.nvim', version = 'v3.*', config = require('setup/bufferline') },
   { 'akinsho/toggleterm.nvim', version = "*", config = true },
