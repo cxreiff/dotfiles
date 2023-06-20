@@ -7,7 +7,7 @@ return function()
       additional_vim_regex_highlighting = false,
     },
     incremental_selection = { enable = true },
-    indent = { enable = false },
+    indent = { enable = true, disable = { 'rust' } },
     autotag = { enable = true },
     rainbow = {
       enable = true,
