@@ -732,7 +732,7 @@
 			<key>Window Type</key>
 			<integer>0</integer>
 			<key>Working Directory</key>
-			<string>/Users/jaxreiff</string>
+			<string>/Users/cxreiff</string>
 		</dict>
 		<dict>
 			<key>ASCII Anti Aliased</key>
@@ -1368,7 +1368,7 @@
 			<key>Window Type</key>
 			<integer>5</integer>
 			<key>Working Directory</key>
-			<string>/Users/jaxreiff</string>
+			<string>/Users/cxreiff</string>
 		</dict>
 	</array>
 	<key>OnlyWhenMoreTabs</key>

@@ -7,7 +7,6 @@ zstyle :compinstall filename "$HOME/.zshrc"
 autoload -Uz compinit && compinit
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 
-
 HISTFILE=~/.zsh_history
 HISTSIZE=10000
 SAVEHIST=10000
