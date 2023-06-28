@@ -24,6 +24,7 @@ require('lazy').setup({
   { 'NvChad/nvim-colorizer.lua', event = 'BufEnter', config = require('setup/nvim_colorizer') },
   { 'lewis6991/gitsigns.nvim', event = 'BufEnter', config = true },
   { 'nmac427/guess-indent.nvim', cmd = 'GuessIndent', config = true },
+  { 'petertriho/nvim-scrollbar', config = require('setup/nvim_scrollbar') },
   {
     'stevearc/oil.nvim',
     dependencies = { 'nvim-tree/nvim-web-devicons' },
