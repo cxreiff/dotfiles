@@ -1,7 +1,9 @@
 return function()
+  vim.filetype.add({ extension = { wgsl = "wgsl" }})
+
   require('nvim-treesitter.configs').setup {
     auto_install = true,
-    ensure_installed = { 'rust', 'toml' },
+    ensure_installed = { 'rust', 'toml', 'wgsl' },
     highlight = {
       enable = true,
       additional_vim_regex_highlighting = false,

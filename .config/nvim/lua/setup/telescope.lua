@@ -7,6 +7,12 @@ return function()
         '.git',
         'node_modules',
         'build',
+        '**/*.png',
+        '**/*.ico',
+        '**/*.icns',
+        '**/*.plist',
+        '**/*.otf',
+        '**/*.lock',
       },
       mappings = {
         i = {

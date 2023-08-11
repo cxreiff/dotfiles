@@ -52,3 +52,5 @@ vim.api.nvim_create_autocmd({'FocusGained', 'BufEnter'}, {
   command = 'checktime',
 })
 
+vim.g.neovide_input_macos_alt_is_meta = true
+

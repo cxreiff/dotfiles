@@ -12,7 +12,6 @@ vim.keymap.set({ 'n', 'v' }, '<leader>m', ':t.<CR>', opts)
 vim.keymap.set({ 'n', 'v' }, '<leader>;', ':', opts)
 vim.keymap.set('t', '<S-space', '<space><CR>', opts)
 vim.keymap.set({ 'n', 'v', 't' }, '<s-space>', '<space>', opts)
-
 vim.keymap.set('n', '-', ':Oil<CR>', opts)
 
 -- window navigation
@@ -27,7 +26,6 @@ vim.keymap.set({ 'n', 'v' }, '<leader><Space>', require('hop').hint_words, opts)
 
 -- lsp
 vim.keymap.set('n', '<leader>f', ':LspZeroFormat!<CR>', opts)
-
 
 -- focus mode
 vim.keymap.set('n', '<leader>z', ':TZAtaraxis<CR>', opts)
