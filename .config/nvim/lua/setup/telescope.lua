@@ -4,15 +4,15 @@ return function()
   telescope.setup {
     defaults = {
       file_ignore_patterns = {
-        '.git',
+        '%.git',
         'node_modules',
         'build',
-        '**/*.png',
-        '**/*.ico',
-        '**/*.icns',
-        '**/*.plist',
-        '**/*.otf',
-        '**/*.lock',
+        '**/*%.png',
+        '**/*%.ico',
+        '**/*%.icns',
+        '**/*%.plist',
+        '**/*%.otf',
+        '**/*%.lock',
       },
       mappings = {
         i = {
@@ -25,6 +25,9 @@ return function()
       },
     },
     pickers = {
+      find_files = {
+        hidden = true,
+      },
       buffers = {
         mappings = {
           i = {
