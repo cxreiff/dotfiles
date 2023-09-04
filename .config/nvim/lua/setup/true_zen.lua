@@ -5,9 +5,11 @@ return function()
         callbacks = {
           open_pos = function()
             vim.cmd [[ set showtabline=0 ]]
+            vim.cmd [[ ScrollbarHide ]]
           end,
-          close_post = function()
+          close_pos = function()
             vim.cmd [[ set showtabline=1 ]]
+            vim.cmd [[ ScrollbarShow ]]
           end,
         },
       },
