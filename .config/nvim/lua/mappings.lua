@@ -77,6 +77,32 @@ end
 
 vim.cmd('autocmd! TermOpen term://* lua set_terminal_keymaps()')
 
+-- create splits when navigating beyond last split
+function _G.split_nav(key)
+  local current = vim.fn.winnr()
+  vim.cmd("wincmd " .. key)
+  if current == vim.fn.winnr() then
+    if key == 'j' then
+      vim.cmd("new")
+    elseif key == 'k' then
+      vim.cmd("set nosplitbelow")
+      vim.cmd("new")
+      vim.cmd("set splitbelow")
+    elseif key == 'h' then
+      vim.cmd("set nosplitright")
+      vim.cmd("vnew")
+      vim.cmd("set splitright")
+    elseif key == 'l' then
+      vim.cmd("vnew")
+    end
+    vim.cmd("wincmd " .. key)
+  end
+end
+vim.keymap.set({'n', 'i', 'v', 't'}, '<C-h>', function() _G.split_nav('h') end, opts)
+vim.keymap.set({'n', 'i', 'v', 't'}, '<C-k>', function() _G.split_nav('k') end, opts)
+vim.keymap.set({'n', 'i', 'v', 't'}, '<C-l>', function() _G.split_nav('l') end, opts)
+vim.keymap.set({'n', 'i', 'v', 't'}, '<C-j>', function() _G.split_nav('j') end, opts)
+
 if vim.g.neovide then
   -- Allow clipboard copy paste in neovide
   vim.g.neovide_input_use_logo = 1

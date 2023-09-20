@@ -29,6 +29,17 @@
 			<key>Version</key>
 			<integer>0</integer>
 		</dict>
+		<key>0x20-0x180000-0x31</key>
+		<dict>
+			<key>Action</key>
+			<integer>26</integer>
+			<key>Label</key>
+			<string></string>
+			<key>Text</key>
+			<string>58CFD4CA-EC83-4C4D-92BE-FDD9EDBACF4D</string>
+			<key>Version</key>
+			<integer>1</integer>
+		</dict>
 		<key>0x30-0x140000-0x1d</key>
 		<dict>
 			<key>Action</key>
@@ -699,7 +710,7 @@
 			<key>Mouse Reporting</key>
 			<true/>
 			<key>Name</key>
-			<string>Default</string>
+			<string>default</string>
 			<key>Non Ascii Font</key>
 			<string>Monaco 12</string>
 			<key>Non-ASCII Anti Aliased</key>
@@ -1344,7 +1355,7 @@
 			<key>Mouse Reporting</key>
 			<true/>
 			<key>Name</key>
-			<string>Hotkey Window</string>
+			<string>hotkey</string>
 			<key>Non Ascii Font</key>
 			<string>Monaco 12</string>
 			<key>Non-ASCII Anti Aliased</key>
@@ -1993,7 +2004,7 @@
 			<key>Mouse Reporting</key>
 			<true/>
 			<key>Name</key>
-			<string>Transparent</string>
+			<string>transparent</string>
 			<key>Non Ascii Font</key>
 			<string>Monaco 12</string>
 			<key>Non-ASCII Anti Aliased</key>
@@ -2047,7 +2058,7 @@
 			<key>Terminal Type</key>
 			<string>xterm-256color</string>
 			<key>Transparency</key>
-			<real>0.84651761968085104</real>
+			<real>0.69823803191489364</real>
 			<key>Unlimited Scrollback</key>
 			<false/>
 			<key>Use Bold Font</key>
@@ -2125,5 +2136,7 @@
 	<integer>5</integer>
 	<key>VisualIndicatorForEsc</key>
 	<false/>
+	<key>findMode_iTerm</key>
+	<integer>0</integer>
 </dict>
 </plist>

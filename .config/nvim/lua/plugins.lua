@@ -5,7 +5,6 @@ require('lazy').setup({
   'tpope/vim-surround',
   'tpope/vim-fugitive',
   'tpope/vim-commentary',
-  'tpope/vim-sleuth',
   'fedepujol/move.nvim',
   'christoomey/vim-tmux-navigator',
   'famiu/bufdelete.nvim',
@@ -23,7 +22,7 @@ require('lazy').setup({
   { 'Pocco81/true-zen.nvim', config = require('setup/true_zen') },
   { 'NvChad/nvim-colorizer.lua', event = 'BufEnter', config = require('setup/nvim_colorizer') },
   { 'lewis6991/gitsigns.nvim', event = 'BufEnter', config = true },
-  { 'nmac427/guess-indent.nvim', cmd = 'GuessIndent', config = true },
+  { 'nmac427/guess-indent.nvim', config = true },
   { 'petertriho/nvim-scrollbar', config = require('setup/nvim_scrollbar') },
   {
     'stevearc/oil.nvim',

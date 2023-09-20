@@ -32,6 +32,8 @@ alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 
+alias pnpx='pnpm exec'
+
 if [[ $(uname) = "Darwin" ]]; then
     alias wrk='cd ~/Documents'
 fi
