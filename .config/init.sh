@@ -9,6 +9,10 @@ git_latest_version() {
 
 # installation
 
+echo "\n=== creating developer folder ===\n"
+
+touch ~/Developer
+
 echo "\n=== installing homebrew ===\n"
 
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"

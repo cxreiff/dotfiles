@@ -35,7 +35,7 @@ alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 alias pnpx='pnpm exec'
 
 if [[ $(uname) = "Darwin" ]]; then
-    alias wrk='cd ~/Documents'
+    alias wrk='cd ~/Developer'
 fi
 
 ### PATH
