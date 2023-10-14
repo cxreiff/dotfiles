@@ -37,7 +37,7 @@ require('lazy').setup({
   },
   {
     'nvim-telescope/telescope.nvim',
-    version = '0.1.0',
+    version = '0.1.4',
     event = 'VeryLazy',
     dependencies = {
       'nvim-lua/plenary.nvim',
@@ -49,7 +49,7 @@ require('lazy').setup({
   },
   {
     'VonHeikemen/lsp-zero.nvim',
-    branch = 'v2.x',
+    branch = 'v3.x',
     dependencies = {
       -- lsp support
       'neovim/nvim-lspconfig',
@@ -80,8 +80,8 @@ require('lazy').setup({
       'jose-elias-alvarez/null-ls.nvim',
 
       -- copilot
-      { 'zbirenbaum/copilot-cmp', cmd = 'Copilot' },
-      { 'zbirenbaum/copilot.lua', cmd = 'Copilot' },
+      -- { 'zbirenbaum/copilot-cmp', cmd = 'Copilot' },
+      -- { 'zbirenbaum/copilot.lua', cmd = 'Copilot' },
     },
     config = require('setup/lsp_zero'),
   },

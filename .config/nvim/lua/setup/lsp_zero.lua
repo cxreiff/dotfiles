@@ -1,11 +1,12 @@
 return function()
-  local lsp = require('lsp-zero').preset('recommended')
+  local lsp_zero = require('lsp-zero')
   local lspconfig = require('lspconfig')
-  local cmp = require('cmp')
   local luasnip = require('luasnip')
+  local cmp = require('cmp')
+  local cmp_action = lsp_zero.cmp_action()
 
-  lsp.on_attach(function(_, bufnr)
-    lsp.default_keymaps({ buffer = bufnr })
+  lsp_zero.on_attach(function(_, bufnr)
+    lsp_zero.default_keymaps({ buffer = bufnr })
     local opts = { noremap = true, silent = true }
     vim.keymap.set('n', '<C-Space>', vim.lsp.buf.hover, opts)
     vim.keymap.set('n', 'gp', vim.diagnostic.setloclist, opts)
@@ -29,56 +30,126 @@ return function()
     end
   end)
 
-  lspconfig.rust_analyzer.setup {
-    settings = {
-      ['rust-analyzer'] = {
-        procMacro = {
-          enable = true,
-        },
-        checkOnSave = {
-          command = 'clippy',
-        },
-        diagnostics = {
-          enabled = true,
-          disabled = { "unresolved-proc-macro" },
-          enableExperimental = true,
-          warningsAsHint = {},
-        },
-      },
-    },
-  }
-
-  -- filtering out *.d.ts files from jump-to-definition
-  local function filter(arr, fn)
-    if type(arr) ~= 'table' then
-      return arr
-    end
-    local filtered = {}
-    for k, v in pairs(arr) do
-      if fn(v, k, arr) then
-        table.insert(filtered, v)
-      end
-    end
-    return filtered
-  end
-  local function filterReactDTS(value)
-    return string.match(value.targetUri, '%.d.ts') == nil
-  end
-  lspconfig.tsserver.setup {
+  require('mason').setup({})
+  require('mason-lspconfig').setup({
+    ensure_installed = {},
     handlers = {
-      ['textDocument/definition'] = function(err, result, method, ...)
-        if vim.tbl_islist(result) and #result > 1 then
-          local filtered_result = filter(result, filterReactDTS)
-          return vim.lsp.handlers['textDocument/definition'](err, filtered_result, method, ...)
+      lsp_zero.default_setup,
+      rust_analyzer = function()
+        lspconfig.rust_analyzer.setup {
+          settings = {
+            ['rust-analyzer'] = {
+              procMacro = {
+                enable = true,
+              },
+              checkOnSave = {
+                command = 'clippy',
+              },
+              diagnostics = {
+                enabled = true,
+                disabled = { "unresolved-proc-macro" },
+                enableExperimental = true,
+                warningsAsHint = {},
+              },
+            },
+          },
+        }
+      end,
+      tsserver = function()
+        -- filtering out *.d.ts files from jump-to-definition
+        local function filter(arr, fn)
+          if type(arr) ~= 'table' then
+            return arr
+          end
+          local filtered = {}
+          for k, v in pairs(arr) do
+            if fn(v, k, arr) then
+              table.insert(filtered, v)
+            end
+          end
+          return filtered
         end
-        vim.lsp.handlers['textDocument/definition'](err, result, method, ...)
-      end
+        local function filterReactDTS(value)
+          return string.match(value.targetUri, '%.d.ts') == nil
+        end
+        lspconfig.tsserver.setup {
+          handlers = {
+            ['textDocument/definition'] = function(err, result, method, ...)
+              if vim.tbl_islist(result) and #result > 1 then
+                local filtered_result = filter(result, filterReactDTS)
+                return vim.lsp.handlers['textDocument/definition'](err, filtered_result, method, ...)
+              end
+              vim.lsp.handlers['textDocument/definition'](err, result, method, ...)
+            end
+          }
+        }
+      end,
+      lua_ls = function()
+        lspconfig.lua_ls.setup(lsp_zero.nvim_lua_ls())
+      end,
     }
-  }
+  })
 
-  lspconfig.lua_ls.setup(lsp.nvim_lua_ls())
+  require('null-ls').setup()
+  require('mason-null-ls').setup({
+    handlers = {},
+  })
+  require('mason-nvim-dap').setup({
+    handlers = {},
+  })
 
-  lsp.setup()
+  cmp.setup({
+    formatting = lsp_zero.cmp_format(),
+    preselect = cmp.PreselectMode.Item,
+    completion = {
+      -- autocomplete = false,
+      completeopt = 'menu,menuone,noinsert',
+    },
+    mapping = cmp.mapping.preset.insert({
+      ['<Tab>'] = cmp_action.luasnip_supertab(),
+      ['<S-Tab>'] = cmp_action.luasnip_shift_supertab(),
+      ['<C-Space>'] = cmp_action.toggle_completion(),
+
+      -- ['Tab'] = cmp_action.tab_complete(),
+      -- ['S-Tab'] = cmp_action.select_prev_or_fallback(),
+      -- ['<C-Tab>'] = cmp.mapping(function(fallback)
+      --   if luasnip.expand_or_locally_jumpable() then
+      --     luasnip.expand_or_jump()
+      --   else
+      --     fallback()
+      --   end
+      -- end, { 'i', 's' }),
+
+      ['<CR>'] = cmp.mapping.confirm({
+        behavior = cmp.ConfirmBehavior.Replace,
+        select = false,
+      }),
+
+      ['<Esc>'] = cmp.mapping(
+        function(fallback)
+          if cmp.visible() then
+            cmp.abort()
+            cmp.core:reset()
+          else
+            fallback()
+          end
+        end,
+        { 'i', 's' }
+      ),
+    }),
+    sources = {
+      { name = 'path',     group_index = 1 },
+      { name = 'nvim_lsp', group_index = 1 },
+      -- uncomment and disable copilot suggestions for copilot in cmp
+      -- { name = 'copilot', group_index = 1 },
+      { name = 'luasnip',  keyword_length = 2, group_index = 2 },
+      { name = 'buffer',   keyword_length = 3, group_index = 3 },
+    },
+    experimental = {
+      ghost_text = true,
+    },
+  })
+
 
   vim.diagnostic.config({
     virtual_text = false,
@@ -90,6 +161,8 @@ return function()
       pad_bottom = 1,
     },
   })
+
+  -- COPILOT
 
   -- require('copilot').setup({
   --   suggestion = {
@@ -118,67 +191,12 @@ return function()
   --   { noremap = true }
   -- )
 
-  cmp.setup {
-    preselect = cmp.PreselectMode.Item,
-    completion = {
-      autocomplete = false,
-      completeopt = 'menu,menuone,noinsert',
-    },
-    mapping = {
-      ['<C-Tab>'] = cmp.mapping(function(fallback)
-        if luasnip.expand_or_locally_jumpable() then
-          luasnip.expand_or_jump()
-        else
-          fallback()
-        end
-      end, { 'i', 's' }),
+--   cmp.event:on('menu_opened', function()
+--     vim.g.copilot_suggestion_hidden = true
+--     require('copilot.suggestion').dismiss()
+--   end)
 
-      ['<CR>'] = cmp.mapping.confirm({
-        behavior = cmp.ConfirmBehavior.Replace,
-        select = false,
-      }),
-
-      ['<Esc>'] = cmp.mapping(
-        function(fallback)
-          if cmp.visible() then
-            cmp.abort()
-            cmp.core:reset()
-          else
-            fallback()
-          end
-        end,
-        { 'i', 's' }
-      ),
-
-      ['<C-Space>'] = cmp.mapping.complete(),
-    },
-    sources = {
-      { name = 'path',     group_index = 1 },
-      { name = 'nvim_lsp', group_index = 1 },
-      -- uncomment and disable copilot suggestions for copilot in cmp
-      -- { name = 'copilot', group_index = 1 },
-      { name = 'luasnip',  keyword_length = 2, group_index = 2 },
-      { name = 'buffer',   keyword_length = 3, group_index = 3 },
-    },
-    experimental = {
-      ghost_text = true,
-    },
-  }
-
-  cmp.event:on('menu_opened', function()
-    vim.g.copilot_suggestion_hidden = true
-    require('copilot.suggestion').dismiss()
-  end)
-
-  cmp.event:on('menu_closed', function()
-    vim.g.copilot_suggestion_hidden = false
-  end)
-
-  require('null-ls').setup()
-  require('mason-null-ls').setup({
-    handlers = {},
-  })
-  require('mason-nvim-dap').setup({
-    handlers = {},
-  })
+--   cmp.event:on('menu_closed', function()
+--     vim.g.copilot_suggestion_hidden = false
+--   end)
 end
