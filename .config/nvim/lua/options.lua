@@ -53,4 +53,5 @@ vim.api.nvim_create_autocmd({'FocusGained', 'BufEnter'}, {
 })
 
 vim.g.neovide_input_macos_alt_is_meta = true
+vim.g.splitjoin_html_attributes_bracket_on_new_line = 1
 

@@ -2,12 +2,15 @@ local opts = { noremap = true, silent = true }
 
 vim.keymap.set('n', '<A-j>', ':MoveLine(1)<CR>', opts)
 vim.keymap.set('n', '<A-k>', ':MoveLine(-1)<CR>', opts)
+vim.keymap.set('n', '<A-h>', ':MoveHChar(-1)<CR>', opts)
+vim.keymap.set('n', '<A-l>', ':MoveHChar(1)<CR>', opts)
 vim.keymap.set('v', '<A-j>', ':MoveBlock(1)<CR>', opts)
 vim.keymap.set('v', '<A-k>', ':MoveBlock(-1)<CR>', opts)
-vim.keymap.set('n', '<leader>j', ':MoveLine(1)<CR>', opts)
-vim.keymap.set('n', '<leader>k', ':MoveLine(-1)<CR>', opts)
-vim.keymap.set('v', '<leader>j', ':MoveBlock(1)<CR>', opts)
-vim.keymap.set('v', '<leader>k', ':MoveBlock(-1)<CR>', opts)
+vim.keymap.set('v', '<A-h>', ':MoveHBlock(-1)<CR>', opts)
+vim.keymap.set('v', '<A-l>', ':MoveHBlock(1)<CR>', opts)
+vim.keymap.set('n', '<leader>l', ':MoveWord(1)<CR>', opts)
+vim.keymap.set('n', '<leader>h', ':MoveWord(-1)<CR>', opts)
+
 vim.keymap.set({ 'n', 'v' }, '<leader>m', ':t.<CR>', opts)
 vim.keymap.set({ 'n', 'v' }, '<leader>;', ':', opts)
 vim.keymap.set('t', '<S-space', '<space><CR>', opts)
@@ -23,6 +26,9 @@ vim.keymap.set('n', '<leader>q', ':close<CR>', opts)
 
 -- hopword
 vim.keymap.set({ 'n', 'v' }, '<leader><Space>', require('hop').hint_words, opts)
+
+-- trevj formatting
+vim.keymap.set('n', '<leader>e', require('trevj').format_at_cursor, opts)
 
 -- lsp
 vim.keymap.set('n', '<leader>f', ':LspZeroFormat!<CR>', opts)
@@ -62,8 +68,8 @@ command! -nargs=1 -count=1 Sh <count>TermExec direction="vertical" size=100 cmd=
 cnoreabbrev sh Sh
 ]]
 vim.keymap.set('n', '<leader>n', ':TermCommand<CR>', opts)
-vim.keymap.set('n', '<leader>g', ':TermFloat<CR>', opts)
-vim.keymap.set('n', '<leader>h', ':TermSplit<CR>', opts)
+vim.keymap.set('n', '<leader>k', ':TermFloat<CR>', opts)
+vim.keymap.set('n', '<leader>j', ':TermSplit<CR>', opts)
 
 -- terminal keymaps
 function _G.set_terminal_keymaps()

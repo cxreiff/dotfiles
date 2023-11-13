@@ -1,4 +1,3 @@
-
 local lazy_config = require('setup/lazy_config')
 
 require('lazy').setup({
@@ -13,6 +12,7 @@ require('lazy').setup({
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
+  { 'AckslD/nvim-trevJ.lua', config = true },
   { 'j-hui/fidget.nvim', tag = 'legacy', config = true, event = 'VeryLazy' },
   { 'nvim-lualine/lualine.nvim', config = require('setup/lualine') },
   { 'akinsho/bufferline.nvim', version = 'v3.*', config = require('setup/bufferline') },
@@ -121,4 +121,3 @@ require('lazy').setup({
   'catppuccin/nvim',
   { 'ramojus/mellifluous.nvim', dependencies = { 'rktjmp/lush.nvim' } },
 }, lazy_config)
-

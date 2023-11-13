@@ -1,7 +1,6 @@
 return function()
   local lsp_zero = require('lsp-zero')
   local lspconfig = require('lspconfig')
-  local luasnip = require('luasnip')
   local cmp = require('cmp')
   local cmp_action = lsp_zero.cmp_action()
 
@@ -20,7 +19,8 @@ return function()
       vim.lsp.buf.references { includeDeclaration = false }
     end, opts)
 
-    if vim.bo.filetype == 'rust' then
+    if vim.bo.filetype == 'rust' or
+        vim.bo.filetype == 'cpp' then
       vim.api.nvim_create_autocmd("BufWritePre", {
         buffer = bufnr,
         callback = function()
@@ -102,29 +102,22 @@ return function()
     formatting = lsp_zero.cmp_format(),
     preselect = cmp.PreselectMode.Item,
     completion = {
-      -- autocomplete = false,
+      autocomplete = false,
       completeopt = 'menu,menuone,noinsert',
     },
     mapping = cmp.mapping.preset.insert({
-      ['<Tab>'] = cmp_action.luasnip_supertab(),
-      ['<S-Tab>'] = cmp_action.luasnip_shift_supertab(),
+      -- ['<Tab>'] = cmp_action.luasnip_supertab(),
+      -- ['<S-Tab>'] = cmp_action.luasnip_shift_supertab(),
+
+      ['<Tab>'] = cmp_action.tab_complete(),
+      ['<S-Tab>'] = cmp_action.select_prev_or_fallback(),
+      ['<C-Tab>'] = cmp_action.luasnip_next_or_expand(),
+
       ['<C-Space>'] = cmp_action.toggle_completion(),
-
-      -- ['Tab'] = cmp_action.tab_complete(),
-      -- ['S-Tab'] = cmp_action.select_prev_or_fallback(),
-      -- ['<C-Tab>'] = cmp.mapping(function(fallback)
-      --   if luasnip.expand_or_locally_jumpable() then
-      --     luasnip.expand_or_jump()
-      --   else
-      --     fallback()
-      --   end
-      -- end, { 'i', 's' }),
-
       ['<CR>'] = cmp.mapping.confirm({
         behavior = cmp.ConfirmBehavior.Replace,
         select = false,
       }),
-
       ['<Esc>'] = cmp.mapping(
         function(fallback)
           if cmp.visible() then
@@ -191,12 +184,12 @@ return function()
   --   { noremap = true }
   -- )
 
---   cmp.event:on('menu_opened', function()
---     vim.g.copilot_suggestion_hidden = true
---     require('copilot.suggestion').dismiss()
---   end)
+  --   cmp.event:on('menu_opened', function()
+  --     vim.g.copilot_suggestion_hidden = true
+  --     require('copilot.suggestion').dismiss()
+  --   end)
 
---   cmp.event:on('menu_closed', function()
---     vim.g.copilot_suggestion_hidden = false
---   end)
+  --   cmp.event:on('menu_closed', function()
+  --     vim.g.copilot_suggestion_hidden = false
+  --   end)
 end

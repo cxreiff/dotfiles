@@ -17,6 +17,7 @@ cask "1password"
 cask "1password-cli"
 cask "iterm2"
 cask "sublime-text"
+cask "sequel-ace"
 cask "dwarf-fortress"
 
 cask "font-gohufont-nerd-font"

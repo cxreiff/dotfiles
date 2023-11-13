@@ -27,6 +27,7 @@ fi
 
 alias zrl='nvim ~/.zshrc.local && ~/.zshrc.local'
 alias zrc='nvim ~/.zshrc && source ~/.zshrc'
+alias crc='nvim ~/.config/'
 alias vrc='nvim ~/.vimrc'
 alias nrc='nvim ~/.config/nvim/lua'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
@@ -56,3 +57,11 @@ export PATH="$PNPM_HOME:$PATH"
 
 [[ -f $HOME/.zshrc.local ]] && source $HOME/.zshrc.local 
 
+
+# pnpm
+export PNPM_HOME="/Users/cxreiff/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
