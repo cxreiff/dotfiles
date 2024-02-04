@@ -20,7 +20,9 @@ return function()
     end, opts)
 
     if vim.bo.filetype == 'rust' or
-        vim.bo.filetype == 'cpp' then
+        vim.bo.filetype == 'cpp' or
+        vim.bo.filetype == 'typescript' or
+        vim.bo.filetype == 'typescriptreact' then
       vim.api.nvim_create_autocmd("BufWritePre", {
         buffer = bufnr,
         callback = function()
@@ -90,13 +92,21 @@ return function()
     }
   })
 
-  require('null-ls').setup()
-  require('mason-null-ls').setup({
-    handlers = {},
-  })
-  require('mason-nvim-dap').setup({
-    handlers = {},
-  })
+
+  -- local null_ls = require('null-ls')
+  -- null_ls.setup({
+  --   sources = {
+  --     null_ls.builtins.formatting.clang_format,
+  --     null_ls.builtins.formatting.prettier,
+  --   }
+  -- })
+  -- require('mason-null-ls').setup({
+  --   ensure_installed = nil,
+  --   automatic_installation = true,
+  -- })
+  -- require('mason-nvim-dap').setup({
+  --   handlers = {},
+  -- })
 
   cmp.setup({
     formatting = lsp_zero.cmp_format(),

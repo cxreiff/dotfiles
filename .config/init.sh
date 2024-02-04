@@ -31,13 +31,13 @@ echo "\n=== installing rust ===\n"
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-echo "\n=== installing node ===\n"
-
-fnm install --lts
-
 echo "\n=== installing pnpm ===\n"
 
 curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+echo "\n=== installing node ===\n"
+
+pnpm env use --global lts
 
 echo "\n=== installing vim-plug ===\n"
 

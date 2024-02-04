@@ -7,7 +7,6 @@ require('lazy').setup({
   'fedepujol/move.nvim',
   'christoomey/vim-tmux-navigator',
   'famiu/bufdelete.nvim',
-  'maxmellon/vim-jsx-pretty',
 
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
@@ -50,15 +49,11 @@ require('lazy').setup({
   {
     'VonHeikemen/lsp-zero.nvim',
     branch = 'v3.x',
+    event = 'VeryLazy',
     dependencies = {
       -- lsp support
       'neovim/nvim-lspconfig',
-      {
-        'williamboman/mason.nvim',
-        build = function()
-          pcall(vim.cmd, 'MasonUpdate')
-        end,
-      },
+      'williamboman/mason.nvim',
       'williamboman/mason-lspconfig.nvim',
 
       -- autocompletion
@@ -72,12 +67,12 @@ require('lazy').setup({
       'L3MON4D3/LuaSnip',
 
       -- dap
-      'mfussenegger/nvim-dap',
-      'jay-babu/mason-nvim-dap.nvim',
+      -- 'mfussenegger/nvim-dap',
+      -- 'jay-babu/mason-nvim-dap.nvim',
 
       -- null_ls
-      'jay-babu/mason-null-ls.nvim',
-      'jose-elias-alvarez/null-ls.nvim',
+      -- 'jay-babu/mason-null-ls.nvim',
+      -- 'nvimtools/none-ls.nvim',
 
       -- copilot
       -- { 'zbirenbaum/copilot-cmp', cmd = 'Copilot' },

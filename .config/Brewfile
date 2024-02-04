@@ -8,7 +8,6 @@ brew "tmux"
 brew "irssi"
 brew "ripgrep"
 brew "fd"
-brew "fnm"
 brew "curl"
 brew "wget"
 

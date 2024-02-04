@@ -25,6 +25,7 @@ fi
 
 ### ALIASES
 
+alias vi='nvim'
 alias zrl='nvim ~/.zshrc.local && ~/.zshrc.local'
 alias zrc='nvim ~/.zshrc && source ~/.zshrc'
 alias crc='nvim ~/.config/'
@@ -44,8 +45,6 @@ fi
 [[ -d /opt/homebrew/bin ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
 [[ -d /home/linuxbrew/.linuxbrew/bin ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 [[ -d /home/linuxbrew/bin ]] && eval "$(/home/linuxbrew/bin/brew shellenv)"
-
-eval "$(fnm env --use-on-cd)"
 
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.bin:$PATH"
