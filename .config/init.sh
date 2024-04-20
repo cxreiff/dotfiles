@@ -25,6 +25,7 @@ echo "=== installing homebrew ==="
 echo
 
 if linux; then
+    sudo apt update
     sudo apt install build-essential procps curl file git
 fi
 
