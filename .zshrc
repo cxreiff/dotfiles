@@ -43,15 +43,11 @@ alias dnew='doctl compute droplet create \
     --vpc-uuid d69e3d9a-5190-4737-8488-c4d623e43ab1 \
     --ssh-keys 41711859\
     cloud'
+alias dlist='doctl compute droplet list'
 alias dssh='doctl compute ssh cloud --ssh-key-path ~/.ssh/id_ed25519'
 alias dsshx='dssh --ssh-command'
 alias dinit='dsshx "\
-    touch ~/.hushlogin &&\
-    sudo apt update &&\
-    sudo apt install git &&\
-    git clone --bare git@github.com:cxreiff/dotfiles.git $HOME/.dotfiles &&\
-    git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME checkout &&\
-    git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME config --local status.showUntrackedFiles no\
+    curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /bin/bash\
     "'
 alias dkill='doctl compute droplet delete cloud'
 
