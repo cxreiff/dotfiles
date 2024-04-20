@@ -32,16 +32,20 @@ fi
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew tap Homebrew/bundle
 
+if linux; then
+    (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/cxreiff/.bashrc
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+
 echo
 echo "=== authenticating with github ==="
 echo
 
-brew install gh
 read -p "github token: " -s token; echo
 read -p "ssh passphrase: " -s passphrase; echo
 read -p "device title: " -s title; echo
 echo $token | gh auth login --with-token
-ssh-keygen -t ed25519 -C "cooper@cxreiff.com" -N "$passphrase" -f github
+ssh-keygen -t ed25519 -C "cooper@cxreiff.com" -N "$passphrase" -f ~/.ssh/github
 eval "$(ssh-agent -s)"
 gh ssh-key add ~/.ssh/github.pub -t "$title"
 
@@ -52,7 +56,7 @@ if macos; then
         IdentityFile ~/.ssh/github" > ~/.ssh/config
     echo $passphrase | ssh-add --apple-use-keychain ~/.ssh/github
 else
-    echo $passphrase | ssh-add -p ~/.ssh/github
+    echo $passphrase | ssh-add ~/.ssh/github
 fi
 
 echo

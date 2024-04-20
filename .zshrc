@@ -42,13 +42,12 @@ alias dnew='doctl compute droplet create \
     --region sfo3 \
     --vpc-uuid d69e3d9a-5190-4737-8488-c4d623e43ab1 \
     --ssh-keys 41711859\
+    --user-data-file ~/.config/dropletconfig.yaml \
     cloud'
 alias dlist='doctl compute droplet list'
-alias dssh='doctl compute ssh cloud --ssh-key-path ~/.ssh/id_ed25519'
-alias dsshx='dssh --ssh-command'
-alias dinit='dsshx "\
-    curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /usr/bin/bash\
-    "'
+alias dsshr='doctl compute ssh cloud --ssh-key-path ~/.ssh/id_ed25519'
+alias dinit='dsshr --ssh-command "cp -rf ~/.ssh/authorized_keys /home/cxreiff/.ssh/authorized_keys"'
+alias dssh='doctl compute ssh cloud --ssh-key-path ~/.ssh/id_ed25519 --ssh-user cxreiff'
 alias dkill='doctl compute droplet delete cloud'
 
 if [[ $(uname) = "Darwin" ]]; then

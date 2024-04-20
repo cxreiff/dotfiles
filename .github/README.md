@@ -7,3 +7,5 @@ Personal dotfiles for unix home directories, managed in source control via bare 
 
 ```curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /usr/bin/bash```
 
+github token needs `repo`, `read:org`, and `gist`.
+
