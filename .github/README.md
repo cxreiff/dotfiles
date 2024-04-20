@@ -3,5 +3,7 @@ Personal dotfiles for unix home directories, managed in source control via bare 
 
 ### setup
 
-To be added. For now, refer to this: https://www.atlassian.com/git/tutorials/dotfiles
+- https://www.atlassian.com/git/tutorials/dotfiles
+
+```curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /usr/bin/bash```
 

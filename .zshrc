@@ -47,7 +47,7 @@ alias dlist='doctl compute droplet list'
 alias dssh='doctl compute ssh cloud --ssh-key-path ~/.ssh/id_ed25519'
 alias dsshx='dssh --ssh-command'
 alias dinit='dsshx "\
-    curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /bin/bash\
+    curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /usr/bin/bash\
     "'
 alias dkill='doctl compute droplet delete cloud'
 
