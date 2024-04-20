@@ -92,7 +92,6 @@ return function()
     }
   })
 
-
   -- local null_ls = require('null-ls')
   -- null_ls.setup({
   --   sources = {
@@ -103,9 +102,6 @@ return function()
   -- require('mason-null-ls').setup({
   --   ensure_installed = nil,
   --   automatic_installation = true,
-  -- })
-  -- require('mason-nvim-dap').setup({
-  --   handlers = {},
   -- })
 
   cmp.setup({

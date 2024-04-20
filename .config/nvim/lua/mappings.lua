@@ -68,8 +68,8 @@ command! -nargs=1 -count=1 Sh <count>TermExec direction="vertical" size=100 cmd=
 cnoreabbrev sh Sh
 ]]
 vim.keymap.set('n', '<leader>n', ':TermCommand<CR>', opts)
-vim.keymap.set('n', '<leader>k', ':TermFloat<CR>', opts)
-vim.keymap.set('n', '<leader>j', ':TermSplit<CR>', opts)
+vim.keymap.set('n', '<leader>j', ':TermFloat<CR>', opts)
+vim.keymap.set('n', '<leader>k', ':TermSplit<CR>', opts)
 
 -- terminal keymaps
 function _G.set_terminal_keymaps()

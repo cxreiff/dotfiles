@@ -4,10 +4,10 @@ require('lazy').setup({
   'tpope/vim-surround',
   'tpope/vim-fugitive',
   'tpope/vim-commentary',
-  'fedepujol/move.nvim',
   'christoomey/vim-tmux-navigator',
   'famiu/bufdelete.nvim',
 
+  { 'fedepujol/move.nvim', config = true },
   { 'folke/which-key.nvim', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
@@ -65,10 +65,6 @@ require('lazy').setup({
 
       -- snippets
       'L3MON4D3/LuaSnip',
-
-      -- dap
-      -- 'mfussenegger/nvim-dap',
-      -- 'jay-babu/mason-nvim-dap.nvim',
 
       -- null_ls
       -- 'jay-babu/mason-null-ls.nvim',

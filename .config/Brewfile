@@ -10,6 +10,7 @@ brew "ripgrep"
 brew "fd"
 brew "curl"
 brew "wget"
+brew "doctl"
 
 cask "firefox"
 cask "1password"
