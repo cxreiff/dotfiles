@@ -52,6 +52,13 @@ vim.api.nvim_create_autocmd({'FocusGained', 'BufEnter'}, {
   command = 'checktime',
 })
 
+-- support for sway config
+vim.filetype.add({
+  extension = {
+    swayconfig = 'swayconfig'
+  },
+})
+
 vim.g.neovide_input_macos_alt_is_meta = true
 vim.g.splitjoin_html_attributes_bracket_on_new_line = 1
 
