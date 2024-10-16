@@ -1,5 +1,8 @@
 local opts = { noremap = true, silent = true }
 
+vim.keymap.set({'v'}, 'p', 'P', opts);
+vim.keymap.set({'v'}, 'P', 'p', opts);
+
 vim.keymap.set('n', '<A-j>', ':MoveLine(1)<CR>', opts)
 vim.keymap.set('n', '<A-k>', ':MoveLine(-1)<CR>', opts)
 vim.keymap.set('n', '<A-h>', ':MoveHChar(-1)<CR>', opts)

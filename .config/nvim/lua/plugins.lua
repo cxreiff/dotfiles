@@ -8,7 +8,7 @@ require('lazy').setup({
   'famiu/bufdelete.nvim',
 
   { 'fedepujol/move.nvim', config = true },
-  { 'folke/which-key.nvim', config = require('setup/which_key') },
+  { 'folke/which-key.nvim', event = 'VeryLazy', config = require('setup/which_key') },
   { 'phaazon/hop.nvim', branch = 'v2', cmd = 'HopWord', config = true },
   { 'windwp/nvim-autopairs', config = true },
   { 'AckslD/nvim-trevJ.lua', config = true },
@@ -79,6 +79,7 @@ require('lazy').setup({
 
   -- languages
   { 'rust-lang/rust.vim', ft = 'rust' },
+  { 'kaarmu/typst.vim', ft = 'typst' },
   {
     'tikhomirov/vim-glsl',
     ft = {

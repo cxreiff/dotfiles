@@ -30,7 +30,6 @@ if linux; then
 fi
 
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew tap Homebrew/bundle
 
 if linux; then
     (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/cxreiff/.bashrc
@@ -63,12 +62,11 @@ echo
 echo "=== cloning dotfiles ==="
 echo
 
-alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 git clone --bare git@github.com:cxreiff/dotfiles.git $HOME/.dotfiles
 mkdir -p .dotbackup
 config checkout 2>&1 | egrep "\s+\." | awk {'print $1'} | xargs -I{} mv {} .dotbackup/{}
-dotfiles checkout
-dotfiles config --local status.showUntrackedFiles no
+/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME checkout
+/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME config --local status.showUntrackedFiles no
 
 echo
 echo "=== installing brews ==="
@@ -136,6 +134,12 @@ elif linux; then
     echo
 
     touch ~/.hushlogin
+
+    echo
+    echo "=== changing shell to zsh ==="
+    echo
+
+    sudo chsh -s /usr/bin/zsh cxreiff
 fi
 
 echo

@@ -57,7 +57,7 @@ return function()
           },
         }
       end,
-      tsserver = function()
+      ts_ls = function()
         -- filtering out *.d.ts files from jump-to-definition
         local function filter(arr, fn)
           if type(arr) ~= 'table' then
@@ -74,7 +74,7 @@ return function()
         local function filterReactDTS(value)
           return string.match(value.targetUri, '%.d.ts') == nil
         end
-        lspconfig.tsserver.setup {
+        lspconfig.ts_ls.setup {
           handlers = {
             ['textDocument/definition'] = function(err, result, method, ...)
               if vim.tbl_islist(result) and #result > 1 then

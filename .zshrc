@@ -25,6 +25,7 @@ fi
 
 ### ALIASES
 
+alias ls='ls -F'
 alias vi='nvim'
 alias zrl='nvim ~/.zshrc.local && ~/.zshrc.local'
 alias zrc='nvim ~/.zshrc && source ~/.zshrc'
@@ -36,9 +37,11 @@ alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 
 alias pnpx='pnpm exec'
 
+alias note='nvim note_$(date +'%Y_%m_%d').txt'
+
 alias dnew='doctl compute droplet create \
     --image debian-12-x64 \
-    --size s-1vcpu-512mb-10gb \
+    --size s-1vcpu-1gb-35gb-intel \
     --region sfo3 \
     --vpc-uuid d69e3d9a-5190-4737-8488-c4d623e43ab1 \
     --ssh-keys 41711859\
@@ -78,3 +81,14 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
+
+
+# ttysvr
+#
+# call with `svr [variant] [seconds]`
+# e.g. `svr maze 1000` for maze screensaver after 1000 seconds.
+#
+svr() { TMOUT=$2; trap "ttysvr $1; zle reset-prompt" ALRM }
+svr_off() { TMOUT=0 }
+# ttysvr end
+
