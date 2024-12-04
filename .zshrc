@@ -37,6 +37,7 @@ alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 
 alias pnpx='pnpm exec'
+alias we='watchexec --wrap-process=session'
 
 alias note='nvim note_$(date +'%Y_%m_%d').txt'
 
