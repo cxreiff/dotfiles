@@ -5,6 +5,7 @@ return {
         "williamboman/mason.nvim",
         "williamboman/mason-lspconfig.nvim",
     },
+    event = "VeryLazy",
     config = function()
         vim.diagnostic.config({
             virtual_text = false,
