@@ -27,17 +27,20 @@ fi
 
 alias ls='ls -F'
 alias vi='nvim'
+alias ze='zellij'
+alias zeh='zellij --layout default'
 alias zrl='nvim ~/.zshrc.local && ~/.zshrc.local'
 alias zrc='nvim ~/.zshrc && source ~/.zshrc'
 alias src='nvim ~/.config/sway'
 alias crc='nvim ~/.config/'
 alias vrc='nvim ~/.vimrc'
+alias jrc='nvim ~/.config/zellij/config.kdl'
 alias nrc='nvim ~/.config/nvim/lua'
-alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
+alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 
-alias pnpx='pnpm exec'
 alias we='watchexec --wrap-process=session'
+alias pnpx='pnpm exec'
 
 alias note='nvim note_$(date +'%Y_%m_%d').txt'
 

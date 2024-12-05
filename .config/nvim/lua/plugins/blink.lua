@@ -20,6 +20,9 @@ return {
             ["<S-Tab>"] = { "select_prev", "snippet_backward", "fallback" },
             ["<C-Tab>"] = { "show", "fallback" },
 
+            ['<PageUp>'] = { 'scroll_documentation_up', 'fallback' },
+            ['<PageDown>'] = { 'scroll_documentation_down', 'fallback' },
+
             ["<CR>"] = { "accept", "fallback" },
             ["<Esc>"] = {
                 "cancel",
@@ -55,7 +58,7 @@ return {
         },
 
         signature = {
-            enabled = true
+            enabled = false
         },
     },
 }

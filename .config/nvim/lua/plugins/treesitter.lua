@@ -9,7 +9,7 @@ return {
             enable = true,
         },
         incremental_selection = { enable = true },
-        indent = { enable = true, disable = { "rust" } },
+        indent = { enable = true },
         autotag = { enable = true },
         rainbow = {
             enable = true,
