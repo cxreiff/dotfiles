@@ -50,5 +50,6 @@
   "vim-hybrid": { "branch": "master", "commit": "cc58baabeabc7b83768e25b852bf89c34756bf90" },
   "vim-surround": { "branch": "master", "commit": "3d188ed2113431cf8dac77be61b842acb64433d9" },
   "vim-vice": { "branch": "master", "commit": "63062328019aeef69d4e4bf5284897c682008fe3" },
+  "wgsl.vim": { "branch": "main", "commit": "fdf91e11243266dfe923fc08c2fc9749429bc5aa" },
   "which-key.nvim": { "branch": "main", "commit": "9b365a6428a9633e3eeb34dbef1b791511c54f70" }
 }

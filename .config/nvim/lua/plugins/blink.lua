@@ -9,7 +9,6 @@ return {
         keymap = {
             ["<Tab>"] = {
                 "select_next",
-                "snippet_forward", -- consider moving this to replace 'show' in C-Tab
                 function(cmp)
                     if require("utils").has_words_before() then
                         return cmp.show()
@@ -18,7 +17,7 @@ return {
                 "fallback",
             },
             ["<S-Tab>"] = { "select_prev", "snippet_backward", "fallback" },
-            ["<C-Tab>"] = { "show", "fallback" },
+            ["<C-Tab>"] = { "snippet_forward", "show", "fallback" },
 
             ["<PageUp>"] = { "scroll_documentation_up", "fallback" },
             ["<PageDown>"] = { "scroll_documentation_down", "fallback" },

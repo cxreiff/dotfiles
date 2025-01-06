@@ -10,6 +10,9 @@ vim.keymap.set({ "n", "v" }, "<leader>;", ":", opts)
 -- duplicate line
 vim.keymap.set({ "n", "v" }, "<leader>m", ":t.<cr>", opts)
 
+-- kill watchexec
+vim.keymap.set({ "n", "v" }, "<leader>d", ":silent ! killall watchexec<CR>", opts)
+
 -- window navigation
 vim.keymap.set({ "n", "i", "t", "v" }, "<C-t>", ":tabnew<cr>", opts)
 vim.keymap.set("n", "<leader>t", ":enew<cr>", opts)

@@ -52,7 +52,7 @@ return {
         { "<leader>x", "<cmd>Telescope commands<cr>" },
         { "<leader>c", "<cmd>Telescope colorscheme<cr>" },
         { "<leader>v", "<cmd>Telescope termfinder<cr>" },
-        { "<leader>d", "<cmd>Telescope lsp_definitions<cr>" },
+        { "<leader>l", "<cmd>Telescope lsp_definitions<cr>" },
         { "<leader>r", "<cmd>Telescope lsp_references<cr>" },
         { "<leader>y", "<cmd>Telescope diagnostics<cr>" },
         { "<leader>u", "<cmd>Telescope lsp_document_symbols<cr>" },

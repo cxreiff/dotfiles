@@ -39,7 +39,9 @@ alias nrc='nvim ~/.config/nvim/lua'
 alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
 
-alias we='watchexec --wrap-process=session'
+# alias we='watchexec --wrap-process=session --no-process-group --restart'
+alias we='watchexec --no-process-group --restart'
+alias wer='we -e rs,toml,ron,wgsl'
 alias pnpx='pnpm exec'
 
 alias note='nvim note_$(date +'%Y_%m_%d').txt'

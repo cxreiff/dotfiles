@@ -7,6 +7,7 @@ return {
     -- languages
     { "rust-lang/rust.vim", ft = "rust" },
     { "kaarmu/typst.vim", ft = "typst" },
+    { "DingDean/wgsl.vim", ft = "wgsl" },
     {
         "tikhomirov/vim-glsl",
         ft = {
