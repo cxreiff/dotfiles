@@ -14,6 +14,7 @@ setopt appendhistory
 
 export EDITOR=nvim
 export LANG=en_US.UTF-8
+export TERM=ansi
 
 if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
@@ -38,6 +39,8 @@ alias jrc='nvim ~/.config/zellij/config.kdl'
 alias nrc='nvim ~/.config/nvim/lua'
 alias init='chmod u+x ~/.config/init.sh && ~/.config/init.sh'
 alias dotfiles='/usr/bin/git --git-dir=$HOME/.dotfiles/ --work-tree=$HOME'
+
+alias sshag='eval `ssh-agent -s` && ssh-add ~/.ssh/github'
 
 # alias we='watchexec --wrap-process=session --no-process-group --restart'
 alias we='watchexec --no-process-group --restart'
