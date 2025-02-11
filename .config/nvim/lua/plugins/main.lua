@@ -1,13 +1,13 @@
 return {
     "tpope/vim-surround",
     "tpope/vim-commentary",
-    { "j-hui/fidget.nvim", version = "v1.*", event = "VeryLazy", opts = {} },
-    { "folke/lazydev.nvim", version = "v1.*", ft = "lua", opts = {} },
+    { "j-hui/fidget.nvim",  version = "v1.*", event = "VeryLazy", opts = {} },
+    { "folke/lazydev.nvim", version = "v1.*", ft = "lua",         opts = {} },
 
     -- languages
     { "rust-lang/rust.vim", ft = "rust" },
-    { "kaarmu/typst.vim", ft = "typst" },
-    { "DingDean/wgsl.vim", ft = "wgsl" },
+    { "kaarmu/typst.vim",   ft = "typst" },
+    { "DingDean/wgsl.vim",  ft = "wgsl" },
     {
         "tikhomirov/vim-glsl",
         ft = {

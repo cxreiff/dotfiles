@@ -12,6 +12,9 @@ return {
             view_options = {
                 show_hidden = true,
             },
+            columns = {
+                "icon",
+            },
         },
         keys = {
             { "-", "<cmd>Oil<cr>", desc = "open parent directory" },

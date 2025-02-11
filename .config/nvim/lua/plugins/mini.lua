@@ -4,7 +4,8 @@ return {
     config = function()
         require("mini.basics").setup()
         require("mini.bufremove").setup()
-        require("mini.pairs").setup()
+        require("mini.icons").setup()
+        -- require("mini.pairs").setup()
         require('mini.move').setup()
 
         require("mini.diff").setup {

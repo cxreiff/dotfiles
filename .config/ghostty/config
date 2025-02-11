@@ -1,0 +1,14 @@
+theme = niji
+
+cursor-style = block
+cursor-style-blink = false
+shell-integration-features = no-cursor
+
+window-padding-x = 8
+window-padding-y = 8
+
+keybind = global:alt+space=toggle_quick_terminal
+
+quick-terminal-position = bottom
+quick-terminal-animation-duration = 0
+quick-terminal-autohide = false
