@@ -14,11 +14,11 @@ return {
         -- set mappings for inside terminal
         function _G.set_terminal_keymaps()
             local opts = {buffer = 0}
-            vim.keymap.set("t", "<ESC>", [[<C-\><C-n>:q<CR>]], term_opts)
-            vim.keymap.set("t", "<C-h>", [[<Cmd>wincmd h<CR>]], term_opts)
-            vim.keymap.set("t", "<C-j>", [[<Cmd>wincmd j<CR>]], term_opts)
-            vim.keymap.set("t", "<C-k>", [[<Cmd>wincmd k<CR>]], term_opts)
-            vim.keymap.set("t", "<C-l>", [[<Cmd>wincmd l<CR>]], term_opts)
+            vim.keymap.set("t", "<ESC>", [[<C-\><C-n>:q<CR>]], opts)
+            vim.keymap.set("t", "<C-h>", [[<Cmd>wincmd h<CR>]], opts)
+            vim.keymap.set("t", "<C-j>", [[<Cmd>wincmd j<CR>]], opts)
+            vim.keymap.set("t", "<C-k>", [[<Cmd>wincmd k<CR>]], opts)
+            vim.keymap.set("t", "<C-l>", [[<Cmd>wincmd l<CR>]], opts)
         end
         vim.cmd("autocmd! TermOpen term://* lua set_terminal_keymaps()")
 
@@ -29,9 +29,10 @@ return {
         })
 
         -- mappings (not in lazy.nvim keys list because of count functionality)
+        local opts = { noremap = true, silent = true }
         vim.cmd [[
-            command! -count=1 TermFloat <count>ToggleTerm direction="float"<CR>
-            command! -count=1 TermSplit <count>ToggleTerm direction="vertical"<CR>
+            command! -count=0 TermFloat <count>ToggleTerm direction="float"<CR>
+            command! -count=0 TermSplit <count>ToggleTerm direction="vertical"<CR>
         ]]
         vim.keymap.set("n", "<leader>j", ":TermFloat<CR>", opts)
         vim.keymap.set("n", "<leader>k", ":TermSplit<CR>", opts)

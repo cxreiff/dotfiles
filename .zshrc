@@ -14,9 +14,8 @@ setopt appendhistory
 
 export EDITOR=nvim
 export LANG=en_US.UTF-8
-export TERM=ansi
 
-if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
+# if [ "$TERM" = xterm ]; then TERM=xterm-256color; fi
 
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
     export PROMPT='%F{cyan}%n@cloud %f%1~ %# '
@@ -33,6 +32,7 @@ alias zeh='zellij --layout default'
 alias zrl='nvim ~/.zshrc.local && ~/.zshrc.local'
 alias zrc='nvim ~/.zshrc && source ~/.zshrc'
 alias grc='nvim ~/.config/ghostty/config'
+alias arc='nvim ~/.config/alacritty/alacritty.toml'
 alias src='nvim ~/.config/sway'
 alias crc='nvim ~/.config/'
 alias vrc='nvim ~/.vimrc'

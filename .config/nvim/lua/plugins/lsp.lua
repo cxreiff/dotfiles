@@ -42,7 +42,7 @@ return {
                 vim.keymap.set("n", "<leader>e", "<cmd>lua vim.lsp.buf.rename()<cr>", opts)
                 vim.keymap.set("n", "gr", "<cmd>lua vim.lsp.buf.references({includeDeclaration = false})<cr>", opts)
                 vim.keymap.set("n", "gl", "<cmd>lua vim.diagnostic.open_float({ alwaysSource = true })<cr>", opts)
-                vim.keymap.set({"n", "x"}, "<leader>f", "<cmd>lua vim.lsp.buf.format({async = false})<cr>", opts)
+                vim.keymap.set({ "n", "x" }, "<leader>f", "<cmd>lua vim.lsp.buf.format({async = false})<cr>", opts)
 
                 if vim.bo.filetype == "rust" or
                     vim.bo.filetype == "cpp" or
@@ -69,7 +69,6 @@ return {
                     require("lspconfig")[server_name].setup({})
                 end,
                 ["rust_analyzer"] = function()
-
                     -- TODO: remove when neovim 0.11 is released
                     -- filters out error messages from rust-analyzer cancelling requests.
                     for _, method in ipairs({ "textDocument/diagnostic", "workspace/diagnostic" }) do

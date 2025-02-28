@@ -18,14 +18,29 @@ return {
             },
             ["<S-Tab>"] = { "select_prev", "snippet_backward", "fallback" },
             ["<C-Tab>"] = { "snippet_forward", "show", "fallback" },
+            ["<C-`>"] = { "show" },
 
             ["<PageUp>"] = { "scroll_documentation_up", "fallback" },
             ["<PageDown>"] = { "scroll_documentation_down", "fallback" },
 
             ["<CR>"] = { "accept", "fallback" },
-            ["<Esc>"] = {
-                "cancel",
-                "fallback",
+
+            ["<Esc>"] = { "cancel", "fallback" },
+
+            cmdline = {
+                ["<Esc>"] = {
+                    function(cmp)
+                        if cmp.is_visible() then
+                            cmp.cancel()
+                        else
+                            vim.api.nvim_feedkeys(
+                                vim.api.nvim_replace_termcodes("<C-c>", true, true, true),
+                                "n",
+                                true
+                            )
+                        end
+                    end,
+                },
             },
         },
 
@@ -39,7 +54,7 @@ return {
             },
             menu = {
                 draw = {
-                    treesitter = true,
+                    treesitter = { "lsp" },
                 },
             },
             trigger = {
@@ -54,10 +69,25 @@ return {
             ghost_text = {
                 enabled = false,
             },
+            list = {
+                selection = {
+                    preselect = true,
+                    auto_insert = false,
+                },
+            },
         },
 
         signature = {
             enabled = false
+        },
+
+        sources = {
+            default = {
+                "lsp",
+                "path",
+                "snippets",
+                "buffer",
+            },
         },
     },
 }
