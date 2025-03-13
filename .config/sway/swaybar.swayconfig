@@ -1,0 +1,20 @@
+
+### swaybar (`man 5 sway-bar`)
+
+bar {
+    position bottom
+
+    status_command SCRIPT_DIR=~/.config/i3blocks i3blocks
+
+    colors {
+        background         $base
+        statusline         $text
+        focused_statusline $text
+        focused_separator  $base
+        focused_workspace  $base $base $green
+        active_workspace   $base $base $blue
+        inactive_workspace $base $base $surface1
+        urgent_workspace   $base $base $surface1
+        binding_mode       $base $base $surface1
+    }
+}

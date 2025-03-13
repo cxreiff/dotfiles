@@ -1,0 +1,21 @@
+include themes/catppuccin-mocha
+
+set $clear #00000000
+
+font pango:monospace 12px 
+default_border pixel 2
+titlebar_border_thickness 0
+gaps outer 3
+gaps inner 6
+smart_gaps on
+
+# target                 title     bg        text   indicator  border
+client.focused           $clear    $surface1 $clear $rosewater $surface1
+client.focused_inactive  $clear    $base     $clear $rosewater $mantle
+client.unfocused         $clear    $base     $clear $rosewater $mantle
+client.urgent            $peach    $base     $peach $overlay0  $peach
+client.placeholder       $overlay0 $base     $text  $overlay0  $overlay0
+client.background        $base
+
+# wallpaper
+output * bg ~/Downloads/1714073069449447.png fill
