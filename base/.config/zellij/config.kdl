@@ -38,6 +38,7 @@ keybinds clear-defaults=true {
     tmux {
         bind "Ctrl z" { Write 2; SwitchToMode "Normal"; }
         bind "Ctrl q" { Quit; }
+        bind "Ctrl w" { CloseTab; SwitchToMode "Normal"; }
 
         bind "Tab" { ToggleTab; }
 
@@ -211,7 +212,7 @@ plugins {
 
 ui {
     pane_frames {
-        hide_session_name true
+        hide_session_name false
     }
 }
 
