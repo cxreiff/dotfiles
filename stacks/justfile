@@ -1,0 +1,29 @@
+mod adguard
+mod freshrss
+
+default:
+    @just --list
+
+up-all:
+    just adguard up
+    just freshrss up
+
+down-all:
+    just freshrss down
+    just adguard down
+
+ps-all:
+    just adguard ps
+    just freshrss ps
+
+pull-all:
+    just adguard pull
+    just freshrss pull
+
+vm-default:
+    colima start -p default
+
+vm-adguard:
+    colima start -p adguard
+
+vm-up: vm-default vm-adguard

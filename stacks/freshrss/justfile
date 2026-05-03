@@ -1,0 +1,31 @@
+context := "colima"
+tailscale := "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+serve_port := "8765"
+internal_port := "18765"
+
+default:
+    @just --list
+
+up:
+    docker --context {{context}} compose up -d
+
+down:
+    docker --context {{context}} compose down
+
+restart:
+    docker --context {{context}} compose restart
+
+logs:
+    docker --context {{context}} compose logs -f
+
+ps:
+    docker --context {{context}} compose ps
+
+pull:
+    docker --context {{context}} compose pull
+
+shell:
+    docker --context {{context}} compose exec freshrss sh
+
+serve:
+    {{tailscale}} serve --bg --https={{serve_port}} http://localhost:{{internal_port}}

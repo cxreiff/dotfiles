@@ -12,12 +12,14 @@ precmd() { psvar=(); local b=$(git branch --show-current 2>/dev/null); [[ -n $b 
 
 export PATH="$HOME/.local/bin:$PATH"
 
-
 # aliases
+
+alias ls='ls -a'
 
 alias vi='nvim'
 alias zrc='vi ~/.zshrc && source ~/.zshrc'
 alias wrk='cd ~/Developer'
+alias dotfiles="just -f ~/Developer/dotfiles/justfile"
 
 alias zz='zellij'
 
@@ -28,14 +30,11 @@ alias suk='security unlock-keychain'
 alias adg='sudo /Applications/AdGuardHome/AdGuardHome -s'
 alias tailscale='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
 
-
-
 # completions
 autoload -Uz compinit && compinit
 
 # scripts
 source "$HOME/.config/scripts/cw.zsh"
-
 
 # tool setup
 

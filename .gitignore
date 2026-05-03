@@ -1,0 +1,17 @@
+# Secrets — never track
+.env
+*.env
+*.env.local
+*.key
+*.pem
+id_rsa
+id_ed25519
+id_ecdsa
+
+# ...except example/template files
+!.env.example
+!*.env.example
+
+# OS noise
+.DS_Store
+Thumbs.db

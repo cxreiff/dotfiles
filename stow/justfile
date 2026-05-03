@@ -1,0 +1,22 @@
+default:
+    @just --list
+
+# Stow all active packages onto a fresh device
+setup:
+    stow -d {{justfile_directory()}} -t ~ base
+    stow --no-folding -d {{justfile_directory()}} -t ~ colima
+
+# Re-link everything (run after adding files to packages)
+restow:
+    stow -R -d {{justfile_directory()}} -t ~ base
+    stow -R --no-folding -d {{justfile_directory()}} -t ~ colima
+
+# Remove all symlinks
+unstow:
+    stow -D -d {{justfile_directory()}} -t ~ base
+    stow -D --no-folding -d {{justfile_directory()}} -t ~ colima
+
+# Dry-run: show what stow would do
+status:
+    stow --simulate -v -d {{justfile_directory()}} -t ~ base
+    stow --simulate -v --no-folding -d {{justfile_directory()}} -t ~ colima

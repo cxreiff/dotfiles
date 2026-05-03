@@ -1,8 +1,8 @@
-local opts = { noremap = true, silent = true }
+local opts = { silent = true }
 
 -- do not copy on paste for lowercase p
-vim.keymap.set("v", "p", "P", opts);
-vim.keymap.set("v", "P", "p", opts);
+vim.keymap.set("v", "p", "P", opts)
+vim.keymap.set("v", "P", "p", opts)
 
 -- shortcut for semicolon
 vim.keymap.set({ "n", "v" }, "<leader>;", ":", opts)
@@ -44,4 +44,3 @@ vim.keymap.set({"n", "i", "v", "t"}, "<C-h>", function() _G.split_nav("h") end, 
 vim.keymap.set({"n", "i", "v", "t"}, "<C-k>", function() _G.split_nav("k") end, opts)
 vim.keymap.set({"n", "i", "v", "t"}, "<C-l>", function() _G.split_nav("l") end, opts)
 vim.keymap.set({"n", "i", "v", "t"}, "<C-j>", function() _G.split_nav("j") end, opts)
-

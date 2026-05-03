@@ -5,8 +5,8 @@ return {
         require("mini.basics").setup()
         require("mini.bufremove").setup()
         require("mini.icons").setup()
-        -- require("mini.pairs").setup()
-        require('mini.move').setup()
+        require("mini.move").setup()
+        require("mini.surround").setup()
 
         require("mini.diff").setup {
             view = {
