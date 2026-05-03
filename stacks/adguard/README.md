@@ -1,6 +1,6 @@
 # adguard stack
 
-AdGuard Home in the bridged `adguard` Colima VM with `network_mode: host`,
+AdGuard Home in the `bridged` Colima VM with `network_mode: host`,
 so DNS source IPs are preserved per-client.
 
 ## Fresh-device setup
@@ -17,7 +17,7 @@ dotfiles stacks adguard advertise  # advertise VM IP as Tailscale subnet route
 
 ## First-run wizard
 
-1. Find the VM IP: `colima list` → look at the `adguard` row's address.
+1. Find the VM IP: `colima list` → look at the `bridged` row's address.
 2. Open `http://<VM_IP>:3000` in a browser.
 
 ### Admin Web Interface

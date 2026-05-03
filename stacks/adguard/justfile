@@ -1,4 +1,4 @@
-context := "colima-adguard"
+context := "colima-bridged"
 tailscale := "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 volumes_dir := join(env("HOME"), ".volumes", "adguard")
 serve_port := "8689"
@@ -34,15 +34,15 @@ shell:
 serve:
     #!/usr/bin/env bash
     set -euo pipefail
-    vm_ip=$(colima list | awk '/^adguard[[:space:]]/ && $2 == "Running" {print $NF}')
-    if [ -z "$vm_ip" ]; then echo "adguard VM not running"; exit 1; fi
+    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+    if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
     {{tailscale}} serve --bg --https={{serve_port}} "http://$vm_ip:{{internal_port}}"
 
 advertise:
     #!/usr/bin/env bash
     set -euo pipefail
-    vm_ip=$(colima list | awk '/^adguard[[:space:]]/ && $2 == "Running" {print $NF}')
-    if [ -z "$vm_ip" ]; then echo "adguard VM not running"; exit 1; fi
+    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+    if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
     {{tailscale}} set --advertise-routes=$vm_ip/32
     echo
     echo "Advertised $vm_ip/32 from this node."

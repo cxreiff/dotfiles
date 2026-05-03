@@ -1,0 +1,18 @@
+services:
+  homebridge:
+    image: homebridge/homebridge:latest
+    container_name: homebridge
+    restart: unless-stopped
+    network_mode: host
+    logging:
+      options:
+        max-size: 10m
+    volumes:
+      - ${HOME}/.volumes/homebridge:/homebridge
+    env_file:
+      - .env
+    environment:
+      TZ: America/Los_Angeles
+      ENABLE_AVAHI: "1"
+      HOMEBRIDGE_CONFIG_UI: "1"
+      HOMEBRIDGE_CONFIG_UI_PORT: ${INTERNAL_PORT}

@@ -1,5 +1,6 @@
 mod adguard
 mod freshrss
+mod homebridge
 mod wallabag
 
 default:
@@ -8,27 +9,31 @@ default:
 up-all:
     just adguard up
     just freshrss up
+    just homebridge up
     just wallabag up
 
 down-all:
     just wallabag down
+    just homebridge down
     just freshrss down
     just adguard down
 
 ps-all:
     just adguard ps
     just freshrss ps
+    just homebridge ps
     just wallabag ps
 
 pull-all:
     just adguard pull
     just freshrss pull
+    just homebridge pull
     just wallabag pull
 
-vm-default:
-    colima start -p default
+vm-shared:
+    colima start -p shared
 
-vm-adguard:
-    colima start -p adguard
+vm-bridged:
+    colima start -p bridged
 
-vm-up: vm-default vm-adguard
+vm-up: vm-shared vm-bridged

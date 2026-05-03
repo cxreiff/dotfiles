@@ -26,7 +26,7 @@ dotfiles stow setup               # fresh-device: stow base + colima
 dotfiles stow restow              # re-link after adding files to a package
 dotfiles stow status              # dry-run; show what stow would do
 
-dotfiles stacks vm-up             # start both Colima VMs (default + adguard)
+dotfiles stacks vm-up             # start both Colima VMs (shared + bridged)
 dotfiles stacks up-all            # bring up all stacks
 dotfiles stacks down-all          # DNS-aware shutdown order (apps before adguard)
 dotfiles stacks ps-all            # status across stacks
@@ -39,16 +39,16 @@ Per-stack details: `stacks/<name>/README.md`. The `adguard` README documents a n
 
 ## Two-VM Colima architecture
 
-`stacks/` splits services across two Colima profiles:
+`stacks/` splits services across two Colima profiles. Profile names describe networking, not their first tenant:
 
 | Profile | VM type | Networking | Holds |
 |---|---|---|---|
-| `default` | `vz` | vzNAT, Mac localhost forwards | `freshrss`, `wallabag`, future general services |
-| `adguard` | `qemu` | bridged via `socket_vmnet`, real LAN IP | `adguardhome` only |
+| `shared` | `vz` | vzNAT, Mac localhost forwards (Colima's `network.mode: shared`) | `freshrss`, `wallabag`, future Mac-localhost-only services |
+| `bridged` | `qemu` | bridged via `socket_vmnet`, real LAN IP (Colima's `network.mode: bridged`) | `adguard` (DNS source IPs), `homebridge` (HomeKit/mDNS) |
 
-Why split: only `qemu + socket_vmnet bridged` preserves DNS source IPs on macOS Colima (`vz` doesn't support bridged networking). Putting everything bridged would force qemu emulation for all services and expose every port to the LAN. The split keeps native vz performance for everything that doesn't need source-IP visibility.
+Why split: only `qemu + socket_vmnet bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to the LAN on macOS Colima — `vz` doesn't support bridged networking. Putting everything bridged would force qemu emulation for all services and expose every port to the LAN. The split keeps native vz performance for everything that doesn't need real LAN visibility.
 
-`adguard`'s justfile uses `docker --context colima-adguard`; `freshrss`'s and `wallabag`'s use `docker --context colima` (the default profile). Don't homogenize them.
+`adguard` and `homebridge` justfiles use `docker --context colima-bridged`; `freshrss` and `wallabag` use `docker --context colima-shared`. Don't homogenize them. Likewise, the bridged-VM `serve` recipes parse `colima list` for the live VM IP (because `network_mode: host` binds inside the VM, not on Mac localhost) — keep that pattern.
 
 ## Stow package conventions
 
@@ -63,7 +63,7 @@ When adding a new package, edit every recipe in `stow/justfile` (`setup`, `resto
 
 - **`serve_port`** — Tailscale-side HTTPS port (the URL users hit).
 - **`internal_port`** — local app/forward port. Convention: `1` prefixed to `serve_port` (`8765` → `18765`, `8689` → `18689`).
-- The justfile is the source of truth for these. When changing a stack's port, the README usually lists the other places that must change in lockstep (e.g., for `adguard`: `internal_port` in justfile **and** `address:` in `~/.volumes/adguard/conf/AdGuardHome.yaml`).
+- The justfile is the source of truth for these. When changing a stack's port, the README usually lists the other places that must change in lockstep (e.g., for `adguard`: `internal_port` in justfile **and** `address:` in `~/.volumes/adguard/conf/AdGuardHome.yaml`; for `homebridge`: `internal_port` in justfile **and** `platforms[].port` in `~/.volumes/homebridge/config.json`).
 - `.env` is gitignored and kept `0600`; `.env.example` is the tracked template. The `.gitignore` allowlists `*.env.example` after blocking `*.env*` — keep that pattern intact.
 - `tailscale` is invoked via the absolute path `/Applications/Tailscale.app/Contents/MacOS/Tailscale` inside justfiles (the Homebrew CLI shim isn't assumed). The user's `.zshrc` aliases `tailscale` to the same path for interactive use.
 

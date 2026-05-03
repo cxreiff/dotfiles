@@ -1,0 +1,18 @@
+{
+  "bridge": {
+    "name": "${BRIDGE_NAME}",
+    "username": "${BRIDGE_USERNAME}",
+    "port": ${HAP_PORT},
+    "pin": "${HOMEKIT_PIN}",
+    "advertiser": "ciao",
+    "bind": ["col0"]
+  },
+  "accessories": [],
+  "platforms": [
+    {
+      "name": "Config",
+      "platform": "config",
+      "port": ${INTERNAL_PORT}
+    }
+  ]
+}

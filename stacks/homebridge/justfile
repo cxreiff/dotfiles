@@ -1,0 +1,113 @@
+context := "colima-bridged"
+tailscale := "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+volumes_dir := join(env("HOME"), ".volumes", "homebridge")
+serve_port := "8767"
+internal_port := "18767"
+
+default:
+    @just --list
+
+# Create the host-side volume dir and seed config.json from the template the
+# first time only. Existing config.json (e.g. restored from backup) is left
+# untouched.
+init:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p {{volumes_dir}}
+    if [ ! -f {{volumes_dir}}/config.json ]; then
+        if [ ! -f .env ]; then
+            echo ".env missing — copy .env.example, fill it in, then re-run" >&2
+            exit 1
+        fi
+        set -a; source .env; set +a
+        export INTERNAL_PORT
+        envsubst < config.json.template > {{volumes_dir}}/config.json
+        echo "Seeded {{volumes_dir}}/config.json from template."
+    fi
+
+up: init
+    docker --context {{context}} compose up -d
+
+down:
+    docker --context {{context}} compose down
+
+restart:
+    docker --context {{context}} compose restart
+
+logs:
+    docker --context {{context}} compose logs -f
+
+ps:
+    docker --context {{context}} compose ps
+
+pull:
+    docker --context {{context}} compose pull
+
+shell:
+    docker --context {{context}} compose exec homebridge bash
+
+# Replace the default admin/admin Config UI X account with ADMIN_* from .env.
+# Talks to the Config UI X HTTP API on the bridged VM IP. Idempotent — if
+# admin/admin no longer logs in, assumes bootstrap already ran and exits 0.
+# Requires `jq` on the host (brew install jq).
+bootstrap:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -a; source .env; set +a
+    command -v jq >/dev/null || { echo "jq required (brew install jq)"; exit 1; }
+    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+    if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
+    base="http://$vm_ip:{{internal_port}}"
+    echo "Waiting for Homebridge UI at $base ..."
+    deadline=$(($(date +%s) + 180))
+    until curl -fs "$base" > /dev/null 2>&1; do
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            echo "UI did not become ready within 180s" >&2
+            exit 1
+        fi
+        sleep 2
+    done
+    login() {
+        curl -fsX POST "$base/api/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"$1\",\"password\":\"$2\"}" 2>/dev/null \
+            | jq -r '.access_token // empty'
+    }
+    token=$(login admin admin || true)
+    if [ -z "$token" ]; then
+        echo "Default admin/admin no longer accessible — assuming bootstrap already ran."
+        exit 0
+    fi
+    if [ "$ADMIN_USERNAME" = "admin" ]; then
+        echo "Updating 'admin' password from .env..."
+        admin_id=$(curl -fs "$base/api/users" -H "Authorization: Bearer $token" \
+            | jq -r '.[] | select(.username=="admin") | .id')
+        curl -fsX PATCH "$base/api/users/$admin_id" \
+            -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
+            -d "$(jq -n --arg p "$ADMIN_PASSWORD" '{password:$p}')" > /dev/null
+    else
+        echo "Creating admin user '$ADMIN_USERNAME'..."
+        curl -fsX POST "$base/api/users" \
+            -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
+            -d "$(jq -n --arg u "$ADMIN_USERNAME" --arg p "$ADMIN_PASSWORD" \
+                '{username:$u, password:$p, name:$u, admin:true}')" > /dev/null \
+            || echo "(user '$ADMIN_USERNAME' may already exist)"
+        new_token=$(login "$ADMIN_USERNAME" "$ADMIN_PASSWORD")
+        admin_id=$(curl -fs "$base/api/users" -H "Authorization: Bearer $new_token" \
+            | jq -r '.[] | select(.username=="admin") | .id')
+        if [ -n "$admin_id" ] && [ "$admin_id" != "null" ]; then
+            echo "Removing default 'admin' user..."
+            curl -fsX DELETE "$base/api/users/$admin_id" \
+                -H "Authorization: Bearer $new_token" > /dev/null
+        fi
+    fi
+    echo "Bootstrap complete. Log in at https://${PUBLIC_HOST}:${PUBLIC_PORT} as '$ADMIN_USERNAME'."
+
+# Tailscale serve. Bridged-VM stacks use the VM IP because network_mode: host
+# binds inside the VM, not on Mac localhost. Same pattern as adguard.
+serve:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+    if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
+    {{tailscale}} serve --bg --https={{serve_port}} "http://$vm_ip:{{internal_port}}"

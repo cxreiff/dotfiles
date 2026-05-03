@@ -1,4 +1,4 @@
-context := "colima"
+context := "colima-shared"
 tailscale := "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 serve_port := "8765"
 internal_port := "18765"

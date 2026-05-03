@@ -1,5 +1,89 @@
 #compdef just
-source <(JUST_COMPLETE=zsh just)
-if [ "$funcstack[1]" = "_just" ]; then
-  _clap_dynamic_completer_just "$@"
-fi
+
+# Completion for `just` and any alias of it (e.g. `dotfiles`).
+# Context-sensitive: completes recipes + submodules at each path level,
+# defers to just's clap dynamic completer for flags only when the current
+# word starts with `-`. The shipped clap completer dumps every global flag
+# alongside recipes and CWD filesystem entries, which buries what you want.
+
+_just() {
+    local cur="${words[CURRENT]}"
+
+    if [[ "$cur" == -* ]]; then
+        if ! whence -w _clap_dynamic_completer_just >/dev/null 2>&1; then
+            # Strip the upstream `compdef _clap_dynamic_completer_just just`
+            # line; otherwise sourcing would rebind `just` to the unfiltered
+            # completer and bypass our wrapper.
+            source <(JUST_COMPLETE=zsh just | grep -v '^compdef ')
+        fi
+        local _CLAP_COMPLETE_INDEX=$(expr $CURRENT - 1)
+        local _CLAP_IFS=$'\n'
+        local raw=("${(@f)$( \
+            _CLAP_IFS="$_CLAP_IFS" \
+            _CLAP_COMPLETE_INDEX="$_CLAP_COMPLETE_INDEX" \
+            JUST_COMPLETE="zsh" \
+            just -- "${words[@]}" 2>/dev/null \
+        )}")
+        local -a flags=()
+        local entry
+        for entry in $raw; do
+            [[ "${entry%%:*}" == --* ]] && flags+=("$entry")
+        done
+        [[ -n $flags ]] && _describe -t flags 'flag' flags
+        return
+    fi
+
+    # Split the words preceding the cursor into pre-options (-f, --justfile,
+    # etc. that affect justfile resolution) and module-path positionals. The
+    # `--list` flag must precede positionals or `just` treats them as args to
+    # a recipe named after the first positional.
+    local -a preopts=() modpath=()
+    local i=2
+    while (( i < CURRENT )); do
+        case "${words[i]}" in
+            -f|--justfile|--working-directory|-d|--dotenv-path|--dotenv-filename|--chooser|--shell|--color)
+                preopts+=("${words[i]}" "${words[i+1]}")
+                (( i += 2 ))
+                ;;
+            -*)
+                (( i++ ))
+                ;;
+            *)
+                modpath+=("${words[i]}")
+                (( i++ ))
+                ;;
+        esac
+    done
+
+    local list_output
+    list_output=$(just "${preopts[@]}" --list "${modpath[@]}" 2>/dev/null) || return
+
+    local -a recipes=() submodules=()
+    local line name desc rest
+    while IFS= read -r line; do
+        # `just --list` indents recipe/module lines with 4 spaces; everything
+        # else (header, blank lines, group headers, nested module trees) we skip.
+        [[ "$line" == "    "* ]] || continue
+        line="${line#    }"
+        [[ -z "$line" ]] && continue
+        [[ "$line" == \[*\] ]] && continue
+
+        name="${line%% *}"
+        rest="${line#$name}"
+        rest="${rest# }"
+
+        if [[ "$rest" == "..." ]]; then
+            submodules+=("$name")
+        elif [[ "$rest" == "# "* ]]; then
+            desc="${rest#\# }"
+            recipes+=("$name:$desc")
+        else
+            recipes+=("$name")
+        fi
+    done <<< "$list_output"
+
+    [[ -n $recipes ]] && _describe -t recipes 'recipe' recipes
+    [[ -n $submodules ]] && _describe -t modules 'module' submodules
+}
+
+_just "$@"
