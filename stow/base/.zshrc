@@ -31,6 +31,7 @@ alias adg='sudo /Applications/AdGuardHome/AdGuardHome -s'
 alias tailscale='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
 
 # completions
+fpath=("$HOME/.config/zsh/completions" $fpath)
 autoload -Uz compinit && compinit
 
 # scripts

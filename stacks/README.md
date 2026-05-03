@@ -8,7 +8,7 @@ Two Colima VMs, each holding the stacks that match its networking model:
 
 | Profile | VM type | Networking | Holds |
 |---|---|---|---|
-| `default` | `vz` | vzNAT (Mac localhost forwards) | freshrss, future general services |
+| `default` | `vz` | vzNAT (Mac localhost forwards) | freshrss, wallabag, future general services |
 | `adguard` | `qemu` | bridged via socket_vmnet (real LAN IP) | AGH only — bridged so DNS clients' source IPs reach the container |
 
 Why split: only `qemu + socket_vmnet bridged` preserves source IPs on macOS
@@ -25,7 +25,8 @@ dotfiles stacks vm-up        # start both Colima profiles (reads stowed colima.y
 dotfiles stacks up-all       # bring up all stacks
 ```
 
-Per-stack first-run details: `adguard/README.md`, `freshrss/README.md`.
+Per-stack first-run details: `adguard/README.md`, `freshrss/README.md`,
+`wallabag/README.md`.
 
 ## Recipes
 
@@ -41,12 +42,13 @@ Per-stack first-run details: `adguard/README.md`, `freshrss/README.md`.
 
 | Recipe | Effect |
 |---|---|
-| `up-all` | bring up adguard then freshrss |
-| `down-all` | down freshrss first, then adguard (DNS-aware order) |
+| `up-all` | bring up adguard, then freshrss, then wallabag |
+| `down-all` | down wallabag, freshrss, then adguard last (DNS-aware order) |
 | `ps-all` | container status across all stacks |
 | `pull-all` | pull latest images for all stacks |
 
 ### Per-stack
 
-Modules: `dotfiles stacks adguard …`, `dotfiles stacks freshrss …`.
-See respective READMEs for the full per-stack recipe set.
+Modules: `dotfiles stacks adguard …`, `dotfiles stacks freshrss …`,
+`dotfiles stacks wallabag …`. See respective READMEs for the full per-stack
+recipe set.

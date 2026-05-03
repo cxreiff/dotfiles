@@ -7,7 +7,7 @@ symlinked from the repo into `$HOME`.
 
 | Package | Folding | Targets |
 |---|---|---|
-| `base` | default (folder symlinks) | `~/.config/nvim`, `~/.config/zellij`, `~/.zshrc` |
+| `base` | default (folder symlinks) | `~/.config/nvim`, `~/.config/zellij`, `~/.config/zsh/completions`, `~/.zshrc` |
 | `colima` | `--no-folding` (file-level symlinks) | `~/.colima/default/colima.yaml`, `~/.colima/adguard/colima.yaml` |
 
 `colima` uses `--no-folding` because the target directories

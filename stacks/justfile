@@ -1,5 +1,6 @@
 mod adguard
 mod freshrss
+mod wallabag
 
 default:
     @just --list
@@ -7,18 +8,22 @@ default:
 up-all:
     just adguard up
     just freshrss up
+    just wallabag up
 
 down-all:
+    just wallabag down
     just freshrss down
     just adguard down
 
 ps-all:
     just adguard ps
     just freshrss ps
+    just wallabag ps
 
 pull-all:
     just adguard pull
     just freshrss pull
+    just wallabag pull
 
 vm-default:
     colima start -p default
