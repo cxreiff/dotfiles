@@ -42,7 +42,10 @@ dotfiles stacks adguard advertise  # advertise VM IP as Tailscale subnet route
 ### Router (RT-AC68U or equivalent)
 
 - **DHCP reservation**: pin the AGH VM's MAC to its current IP.
-  - MAC: `52:55:55:c6:d2:9f` (deterministic, stable across `colima stop`/`start`)
+  - MAC: stable across `colima stop`/`start` for a given VM, but a *fresh* VM
+    (`colima delete` + recreate, or first-boot on a new device) gets a new
+    one. Discover with: `colima ssh -p bridged -- ip link show col0` — the
+    `link/ether` line is the MAC.
   - IP: whatever the VM currently has (`colima list`)
   - On Asus routers, set "Manual Assignment" master toggle to "Yes" or
     reservations won't be enforced.

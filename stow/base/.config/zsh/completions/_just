@@ -55,6 +55,12 @@ _just() {
         esac
     done
 
+    # Expand a leading `~` in each pre-option value. zsh expands aliases for
+    # completion but does NOT re-do tilde expansion on the result, so e.g.
+    # `dotfiles=just -f ~/foo/justfile` arrives here with literal `~/foo/...`,
+    # which `just` itself won't expand.
+    preopts=("${preopts[@]/#\~/$HOME}")
+
     local list_output
     list_output=$(just "${preopts[@]}" --list "${modpath[@]}" 2>/dev/null) || return
 
