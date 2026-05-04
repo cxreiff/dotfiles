@@ -37,9 +37,7 @@ first `up` is the right pattern.
 
 ## Fresh-device setup
 
-Prerequisites: stow + the `bridged` Colima profile already up (`dotfiles
-stacks vm-bridged` or `dotfiles stacks vm-up`). `jq` on the host (`brew
-install jq`) for the `bootstrap` recipe.
+Prerequisites: Stage 2 setup complete (`dotfiles stow setup-colima` and `dotfiles stacks vm-up` already run). `jq` on the host (`brew install jq`) for the `bootstrap` recipe.
 
 ```sh
 cp .env.example .env

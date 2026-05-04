@@ -5,7 +5,7 @@ VM. Single container with host bind mounts under `~/.volumes/wallabag/`.
 
 ## Fresh-device setup
 
-Prerequisites: stow + the default Colima profile already up.
+Prerequisites: Stage 2 setup complete (`dotfiles stow setup-colima` and `dotfiles stacks vm-up` already run).
 
 ```sh
 cp .env.example .env

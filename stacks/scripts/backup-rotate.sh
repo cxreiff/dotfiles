@@ -3,6 +3,10 @@
 # GFS rotation for ~/.volume-backups/. Promotes Sunday → weekly, 1st of month
 # → monthly; prunes daily=7, weekly=4, monthly=3 per stack by mtime.
 # Idempotent — safe to re-run same day.
+#
+# Exit codes:
+#   0 — rotation and pruning successful
+#   other — mkdir, cp, find, stat, or rm failed (set -euo pipefail)
 set -euo pipefail
 
 backups="${HOME}/.volume-backups"

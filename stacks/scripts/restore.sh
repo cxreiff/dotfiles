@@ -5,6 +5,12 @@
 # Caller stops the stack first; this script does not touch container state.
 #
 # Usage: restore.sh <stack-name> <tarball-path> [--force]
+#
+# Exit codes:
+#   0 — restore successful, success message printed to stdout
+#   1 — destination volume not empty (and --force not passed)
+#   2 — usage error (too few args) or tarball not found
+#   other — tar or mkdir failed (set -euo pipefail)
 set -euo pipefail
 
 if [ $# -lt 2 ]; then

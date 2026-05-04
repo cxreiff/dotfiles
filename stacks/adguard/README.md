@@ -5,8 +5,7 @@ so DNS source IPs are preserved per-client.
 
 ## Fresh-device setup
 
-Prerequisites: stow + colima profiles already up (see `../README.md` and
-`../../stow/README.md`).
+Prerequisites: Stage 2 setup complete (`dotfiles stow setup-colima` and `dotfiles stacks vm-up` already run).
 
 ```sh
 dotfiles stacks adguard up         # boot AGH (creates volume dirs, starts wizard on :3000)

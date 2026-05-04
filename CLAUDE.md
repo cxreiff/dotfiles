@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-05-04.
 
 ## Repo shape
 
@@ -9,6 +9,8 @@ Three independent areas, intentionally not unified:
 - `bare/` — legacy bare-repo dotfiles. **Unmanaged, untouched.** Do not edit unless the user explicitly asks; nothing in the active workflow reads from here.
 - `stow/` — GNU Stow packages, symlinked into `$HOME` for tools that read fixed paths.
 - `stacks/` — Docker Compose stacks. **Not stowed** — invoked in place via `just`.
+- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist template). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
+- `docs/` — operational references: `docs/migration-recovery.md` (clean-slate rebuild procedure), `docs/design-plans/` and `docs/implementation-plans/` (planning artifacts).
 
 The `dotfiles` shell alias (defined in `stow/base/.zshrc`) is the entry point for everything:
 
@@ -17,6 +19,16 @@ alias dotfiles="just -f ~/Developer/dotfiles/justfile"
 ```
 
 The root `justfile` only does `mod stacks` / `mod stow`; all real recipes live in `stacks/justfile`, `stow/justfile`, and per-stack `stacks/<name>/justfile`. Use `dotfiles` (or `just -f …`) rather than invoking `docker compose` / `stow` / `tailscale serve` by hand — the justfiles encode the right context, ports, and ordering.
+
+## Setup is staged (universal → container → per-stack)
+
+The top-level README is bifurcated; CLAUDE.md edits that touch setup must keep the same boundaries:
+
+- **Stage 1 (`README.md`)** — universal: `brew install just stow neovim ...` + `dotfiles stow setup-base`. Every device.
+- **Stage 2 (`stacks/README.md`)** — opt-in container support: brew Colima/Docker/socket_vmnet/tailscale-cli + `dotfiles stow setup-colima` + `dotfiles stacks vm-up`. Only on hosts that run stacks.
+- **Stage 3** — per-stack first-run, documented in each `stacks/<name>/README.md`.
+
+`docs/migration-recovery.md` is the canonical clean-slate / fresh-device rebuild procedure (covers `colima delete && colima start` preserving the qemu-deterministic MAC, restore-from-tarball, and the bridged-IP recovery checklist).
 
 ## Reproducible vs runtime
 
@@ -57,20 +69,37 @@ runtime churn:
 
 ```sh
 dotfiles                          # list root recipes
-dotfiles stow setup               # fresh-device: stow base + colima
-dotfiles stow restow              # re-link after adding files to a package
-dotfiles stow status              # dry-run; show what stow would do
+dotfiles stow setup               # both packages (base + colima)
+dotfiles stow setup-base          # editor + shell only (Stage 1)
+dotfiles stow setup-colima        # container support only (Stage 2)
+dotfiles stow restow              # re-link after adding files (also: restow-base, restow-colima)
+dotfiles stow status              # dry-run (also: status-base, status-colima)
 
 dotfiles stacks vm-up             # start both Colima VMs (shared + bridged)
 dotfiles stacks up-all            # bring up all stacks
 dotfiles stacks down-all          # DNS-aware shutdown order (apps before adguard)
 dotfiles stacks ps-all            # status across stacks
+dotfiles stacks doctor            # ~22 read-only checks across 6 sections (run after non-trivial changes)
+
+dotfiles stacks backup-all        # per-stack backup + GFS rotation
+dotfiles stacks backup-install    # install ~/Library/LaunchAgents nightly 4 AM timer
+dotfiles stacks bridged-ip-changed  # re-coordinate every IP-coupled artifact
 
 dotfiles stacks <stack> up|down|restart|logs|ps|pull|shell
 dotfiles stacks <stack> serve     # publish via Tailscale serve
+dotfiles stacks <stack> backup|restore <tarball>
+dotfiles stacks adguard tailnet-dns-on|tailnet-dns-off|tailnet-dns-status
 ```
 
 Per-stack details: `stacks/<name>/README.md`. The `adguard` README documents a non-obvious wizard gotcha (must bind DNS to `col0`, not `eth0` or "All interfaces") — preserve that if editing.
+
+`doctor` is the first thing to run when investigating any operational issue — it covers Infrastructure, Stack volumes, Backups (fails if any tarball is >36h old), DNS failover, IP coupling, and Stack identity & env. It's read-only and AC5.4-compliant (does not read .env *values*; the one BRIDGE_USERNAME read is a public pairing identifier, not a secret — don't extend that pattern to other keys without thought).
+
+## DNS failover state machine
+
+`adguard up` and `adguard down` automatically toggle Tailscale Global Nameservers via `adguard/scripts/tailnet-dns.sh` (Tailscale REST API, requires `TAILSCALE_PAT` in `stacks/adguard/.env`). The `up` recipe wires `wait-healthy.sh && tailnet-dns.sh on` on a single shell line so a wait-healthy failure surfaces as the recipe's exit code (no half-state where AGH is unhealthy but tailnet NS already points at it). The `down` recipe flips off *before* `compose down` to keep the tailnet resolvable for the brief overlap.
+
+`doctor`'s "DNS failover" section cross-checks AGH container state vs the tailnet NS list and **fails** if AGH is Down but the tailnet NS still points at it (the bricked-DNS scenario). Don't add manual `tailscale dns` invocations to other places — route through the `tailnet-dns-*` recipes.
 
 ## Two-VM Colima architecture
 
@@ -92,7 +121,7 @@ Why split: only `qemu + socket_vmnet bridged` preserves source IPs and propagate
 | `base` | default (folder symlinks) | `~/.config/nvim`, `~/.config/zellij`, `~/.zshrc` — folder symlinks fine |
 | `colima` | `--no-folding` (file-level symlinks) | `~/.colima/<profile>/` holds runtime state files; folder-level symlinking would suck them into the repo |
 
-When adding a new package, edit every recipe in `stow/justfile` (`setup`, `restow`, `unstow`, `status`) — there's no loop. Use `--no-folding` if the target dir holds runtime state.
+When adding a new package, edit `stow/justfile` to add the package to **every aggregate recipe** (`setup`, `restow`, `unstow`, `status`) AND add **per-package recipes** (`setup-<name>`, `restow-<name>`, `unstow-<name>`, `status-<name>`) mirroring the existing pattern — there's no loop, every recipe lists each package explicitly. Use `--no-folding` if the target dir holds runtime state.
 
 ## Port and `.env` conventions
 
@@ -102,8 +131,16 @@ When adding a new package, edit every recipe in `stow/justfile` (`setup`, `resto
 - `.env` is gitignored and kept `0600`; `.env.example` is the tracked template. The `.gitignore` allowlists `*.env.example` after blocking `*.env*` — keep that pattern intact.
 - `tailscale` is invoked via the absolute path `/Applications/Tailscale.app/Contents/MacOS/Tailscale` inside justfiles (the Homebrew CLI shim isn't assumed). The user's `.zshrc` aliases `tailscale` to the same path for interactive use.
 
+## Backups
+
+- Per-stack `backup` recipes tar `~/.volumes/<stack>/` into `~/.volume-backups/daily/<stack>-YYYY-MM-DD.tgz`. Quiesce-needing stacks (`freshrss`, `wallabag`, `homebridge` — SQLite) wrap the tar in `down && up`; `adguard` stays up (its on-disk format is safe to read live).
+- `backup-rotate.sh` GFS-promotes daily → weekly (Sundays, kept 4) → monthly (1st of month, kept 3). `daily/` is capped at 7 per stack.
+- The launchd LaunchAgent installed by `dotfiles stacks backup-install` runs `dotfiles stacks backup-all` nightly at 04:00. Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. The plist Label is `com.cxreiff.dotfiles.backup`.
+- `~/.volume-backups/` is gitignored runtime data; never commit a tarball.
+
 ## When editing
 
 - Cross-cutting changes (ports, new stack, new package) usually touch a justfile **and** a README — keep them in sync; READMEs are operational, not decorative.
-- Don't introduce manual `docker compose` / `tailscale serve` invocations in docs or new recipes; route through the existing module structure.
+- Don't introduce manual `docker compose` / `tailscale serve` / `tailscale dns` invocations in docs or new recipes; route through the existing module structure.
 - The `bare/` tree is frozen. If a config under `bare/.config/<tool>/` needs to become live, the move is into `stow/base/.config/<tool>/` plus a `restow` — not editing in place.
+- After non-trivial changes, run `dotfiles stacks doctor` and fix any FAILs before declaring work complete. WARNs are informational (e.g., missing `.env` on a stack you don't run).

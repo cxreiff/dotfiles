@@ -3,6 +3,9 @@
 # Generate a HomeKit setup pin (XXX-XX-XXX) that is NOT on Apple's reserved
 # list. Prints exactly one pin per invocation. Use to seed HOMEKIT_PIN in
 # stacks/homebridge/.env on a fresh setup.
+#
+# Exit codes:
+#   0 — always (loops until a non-reserved pin is generated, then exits)
 set -euo pipefail
 
 reserved=(

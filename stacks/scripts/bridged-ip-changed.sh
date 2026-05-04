@@ -2,6 +2,11 @@
 # stacks/scripts/bridged-ip-changed.sh
 # Re-run all the automatable refreshes after the bridged VM IP changes.
 # Prints a checklist of remaining human-must-do steps at the end.
+#
+# Exit codes:
+#   0 — all automatable steps complete, checklist printed to stdout
+#   1 — bridged VM not running or col0 MAC not readable or AGH config missing
+#   other — sed, diff, just, or tailscale failed (set -euo pipefail)
 set -euo pipefail
 
 TAILSCALE="/Applications/Tailscale.app/Contents/MacOS/Tailscale"

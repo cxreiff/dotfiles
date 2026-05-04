@@ -4,6 +4,11 @@
 # Quiesce, if needed, is the caller's responsibility (declared at justfile level).
 #
 # Usage: backup.sh <stack-name>
+#
+# Exit codes:
+#   0 — backup successful, archive path printed to stdout
+#   2 — usage error (wrong arg count) or source volume missing/empty
+#   other — tar or mkdir failed (set -euo pipefail)
 set -euo pipefail
 
 if [ $# -ne 1 ]; then

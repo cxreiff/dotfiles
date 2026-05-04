@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # stacks/scripts/backup-install.sh
+# Install the backup timer plist into ~/Library/LaunchAgents.
+#
+# Exit codes:
+#   0 — plist installed and scheduled, status printed to stdout
+#   2 — required tool/file not found (just, justfile, template)
+#   other — sed, plutil, mkdir, launchctl failed (set -euo pipefail)
 set -euo pipefail
 
 just_bin="$(command -v just)"

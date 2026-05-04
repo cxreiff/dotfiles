@@ -20,15 +20,51 @@ would mean qemu emulation for all services and exposing every port on the
 LAN. The split keeps native vz performance for everything that doesn't need
 real LAN visibility.
 
-## Fresh-device setup
+## Stage 2 — fresh-device setup
+
+Prerequisites:
+- Stage 1 done (`dotfiles stow setup-base` already ran on this device).
+- macOS host with admin/sudo (socket_vmnet needs sudo at install time).
 
 ```sh
-dotfiles stacks vm-up        # start both Colima profiles (reads stowed colima.yaml)
-dotfiles stacks up-all       # bring up all stacks
+brew install colima docker socket_vmnet gettext jq tailscale-cli
+sudo brew services start socket_vmnet                  # bridged-VM networking
+
+dotfiles stow setup-colima                             # symlink ~/.colima/<profile>/colima.yaml
+dotfiles stacks vm-up                                  # start both Colima VMs
 ```
 
-Per-stack first-run details: `adguard/README.md`, `freshrss/README.md`,
-`homebridge/README.md`, `wallabag/README.md`.
+`brew install tailscale-cli` installs the CLI shim. The actual Tailscale
+.app must be installed separately from <https://tailscale.com/download>
+or via `brew install --cask tailscale` — every justfile invokes the .app
+binary directly at `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+
+After Stage 2, both Colima VMs are running and Docker contexts
+`colima-shared` and `colima-bridged` exist.
+
+## Stage 3 — per-stack setup (only stacks you want)
+
+For each stack you want to run, follow that stack's README:
+
+- `adguard/README.md` — DNS resolver (bridged VM, must complete the wizard
+  pinning the listener to `col0`; Tailscale Global NS hookup via
+  `dotfiles stacks adguard tailnet-dns-on`)
+- `freshrss/README.md` — RSS reader (shared VM, fully declarative via .env)
+- `homebridge/README.md` — HomeKit bridge (bridged VM, pair via the iOS
+  Home app after `dotfiles stacks homebridge bootstrap`)
+- `wallabag/README.md` — read-it-later (shared VM, run `dotfiles stacks
+  wallabag bootstrap` after first up)
+
+After all desired stacks are up, install the nightly backup timer:
+
+```sh
+dotfiles stacks backup-install                         # ~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist
+dotfiles stacks doctor                                 # confirm everything's green
+```
+
+`doctor` runs read-only diagnostics (~12 checks across infrastructure,
+per-stack state, Tailscale failover state, IP coupling, .env keys, and
+homebridge pairing identity). Run it after any non-trivial change.
 
 ## Recipes
 
