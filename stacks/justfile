@@ -37,3 +37,6 @@ vm-bridged:
     colima start -p bridged
 
 vm-up: vm-shared vm-bridged
+
+doctor:
+    @./scripts/doctor.sh
