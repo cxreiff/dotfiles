@@ -166,6 +166,56 @@ for port in 8689 8767; do
     fi
 done
 
+echo
+echo "--- Stack identity & env ---"
+
+# Check A: homebridge BRIDGE_USERNAME matches config.json bridge.username
+repo_root="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+hb_env="${repo_root}/stacks/homebridge/.env"
+hb_config="${HOME}/.volumes/homebridge/config.json"
+if [ -f "$hb_env" ] && [ -f "$hb_config" ]; then
+    # NOTE: Per AC5.4 doctor avoids reading .env *secret* values. BRIDGE_USERNAME
+    # is the public MAC-format pairing identifier, not a secret. This read is
+    # required to verify AC5.8 (pairing identity coherence). Do not extend this
+    # to other .env keys without revisiting AC5.4.
+    bridge_env=$(grep -E '^BRIDGE_USERNAME=' "$hb_env" | cut -d= -f2-)
+    bridge_config=$(jq -r '.bridge.username' "$hb_config")
+    if [ "$bridge_env" = "$bridge_config" ]; then
+        pass "homebridge BRIDGE_USERNAME matches config.json bridge.username"
+    else
+        fail "homebridge BRIDGE_USERNAME (.env=${bridge_env}) != config.json (${bridge_config}) — pairing will break"
+    fi
+fi
+
+# Check B: env-key presence (no value reads, AC5.4-compliant)
+for stack in adguard freshrss homebridge wallabag; do
+    example="${repo_root}/stacks/${stack}/.env.example"
+    actual="${repo_root}/stacks/${stack}/.env"
+    if [ ! -f "$example" ]; then
+        # adguard had no .env.example before Phase 5 — so .example may or may
+        # not exist depending on plan progress. Skip gracefully.
+        continue
+    fi
+    if [ ! -f "$actual" ]; then
+        warn "${stack}/.env missing (run: cp .env.example .env && chmod 600 .env)"
+        continue
+    fi
+    # Count keys per file (just the LHS of `=`, ignore comments)
+    expected_keys=$(grep -E '^[A-Z][A-Z0-9_]*=' "$example" | sed 's/=.*//' | sort -u)
+    missing=()
+    while IFS= read -r key; do
+        [ -z "$key" ] && continue
+        if ! grep -qE "^${key}=" "$actual"; then
+            missing+=("$key")
+        fi
+    done <<< "$expected_keys"
+    if [ "${#missing[@]}" -eq 0 ]; then
+        pass "${stack}/.env has all keys from .env.example"
+    else
+        fail "${stack}/.env missing keys: ${missing[*]}"
+    fi
+done
+
 # Exit status: 1 if any FAIL, 0 otherwise (WARN does not fail).
 [ "$__check_failed" -eq 0 ] || exit 1
 exit 0

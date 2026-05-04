@@ -18,6 +18,41 @@ alias dotfiles="just -f ~/Developer/dotfiles/justfile"
 
 The root `justfile` only does `mod stacks` / `mod stow`; all real recipes live in `stacks/justfile`, `stow/justfile`, and per-stack `stacks/<name>/justfile`. Use `dotfiles` (or `just -f …`) rather than invoking `docker compose` / `stow` / `tailscale serve` by hand — the justfiles encode the right context, ports, and ordering.
 
+## Reproducible vs runtime
+
+What's in the repo vs what's environment-specific:
+
+| In repo (tracked) | Runtime / environment (gitignored or external) |
+|---|---|
+| `stacks/<stack>/{justfile, compose.yaml, README.md, .env.example}` | `stacks/<stack>/.env` (mode 0600) |
+| `stacks/<stack>/scripts/*.sh` | Container state inside Colima VMs |
+| `stacks/<stack>/conf/...` templates (e.g., `homebridge/config.json.template`) | Live files under `~/.volumes/<stack>/` |
+| `stow/<package>/...` | Stowed symlinks under `$HOME` |
+| `stow/colima/.colima/<profile>/colima.yaml` | Live VM disks under `~/.colima/_lima/`, qemu MAC, DHCP-leased IP |
+| `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data) |
+| `~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` |
+
+Things that look like "runtime drift" but are actually fine:
+- Bridged VM IP changing rarely (router reservation pins it; `dotfiles
+  stacks bridged-ip-changed` re-coordinates everything else).
+- Tailscale Global Nameservers being toggled by `tailnet-dns-on/off` —
+  not configuration drift, an intentional state machine.
+
+## Colima first-start config mutations
+
+When you first `colima start -p <profile>`, Colima rewrites the stowed
+`colima.yaml` to add resolved fields (the `vmnet` socket path, the user's
+home dir absolute path, etc.). This is a one-time lifecycle event, NOT
+runtime churn:
+
+- The mutated yaml IS committed to the repo when it changes (`stow
+  restow` keeps the symlink pointing at the repo file, so `git diff` shows
+  the new resolved fields after first start on a fresh device).
+- Subsequent `colima start`/`stop`/`restart` do NOT mutate the yaml.
+- If `colima.yaml` shows up in `git status` after a routine restart on
+  an existing setup, that's a regression worth investigating — Colima is
+  not supposed to rewrite the file outside of first-start.
+
 ## Common commands
 
 ```sh

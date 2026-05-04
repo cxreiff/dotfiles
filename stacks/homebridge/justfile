@@ -46,43 +46,8 @@ pull:
 shell:
     docker --context {{context}} compose exec homebridge bash
 
-# Complete the Config UI X setup wizard non-interactively, creating the admin
-# user from ADMIN_* in .env. Uses the /api/setup-wizard endpoints (the image
-# does NOT ship admin/admin defaults — it ships in setup-wizard mode).
-# Idempotent — if the wizard is already complete, the token endpoint 403s and
-# we exit 0. Requires `jq` on the host (brew install jq).
 bootstrap:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    set -a; source .env; set +a
-    command -v jq >/dev/null || { echo "jq required (brew install jq)"; exit 1; }
-    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
-    if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
-    base="http://$vm_ip:{{internal_port}}"
-    echo "Waiting for Homebridge UI at $base ..."
-    deadline=$(($(date +%s) + 180))
-    until curl -fs "$base/api/auth/settings" > /dev/null 2>&1; do
-        if [ "$(date +%s)" -ge "$deadline" ]; then
-            echo "UI did not become ready within 180s" >&2
-            exit 1
-        fi
-        sleep 2
-    done
-    wizard_done=$(curl -fs "$base/api/auth/settings" | jq -r '.env.setupWizardComplete')
-    if [ "$wizard_done" = "true" ]; then
-        echo "Setup wizard already complete — nothing to do."
-        exit 0
-    fi
-    echo "Running setup wizard for user '$ADMIN_USERNAME'..."
-    token=$(curl -fs "$base/api/setup-wizard/get-setup-wizard-token" | jq -r '.access_token')
-    if [ -z "$token" ] || [ "$token" = "null" ]; then
-        echo "Could not obtain setup-wizard token" >&2; exit 1
-    fi
-    curl -fsX POST "$base/api/setup-wizard/create-first-user" \
-        -H "Authorization: Bearer $token" -H "Content-Type: application/json" \
-        -d "$(jq -n --arg u "$ADMIN_USERNAME" --arg p "$ADMIN_PASSWORD" \
-            '{username:$u, password:$p, name:$u, admin:true}')" > /dev/null
-    echo "Bootstrap complete. Log in at https://${PUBLIC_HOST}:${PUBLIC_PORT} as '$ADMIN_USERNAME'."
+    @./scripts/bootstrap.sh
 
 # Tailscale serve. Bridged-VM stacks use the VM IP because network_mode: host
 # binds inside the VM, not on Mac localhost. Same pattern as adguard.

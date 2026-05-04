@@ -5,6 +5,36 @@
 HomeKit/mDNS discovery actually work from Apple devices on the LAN — see
 the networking section at the bottom for the why.
 
+## Pairing identity
+
+`BRIDGE_USERNAME` (a MAC-format ID) and `HOMEKIT_PIN` are pairing-identity
+critical. Once HomeKit accessories are paired against a bridge with a
+specific `BRIDGE_USERNAME` + `HOMEKIT_PIN`, those values become permanent
+identifiers in the user's iOS Home database.
+
+**Never regenerate `BRIDGE_USERNAME` or `HOMEKIT_PIN` on a paired
+bridge.** Doing so silently breaks the HomeKit pairing — accessories
+appear "responding" in Home but commands silently fail, until the user
+deletes the bridge from Home and re-pairs every accessory.
+
+Restoring `~/.volumes/homebridge/` from a backup is the **only** path that
+preserves the pairing identity across a device move:
+
+```sh
+# On the old device
+dotfiles stacks homebridge backup    # writes ~/.volume-backups/daily/homebridge-YYYY-MM-DD.tgz
+
+# On the new device, before first homebridge up
+dotfiles stacks homebridge restore /path/to/homebridge-YYYY-MM-DD.tgz --force
+dotfiles stacks homebridge up        # init sees existing config.json, doesn't reseed
+```
+
+`config.json` (rendered from `config.json.template` at first `up` via
+envsubst) bakes `BRIDGE_USERNAME`, `HOMEKIT_PIN`, and `HAP_PORT` into the
+runtime config. The init recipe is intentionally idempotent — it skips
+re-seeding if `config.json` already exists, so restoring a backup before
+first `up` is the right pattern.
+
 ## Fresh-device setup
 
 Prerequisites: stow + the `bridged` Colima profile already up (`dotfiles

@@ -24,7 +24,6 @@ if [ ! -f "$env_file" ]; then
     echo "tailnet-dns: ${env_file} missing — copy .env.example, fill in TAILSCALE_PAT" >&2
     exit 2
 fi
-# shellcheck disable=SC1090
 set -a; source "$env_file"; set +a
 
 if [ -z "${TAILSCALE_PAT:-}" ] || [ "$TAILSCALE_PAT" = "tskey-api-CHANGE_ME" ]; then
