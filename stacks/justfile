@@ -30,6 +30,16 @@ pull-all:
     just homebridge pull
     just wallabag pull
 
+backup-all:
+    just adguard backup
+    just freshrss backup
+    just homebridge backup
+    just wallabag backup
+    @./scripts/backup-rotate.sh
+
+backup-install:
+    @./scripts/backup-install.sh
+
 vm-shared:
     colima start -p shared
 

@@ -92,3 +92,9 @@ serve:
     vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
     if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
     {{tailscale}} serve --bg --https={{serve_port}} "http://$vm_ip:{{internal_port}}"
+
+backup: down && up
+    @../scripts/backup.sh homebridge
+
+restore tarball:
+    @../scripts/restore.sh homebridge {{tarball}}

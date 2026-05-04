@@ -68,6 +68,46 @@ else
     fail "tailscale CLI missing at $TAILSCALE (install Tailscale.app)"
 fi
 
+echo
+echo "--- Stack volumes ---"
+for stack in adguard freshrss homebridge wallabag; do
+    dir="${HOME}/.volumes/${stack}"
+    if [ ! -d "$dir" ]; then
+        fail "${stack} host volume dir missing: ${dir}"
+    elif [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
+        fail "${stack} host volume dir empty: ${dir}"
+    else
+        pass "${stack} host volume dir present and non-empty"
+    fi
+done
+
+echo
+echo "--- Backups ---"
+
+backups_dir="${HOME}/.volume-backups/daily"
+for stack in adguard freshrss homebridge wallabag; do
+    if [ ! -d "$backups_dir" ]; then
+        fail "${stack} has no backups yet (no ~/.volume-backups/daily/)"
+        continue
+    fi
+    # Find most-recent tarball for this stack
+    latest=$(find "$backups_dir" -maxdepth 1 -name "${stack}-*.tgz" -print 2>/dev/null \
+        | sort | tail -1)
+    if [ -z "$latest" ]; then
+        fail "${stack} has no backups yet"
+        continue
+    fi
+    # mtime in epoch seconds (BSD stat syntax — macOS default)
+    mtime=$(stat -f %m "$latest")
+    now=$(date +%s)
+    age_hours=$(( (now - mtime) / 3600 ))
+    if [ "$age_hours" -gt 36 ]; then
+        fail "${stack} latest backup is ${age_hours}h old (>36h)"
+    else
+        pass "${stack} latest backup is ${age_hours}h old"
+    fi
+done
+
 # Exit status: 1 if any FAIL, 0 otherwise (WARN does not fail).
 [ "$__check_failed" -eq 0 ] || exit 1
 exit 0

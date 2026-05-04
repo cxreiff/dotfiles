@@ -1,7 +1,7 @@
 # freshrss stack
 
-FreshRSS in the default Colima VM. Runs as a single container with named
-Docker volumes for data and extensions; no host-side bind mounts.
+FreshRSS in the `shared` Colima VM. Runs as a single container with host
+bind mounts under `~/.volumes/freshrss/`.
 
 ## Fresh-device setup
 
@@ -29,6 +29,18 @@ dotfiles stacks freshrss serve   # expose via Tailscale at https://<host>.<tailn
 | `ADMIN_API_PASSWORD` | Separate password for API/RSS clients (Reeder, etc.) |
 
 `.env` is gitignored; `.env.example` is the tracked template.
+
+## Volumes
+
+| Host path | Container path | Contents |
+|---|---|---|
+| `~/.volumes/freshrss/data` | `/var/www/FreshRSS/data` | SQLite DB, user accounts, feed/article state |
+| `~/.volumes/freshrss/extensions` | `/var/www/FreshRSS/extensions` | Installed UI extensions |
+
+`init` (a `up` prerequisite) creates these directories. `backup` and `restore`
+recipes target them via the shared `stacks/scripts/backup.sh` /
+`restore.sh`. `restore` refuses to overwrite a non-empty destination unless
+`--force` is passed.
 
 ## First-run automation
 

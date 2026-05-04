@@ -48,3 +48,9 @@ advertise:
     echo "Advertised $vm_ip/32 from this node."
     echo "Approve at https://login.tailscale.com/admin/machines (find this host, edit route settings)."
     echo "Then set Global nameserver to $vm_ip in https://login.tailscale.com/admin/dns"
+
+backup:
+    @../scripts/backup.sh adguard
+
+restore tarball:
+    @../scripts/restore.sh adguard {{tarball}}

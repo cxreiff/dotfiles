@@ -1,8 +1,7 @@
 # wallabag stack
 
-[Wallabag](https://www.wallabag.org/) (read-it-later) in the default Colima
-VM. Single container with named Docker volumes for the SQLite database and
-asset images; no host-side bind mounts.
+[Wallabag](https://www.wallabag.org/) (read-it-later) in the `shared` Colima
+VM. Single container with host bind mounts under `~/.volumes/wallabag/`.
 
 ## Fresh-device setup
 
@@ -35,6 +34,18 @@ later (it just won't be able to recover the deactivated default user).
 | `ADMIN_PASSWORD` | Same — `openssl rand -base64 16` |
 
 `.env` is gitignored; `.env.example` is the tracked template.
+
+## Volumes
+
+| Host path | Container path | Contents |
+|---|---|---|
+| `~/.volumes/wallabag/data` | `/var/www/wallabag/data` | SQLite DB (`db/wallabag.sqlite`), assets |
+| `~/.volumes/wallabag/images` | `/var/www/wallabag/web/assets/images` | Cached article images |
+
+`init` (a `up` prerequisite) creates these directories. `backup` and `restore`
+recipes target them via the shared `stacks/scripts/backup.sh` /
+`restore.sh`. `restore` refuses to overwrite a non-empty destination unless
+`--force` is passed.
 
 ## First-run automation
 

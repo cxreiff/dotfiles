@@ -55,6 +55,31 @@ Modules: `dotfiles stacks adguard …`, `dotfiles stacks freshrss …`,
 `dotfiles stacks homebridge …`, `dotfiles stacks wallabag …`. See
 respective READMEs for the full per-stack recipe set.
 
+## Backups
+
+Per-stack `backup` and `restore` recipes tar `~/.volumes/<stack>/` into
+`~/.volume-backups/{daily,weekly,monthly}/`. The aggregate `backup-all`
+recipe runs all four stacks then `backup-rotate.sh`:
+
+| Tier | Retention | Promoted from |
+|---|---|---|
+| `daily/` | 7 per stack | `backup-all` itself |
+| `weekly/` | 4 per stack | Sunday's daily tarball |
+| `monthly/` | 3 per stack | The 1st of month's daily tarball |
+
+Schedule unattended nightly runs via launchd:
+
+```sh
+dotfiles stacks backup-install     # installs ~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist
+launchctl print gui/$(id -u)/com.cxreiff.dotfiles.backup    # confirm next start
+```
+
+Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. `dotfiles stacks
+doctor` fails if the latest tarball for any stack is older than 36 hours.
+
+(Phase 6 adds a cross-reference to `docs/migration-recovery.md` here once
+that doc exists.)
+
 ## Migrating from the old `default`/`adguard` profile names
 
 Earlier versions of this repo used profile names `default` (vz) and

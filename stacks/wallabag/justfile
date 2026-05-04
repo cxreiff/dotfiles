@@ -2,11 +2,15 @@ context := "colima-shared"
 tailscale := "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 serve_port := "8766"
 internal_port := "18766"
+volumes_dir := join(env("HOME"), ".volumes", "wallabag")
 
 default:
     @just --list
 
-up:
+init:
+    mkdir -p {{volumes_dir}}/data {{volumes_dir}}/images
+
+up: init
     docker --context {{context}} compose up -d
 
 down:
@@ -56,3 +60,9 @@ bootstrap:
 
 serve:
     {{tailscale}} serve --bg --https={{serve_port}} http://localhost:{{internal_port}}
+
+backup: down && up
+    @../scripts/backup.sh wallabag
+
+restore tarball:
+    @../scripts/restore.sh wallabag {{tarball}}
