@@ -77,72 +77,53 @@ launchctl print gui/$(id -u)/com.cxreiff.dotfiles.backup    # confirm next start
 Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. `dotfiles stacks
 doctor` fails if the latest tarball for any stack is older than 36 hours.
 
-(Phase 6 adds a cross-reference to `docs/migration-recovery.md` here once
-that doc exists.)
+To restore on a fresh device, see
+[`docs/migration-recovery.md`](../docs/migration-recovery.md).
 
-## Migrating from the old `default`/`adguard` profile names
+## When the bridged VM IP changes
 
-Earlier versions of this repo used profile names `default` (vz) and
-`adguard` (bridged). Those have been renamed to `shared` and `bridged`
-(after Colima's own `network.mode` terms). On the current device, the
-live `~/.colima/default/` and `~/.colima/adguard/` directories are
-orphaned after `dotfiles stow restow`; pick one of the paths below to
-bring the device back in sync.
+The bridged VM's IP is **pinned via router DHCP reservation** as a setup
+step. It changes only on rare events: router replacement, subnet
+renumbering, or the DHCP reservation getting lost.
 
-### Clean-slate migration (also: new device)
+Couplings that all reference the bridged VM IP:
 
-Recreates the VMs from scratch. AGH state survives because it lives in
-`~/.volumes/adguard/`; freshrss and wallabag use named docker volumes
-inside the VM and **must be backed up first** or their data is lost.
+| Coupling | Source of truth | Refreshed by |
+|---|---|---|
+| AGH `bind_hosts:` | `~/.volumes/adguard/conf/AdGuardHome.yaml` | `bridged-ip-changed.sh` patches via sed |
+| AGH `serve` mapping `:8689` | `tailscale serve` state | `dotfiles stacks adguard serve` |
+| Homebridge `serve` mapping `:8767` | `tailscale serve` state | `dotfiles stacks homebridge serve` |
+| Subnet route advertisement | Tailscale node config | `dotfiles stacks adguard advertise` |
+| Tailscale Global Nameservers | Tailscale tailnet config | `dotfiles stacks adguard tailnet-dns-on` |
+| Router DHCP reservation | Router admin UI | **Manual** |
+| Tailscale admin route approval | Tailscale admin UI | **Manual** |
 
-```sh
-dotfiles stacks down-all
+Run `dotfiles stacks bridged-ip-changed` to re-do every automatable step
+in one command; the script prints a closing checklist with the live MAC +
+IP for the manual steps.
 
-# Back up named volumes (skip if you don't care about the data)
-mkdir -p ~/stack-backups
-for vol in freshrss_data freshrss_extensions wallabag_data wallabag_images; do
-    docker --context colima run --rm -v "$vol:/v" -v ~/stack-backups:/b alpine \
-        tar czf "/b/$vol.tgz" -C /v .
-done
+### Static-MAC behavior
 
-colima delete -p default
-colima delete -p adguard
+The bridged VM's MAC is qemu-deterministic from the lima instance
+directory path (`~/.colima/_lima/colima-bridged/`). This means:
 
-dotfiles stow restow
-dotfiles stacks vm-up
-dotfiles stacks up-all
+- **Stable across** `colima stop`/`start`/`restart`.
+- **Stable across** `colima delete -p bridged && colima start -p bridged`
+  (the lima dir gets recreated at the same path → same MAC seed).
+- **Changes only** if you rename the Colima profile or move the
+  `~/.colima/_lima/` directory. Don't do either — use clean-slate
+  (below) instead of in-place renames.
 
-# Restore named volumes
-for vol in freshrss_data freshrss_extensions wallabag_data wallabag_images; do
-    docker --context colima-shared run --rm -v "$vol:/v" -v ~/stack-backups:/b alpine \
-        tar xzf "/b/$vol.tgz" -C /v
-done
-dotfiles stacks freshrss restart
-dotfiles stacks wallabag restart
+The DHCP reservation will continue to work across `colima delete` cycles
+because the MAC is preserved.
 
-# If the bridged VM IP changed, re-advertise + re-approve in Tailscale
-dotfiles stacks adguard advertise
-```
+## Renaming a Colima profile
 
-### In-place migration (current device only, riskier)
+**`limactl rename` is not viable in place.** It doesn't rewrite hardcoded
+paths in `lima.yaml` or the qemu MAC derivation, leaving lima in an
+inconsistent state. Same applies to manual `mv ~/.colima/<old>
+~/.colima/<new>` and `mv ~/.lima/colima-<old> ~/.lima/colima-<new>` —
+some things work, some don't, and recovery is harder than rebuilding.
 
-Preserves existing VM disks by renaming Colima/Lima dirs. Verify the Lima
-instance path with `colima list -j` first — Colima ≥0.6 uses
-`~/.lima/colima-<profile>` (with the bare `colima` instance for the default
-profile); older versions stored Lima instances under `~/.colima/_lima/`. If
-the in-place rename leaves Lima confused, fall back to clean-slate.
-
-```sh
-dotfiles stacks down-all
-colima stop -p default
-colima stop -p adguard
-
-mv ~/.colima/default ~/.colima/shared
-mv ~/.colima/adguard ~/.colima/bridged
-mv ~/.lima/colima ~/.lima/colima-shared
-mv ~/.lima/colima-adguard ~/.lima/colima-bridged
-
-dotfiles stow restow
-dotfiles stacks vm-up
-dotfiles stacks up-all
-```
+For renames or fresh-device setup, use the clean-slate procedure in
+[`docs/migration-recovery.md`](../docs/migration-recovery.md).

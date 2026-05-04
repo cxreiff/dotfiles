@@ -12,8 +12,12 @@ init:
 
 up: init
     docker --context {{context}} compose up -d
+    # shell `&&`: tailnet-dns flips on only if wait-healthy succeeded; both
+    # share one line so a wait-healthy failure surfaces as the recipe's exit.
+    @./scripts/wait-healthy.sh && ./scripts/tailnet-dns.sh on
 
 down:
+    @./scripts/tailnet-dns.sh off
     docker --context {{context}} compose down
 
 restart:
@@ -54,3 +58,12 @@ backup:
 
 restore tarball:
     @../scripts/restore.sh adguard {{tarball}}
+
+tailnet-dns-on:
+    @./scripts/tailnet-dns.sh on
+
+tailnet-dns-off:
+    @./scripts/tailnet-dns.sh off
+
+tailnet-dns-status:
+    @./scripts/tailnet-dns.sh status

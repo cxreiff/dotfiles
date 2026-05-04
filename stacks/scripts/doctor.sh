@@ -108,6 +108,64 @@ for stack in adguard freshrss homebridge wallabag; do
     fi
 done
 
+echo
+echo "--- DNS failover ---"
+
+agh_state=$(docker --context colima-bridged inspect adguardhome \
+    --format '{{.State.Running}}' 2>/dev/null || echo "false")
+vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+
+tailnet_dns="${SCRIPT_DIR}/../adguard/scripts/tailnet-dns.sh"
+if [ -x "$tailnet_dns" ]; then
+    ns_json=$("$tailnet_dns" status 2>/dev/null | jq -r '.dns | @json' 2>/dev/null || true)
+else
+    ns_json=""
+fi
+
+if [ -z "$ns_json" ]; then
+    warn "tailnet-dns status unavailable (PAT missing or API unreachable)"
+elif [ "$agh_state" = "true" ] && [ "$ns_json" = "[\"${vm_ip}\"]" ]; then
+    pass "AGH Up + tailnet NS points at AGH (${vm_ip})"
+elif [ "$agh_state" = "true" ] && [ "$ns_json" != "[\"${vm_ip}\"]" ]; then
+    warn "AGH Up but tailnet NS = ${ns_json} (expected [\"${vm_ip}\"])"
+elif [ "$agh_state" = "false" ] && [ "$ns_json" = "[\"${vm_ip}\"]" ]; then
+    fail "AGH Down but tailnet NS still points at AGH — DNS bricked!"
+else
+    pass "AGH Down + tailnet NS pointed away from AGH (${ns_json})"
+fi
+
+echo
+echo "--- IP coupling ---"
+
+# 1. AGH bind_hosts vs current VM IP
+agh_yaml="${HOME}/.volumes/adguard/conf/AdGuardHome.yaml"
+if [ -f "$agh_yaml" ]; then
+    bind=$(awk '
+        /^[[:space:]]+bind_hosts:/ { in_bh=1; next }
+        in_bh && /^[[:space:]]+- / { gsub(/^[[:space:]]+- /, ""); print; exit }
+    ' "$agh_yaml")
+    if [ "$bind" = "$vm_ip" ]; then
+        pass "AGH bind_hosts matches bridged VM IP (${vm_ip})"
+    else
+        fail "AGH bind_hosts is ${bind} but VM IP is ${vm_ip} (run: dotfiles stacks bridged-ip-changed)"
+    fi
+else
+    warn "AGH yaml not found at ${agh_yaml} (AGH never started?)"
+fi
+
+# 2/3. Tailscale serve mappings
+serve_status=$("$TAILSCALE" serve status 2>/dev/null || true)
+for port in 8689 8767; do
+    block=$(echo "$serve_status" | grep -A1 -E ":${port}[^0-9]" || true)
+    if [ -z "$block" ]; then
+        warn "tailscale serve has no mapping for :${port} (run: dotfiles stacks <stack> serve)"
+    elif echo "$block" | grep -qF "${vm_ip}"; then
+        pass "tailscale serve :${port} points at ${vm_ip}"
+    else
+        fail "tailscale serve :${port} not pointing at ${vm_ip} (run: dotfiles stacks bridged-ip-changed)"
+    fi
+done
+
 # Exit status: 1 if any FAIL, 0 otherwise (WARN does not fail).
 [ "$__check_failed" -eq 0 ] || exit 1
 exit 0

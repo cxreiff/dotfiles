@@ -48,5 +48,8 @@ vm-bridged:
 
 vm-up: vm-shared vm-bridged
 
+bridged-ip-changed:
+    @./scripts/bridged-ip-changed.sh
+
 doctor:
     @./scripts/doctor.sh
