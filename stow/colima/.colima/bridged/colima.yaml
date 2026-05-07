@@ -64,7 +64,7 @@ kubernetes:
 #  - sets as active Kubernetes context (if Kubernetes is enabled).
 #  - sets as active Incus remote (for Incus runtime).
 # Default: true
-autoActivate: true
+autoActivate: false
 
 # Network configurations for the virtual machine.
 network:
