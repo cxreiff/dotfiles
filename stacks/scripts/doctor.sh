@@ -25,16 +25,14 @@ for profile in shared bridged; do
     fi
 done
 
-# 1b. Optional agents profile (on-demand).
-# Silent if the VM has never been created. WARN/PASS once it exists.
-if [ -d "${HOME}/.colima/_lima/colima-agents" ]; then
-    status=$(colima list 2>/dev/null \
-        | awk '$1 == "agents" {print $2}')
-    if [ "$status" = "Running" ]; then
-        pass "colima profile 'agents' is Running"
-    else
-        warn "colima profile 'agents' is '${status:-unknown}' (start with: dotfiles stacks vm-agents-up)"
-    fi
+# 1b. Agents profile (on-demand). Always reported; OFF when not Running
+# is informational, not a warning.
+status=$(colima list 2>/dev/null \
+    | awk '$1 == "agents" {print $2}')
+if [ "$status" = "Running" ]; then
+    pass "colima profile 'agents' is Running"
+else
+    off "colima profile 'agents' is ${status:-not created} (start with: dotfiles stacks vm-agents-up)"
 fi
 
 # 2. Docker contexts present and connectable
@@ -51,17 +49,16 @@ for ctx in colima-shared colima-bridged; do
     fi
 done
 
-# 2b. Optional agents docker context — only checked if its VM has been created.
-if [ -d "${HOME}/.colima/_lima/colima-agents" ]; then
-    if echo "$contexts" | grep -qx "colima-agents"; then
-        if docker --context colima-agents info >/dev/null 2>&1; then
-            pass "docker context 'colima-agents' connects"
-        else
-            warn "docker context 'colima-agents' present but not connectable"
-        fi
+# 2b. Agents docker context. Always reported; OFF when not present /
+# not connectable is informational (the context is created on VM start).
+if echo "$contexts" | grep -qx "colima-agents"; then
+    if docker --context colima-agents info >/dev/null 2>&1; then
+        pass "docker context 'colima-agents' connects"
     else
-        warn "docker context 'colima-agents' missing (start with: dotfiles stacks vm-agents-up)"
+        off "docker context 'colima-agents' not connectable"
     fi
+else
+    off "docker context 'colima-agents' not registered"
 fi
 
 # 3. socket_vmnet daemon
