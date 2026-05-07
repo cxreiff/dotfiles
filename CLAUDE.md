@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-05-04.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-05-06.
 
 ## Repo shape
 
@@ -25,7 +25,7 @@ The root `justfile` only does `mod stacks` / `mod stow`; all real recipes live i
 The top-level README is bifurcated; CLAUDE.md edits that touch setup must keep the same boundaries:
 
 - **Stage 1 (`README.md`)** — universal: `brew install just stow neovim ...` + `dotfiles stow setup-base`. Every device.
-- **Stage 2 (`stacks/README.md`)** — opt-in container support: brew Colima/Docker/socket_vmnet/tailscale-cli + `dotfiles stow setup-colima` + `dotfiles stacks vm-up`. Only on hosts that run stacks.
+- **Stage 2 (`stacks/README.md`)** — opt-in container support: brew Colima/Docker/socket_vmnet/tailscale-cli + `dotfiles stow setup-colima` + `dotfiles stacks vm-shared-up` + `dotfiles stacks vm-bridged-up`. Only on hosts that run stacks.
 - **Stage 3** — per-stack first-run, documented in each `stacks/<name>/README.md`.
 
 `docs/migration-recovery.md` is the canonical clean-slate / fresh-device rebuild procedure (covers `colima delete && colima start` preserving the qemu-deterministic MAC, restore-from-tarball, and the bridged-IP recovery checklist).
@@ -75,7 +75,7 @@ dotfiles stow setup-colima        # container support only (Stage 2)
 dotfiles stow restow              # re-link after adding files (also: restow-base, restow-colima)
 dotfiles stow status              # dry-run (also: status-base, status-colima)
 
-dotfiles stacks vm-up             # start both Colima VMs (shared + bridged)
+dotfiles stacks vm-shared-up      # start a VM (also: vm-shared-down, vm-bridged-{up,down}, vm-agents-{up,down})
 dotfiles stacks up-all            # bring up all stacks
 dotfiles stacks down-all          # DNS-aware shutdown order (apps before adguard)
 dotfiles stacks ps-all            # status across stacks
@@ -101,16 +101,19 @@ Per-stack details: `stacks/<name>/README.md`. The `adguard` README documents a n
 
 `doctor`'s "DNS failover" section cross-checks AGH container state vs the tailnet NS list and **fails** if AGH is Down but the tailnet NS still points at it (the bricked-DNS scenario). Don't add manual `tailscale dns` invocations to other places — route through the `tailnet-dns-*` recipes.
 
-## Two-VM Colima architecture
+## Colima architecture
 
-`stacks/` splits services across two Colima profiles. Profile names describe networking, not their first tenant:
+Three Colima profiles, each tuned for the workloads it carries:
 
 | Profile | VM type | Networking | Holds |
 |---|---|---|---|
 | `shared` | `vz` | vzNAT, Mac localhost forwards (Colima's `network.mode: shared`) | `freshrss`, `wallabag`, future Mac-localhost-only services |
 | `bridged` | `qemu` | bridged via `socket_vmnet`, real LAN IP (Colima's `network.mode: bridged`) | `adguard` (DNS source IPs), `homebridge` (HomeKit/mDNS) |
+| `agents` | `vz` | vzNAT (`network.mode: shared`) | container host for agent workloads |
 
-Why split: only `qemu + socket_vmnet bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to the LAN on macOS Colima — `vz` doesn't support bridged networking. Putting everything bridged would force qemu emulation for all services and expose every port to the LAN. The split keeps native vz performance for everything that doesn't need real LAN visibility.
+Each VM is started and stopped individually via `vm-<name>-up` / `vm-<name>-down`. `shared` and `bridged` are the always-on home-services VMs; `agents` is started on demand so its CPU/RAM are only reserved while in use.
+
+Why `bridged` exists separately from `shared`: only `qemu + socket_vmnet bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to the LAN on macOS Colima — `vz` doesn't support bridged networking. Putting everything bridged would force qemu emulation for all services and expose every port to the LAN. The split keeps native vz performance for everything that doesn't need real LAN visibility.
 
 `adguard` and `homebridge` justfiles use `docker --context colima-bridged`; `freshrss` and `wallabag` use `docker --context colima-shared`. Don't homogenize them. Likewise, the bridged-VM `serve` recipes parse `colima list` for the live VM IP (because `network_mode: host` binds inside the VM, not on Mac localhost) — keep that pattern.
 

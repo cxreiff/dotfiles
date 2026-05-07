@@ -40,13 +40,23 @@ backup-all:
 backup-install:
     @./scripts/backup-install.sh
 
-vm-shared:
+vm-shared-up:
     colima start -p shared
 
-vm-bridged:
+vm-shared-down:
+    colima stop -p shared
+
+vm-bridged-up:
     colima start -p bridged
 
-vm-up: vm-shared vm-bridged
+vm-bridged-down:
+    colima stop -p bridged
+
+vm-agents-up:
+    colima start -p agents
+
+vm-agents-down:
+    colima stop -p agents
 
 bridged-ip-changed:
     @./scripts/bridged-ip-changed.sh

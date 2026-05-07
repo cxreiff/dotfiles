@@ -25,6 +25,18 @@ for profile in shared bridged; do
     fi
 done
 
+# 1b. Optional agents profile (on-demand).
+# Silent if the VM has never been created. WARN/PASS once it exists.
+if [ -d "${HOME}/.colima/_lima/colima-agents" ]; then
+    status=$(colima list 2>/dev/null \
+        | awk '$1 == "agents" {print $2}')
+    if [ "$status" = "Running" ]; then
+        pass "colima profile 'agents' is Running"
+    else
+        warn "colima profile 'agents' is '${status:-unknown}' (start with: dotfiles stacks vm-agents-up)"
+    fi
+fi
+
 # 2. Docker contexts present and connectable
 contexts=$(docker context ls --format '{{.Name}}' 2>/dev/null || true)
 for ctx in colima-shared colima-bridged; do
@@ -38,6 +50,19 @@ for ctx in colima-shared colima-bridged; do
         fail "docker context '$ctx' missing"
     fi
 done
+
+# 2b. Optional agents docker context — only checked if its VM has been created.
+if [ -d "${HOME}/.colima/_lima/colima-agents" ]; then
+    if echo "$contexts" | grep -qx "colima-agents"; then
+        if docker --context colima-agents info >/dev/null 2>&1; then
+            pass "docker context 'colima-agents' connects"
+        else
+            warn "docker context 'colima-agents' present but not connectable"
+        fi
+    else
+        warn "docker context 'colima-agents' missing (start with: dotfiles stacks vm-agents-up)"
+    fi
+fi
 
 # 3. socket_vmnet daemon
 if pgrep -x socket_vmnet >/dev/null; then

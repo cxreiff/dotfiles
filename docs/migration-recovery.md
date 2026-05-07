@@ -45,7 +45,8 @@ colima delete -p bridged
 dotfiles stow setup    # or stow setup-base + stow setup-colima per Phase 8
 
 # 5. Re-create VMs from the stowed colima.yaml profiles
-dotfiles stacks vm-up
+dotfiles stacks vm-shared-up
+dotfiles stacks vm-bridged-up
 
 # 6. Restore named-volume backups if you're recovering from a backup
 #    (otherwise skip — host bind mounts are already populated):

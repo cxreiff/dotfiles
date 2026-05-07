@@ -4,21 +4,26 @@ Docker compose stacks. Not stowed — invoked from the repo via `just`.
 
 ## Architecture
 
-Two Colima VMs, each holding the stacks that match its networking model.
-Profile names describe networking, not their first tenant:
+Three Colima VMs, each tuned for the workloads it carries:
 
-| Profile   | VM type | Networking | Holds |
+| Profile    | VM type | Networking | Holds |
 |---|---|---|---|
-| `shared`  | `vz`   | vzNAT — Mac localhost forwards (Colima's `network.mode: shared`) | freshrss, wallabag, future Mac-localhost-only services |
-| `bridged` | `qemu` | socket_vmnet bridged — real LAN IP (Colima's `network.mode: bridged`) | adguard, homebridge — services that need real LAN visibility (DNS source IPs, mDNS/Bonjour) |
+| `shared`   | `vz`   | vzNAT — Mac localhost forwards (Colima's `network.mode: shared`) | freshrss, wallabag, future Mac-localhost-only services |
+| `bridged`  | `qemu` | socket_vmnet bridged — real LAN IP (Colima's `network.mode: bridged`) | adguard, homebridge — services that need real LAN visibility (DNS source IPs, mDNS/Bonjour) |
+| `agents`   | `vz`   | vzNAT (`network.mode: shared`) | container host for agent workloads |
 
-Why split: only `qemu + socket_vmnet bridged` preserves source IPs and
-propagates multicast (mDNS/Bonjour) to the LAN on macOS Colima — `vz`
-doesn't support bridged networking (Apple's `com.apple.vm.networking`
-entitlement isn't granted to third-party tools). Putting everything bridged
-would mean qemu emulation for all services and exposing every port on the
-LAN. The split keeps native vz performance for everything that doesn't need
-real LAN visibility.
+Each VM is started and stopped individually via `vm-<name>-up` /
+`vm-<name>-down`. `shared` and `bridged` are the always-on home-services
+VMs; `agents` is started on demand.
+
+Why `bridged` is a separate VM from `shared`: only `qemu + socket_vmnet
+bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to
+the LAN on macOS Colima — `vz` doesn't support bridged networking
+(Apple's `com.apple.vm.networking` entitlement isn't granted to
+third-party tools). Putting everything bridged would mean qemu emulation
+for all services and exposing every port on the LAN. The split keeps
+native vz performance for everything that doesn't need real LAN
+visibility.
 
 ## Stage 2 — fresh-device setup
 
@@ -31,7 +36,8 @@ brew install colima docker socket_vmnet gettext jq tailscale-cli
 sudo brew services start socket_vmnet                  # bridged-VM networking
 
 dotfiles stow setup-colima                             # symlink ~/.colima/<profile>/colima.yaml
-dotfiles stacks vm-up                                  # start both Colima VMs
+dotfiles stacks vm-shared-up                           # start the shared VM
+dotfiles stacks vm-bridged-up                          # start the bridged VM
 ```
 
 `brew install tailscale-cli` installs the CLI shim. The actual Tailscale
@@ -72,9 +78,12 @@ homebridge pairing identity). Run it after any non-trivial change.
 
 | Recipe | Effect |
 |---|---|
-| `vm-shared`  | `colima start -p shared`  |
-| `vm-bridged` | `colima start -p bridged` |
-| `vm-up`      | both profiles             |
+| `vm-shared-up`    | `colima start -p shared`  |
+| `vm-shared-down`  | `colima stop -p shared`   |
+| `vm-bridged-up`   | `colima start -p bridged` |
+| `vm-bridged-down` | `colima stop -p bridged`  |
+| `vm-agents-up`    | `colima start -p agents`  |
+| `vm-agents-down`  | `colima stop -p agents`   |
 
 ### Composite (across stacks)
 
