@@ -103,11 +103,39 @@ for stack in adguard freshrss homebridge wallabag; do
     fi
 done
 
+# onecli stores its vault in Docker named volumes inside the agents VM
+# (NOT under ~/.volumes/onecli/) — see stacks/onecli/README.md "Volumes"
+# for the threat-model rationale. Check the named volumes when the VM
+# is up; report [OFF] otherwise.
+if docker --context colima-agents info >/dev/null 2>&1; then
+    onecli_volumes=$(docker --context colima-agents volume ls --format '{{.Name}}' 2>/dev/null || true)
+    for vol in onecli_pgdata onecli_app-data; do
+        if echo "$onecli_volumes" | grep -qx "$vol"; then
+            pass "onecli named volume '$vol' present in colima-agents"
+        else
+            fail "onecli named volume '$vol' missing in colima-agents (run: dotfiles stacks onecli up)"
+        fi
+    done
+else
+    off "onecli volumes not checked (colima-agents not running)"
+fi
+
 echo
 echo "--- Backups ---"
 
 backups_dir="${HOME}/.volume-backups/daily"
-for stack in adguard freshrss homebridge wallabag; do
+agents_up=0
+if docker --context colima-agents info >/dev/null 2>&1; then
+    agents_up=1
+fi
+for stack in adguard freshrss homebridge onecli wallabag; do
+    # onecli's backup recipe is a no-op when colima-agents is down, so
+    # the >36h rule would FAIL daily on hosts that keep agents off.
+    # Report [OFF] in that case; otherwise apply the normal rule.
+    if [ "$stack" = "onecli" ] && [ "$agents_up" -eq 0 ]; then
+        off "${stack} backup-age skipped (colima-agents not running)"
+        continue
+    fi
     if [ ! -d "$backups_dir" ]; then
         fail "${stack} has no backups yet (no ~/.volume-backups/daily/)"
         continue
@@ -210,7 +238,7 @@ if [ -f "$hb_env" ] && [ -f "$hb_config" ]; then
 fi
 
 # Check B: env-key presence (no value reads, AC5.4-compliant)
-for stack in adguard freshrss homebridge wallabag; do
+for stack in adguard freshrss homebridge onecli wallabag; do
     example="${repo_root}/stacks/${stack}/.env.example"
     actual="${repo_root}/stacks/${stack}/.env"
     if [ ! -f "$example" ]; then

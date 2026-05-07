@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-05-06.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-05-07.
 
 ## Repo shape
 
@@ -41,6 +41,7 @@ What's in the repo vs what's environment-specific:
 | `stacks/<stack>/conf/...` templates (e.g., `homebridge/config.json.template`) | Live files under `~/.volumes/<stack>/` |
 | `stow/<package>/...` | Stowed symlinks under `$HOME` |
 | `stow/colima/.colima/<profile>/colima.yaml` | Live VM disks under `~/.colima/_lima/`, qemu MAC, DHCP-leased IP |
+| (none — upstream compose is tracked at `stacks/onecli/compose.yaml`) | `onecli_pgdata` / `onecli_app-data` Docker named volumes inside the `agents` VM (the credential vault — intentionally not bind-mounted to the Mac filesystem) |
 | `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data) |
 | `~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` |
 
@@ -109,13 +110,15 @@ Three Colima profiles, each tuned for the workloads it carries:
 |---|---|---|---|
 | `shared` | `vz` | vzNAT, Mac localhost forwards (Colima's `network.mode: shared`) | `freshrss`, `wallabag`, future Mac-localhost-only services |
 | `bridged` | `qemu` | bridged via `socket_vmnet`, real LAN IP (Colima's `network.mode: bridged`) | `adguard` (DNS source IPs), `homebridge` (HomeKit/mDNS) |
-| `agents` | `vz` | vzNAT (`network.mode: shared`) | container host for agent workloads |
+| `agents` | `vz` | vzNAT (`network.mode: shared`) | `onecli` (credential vault), future agent-side services |
 
 Each VM is started and stopped individually via `vm-<name>-up` / `vm-<name>-down`. `shared` and `bridged` are the always-on home-services VMs; `agents` is started on demand so its CPU/RAM are only reserved while in use.
 
 Why `bridged` exists separately from `shared`: only `qemu + socket_vmnet bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to the LAN on macOS Colima — `vz` doesn't support bridged networking. Putting everything bridged would force qemu emulation for all services and expose every port to the LAN. The split keeps native vz performance for everything that doesn't need real LAN visibility.
 
 `adguard` and `homebridge` justfiles use `docker --context colima-bridged`; `freshrss` and `wallabag` use `docker --context colima-shared`. Don't homogenize them. Likewise, the bridged-VM `serve` recipes parse `colima list` for the live VM IP (because `network_mode: host` binds inside the VM, not on Mac localhost) — keep that pattern.
+
+`onecli` uses `docker --context colima-agents`. **Unlike every other stack, onecli's volumes live inside the VM as Docker named volumes, not under `~/.volumes/onecli/`** — see `stacks/onecli/README.md` for the threat-model rationale.
 
 All three profiles set `autoActivate: false` so `colima start -p X` does not steal the active Docker context. The active context is held at `default` (the built-in `unix:///var/run/docker.sock` pointer, which is unbound on this machine — there's no Docker Desktop). Any ad-hoc `docker run` from a fresh shell therefore fails fast rather than silently dropping a stray container into a purpose-dedicated VM. Recipes that need a VM target it explicitly with `--context colima-<profile>`; if you genuinely want ad-hoc work to land somewhere, `docker context use colima-<profile>` is a deliberate, scoped switch.
 

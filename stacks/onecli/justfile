@@ -1,0 +1,80 @@
+context := "colima-agents"
+backups_dir := join(env("HOME"), ".volume-backups", "daily")
+
+default:
+    @just --list
+
+up:
+    docker --context {{context}} compose up -d
+
+down:
+    docker --context {{context}} compose down
+
+restart:
+    docker --context {{context}} compose restart
+
+logs:
+    docker --context {{context}} compose logs -f
+
+ps:
+    docker --context {{context}} compose ps
+
+pull:
+    docker --context {{context}} compose pull
+
+shell:
+    docker --context {{context}} compose exec onecli sh
+
+# Lazy-create the local-admin and register the host CLI's API key.
+# Required after first `up` — without it the host `onecli` CLI is not
+# usable. Idempotent; safe to re-run.
+bootstrap:
+    @./scripts/bootstrap.sh
+
+# Snapshot pgdata + app-data named volumes; no-op when agents VM is down.
+backup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker --context {{context}} info >/dev/null 2>&1; then
+        echo "onecli: agents VM not running, skipping backup"
+        exit 0
+    fi
+    docker --context {{context}} compose down
+    mkdir -p "{{backups_dir}}"
+    dst="{{backups_dir}}/onecli-$(date +%Y-%m-%d).tgz"
+    docker --context {{context}} run --rm \
+        -v onecli_pgdata:/src/pgdata:ro \
+        -v onecli_app-data:/src/app-data:ro \
+        -v "{{backups_dir}}":/dst \
+        alpine \
+        sh -c "cd /src && tar czf /dst/$(basename "$dst") pgdata app-data"
+    docker --context {{context}} compose up -d
+    echo "$dst"
+
+# Restore vault from tarball; refuses to overwrite a populated volume.
+restore tarball:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker --context {{context}} info >/dev/null 2>&1; then
+        echo "onecli: agents VM not running (run dotfiles stacks vm-agents-up)" >&2
+        exit 1
+    fi
+    if [ ! -f "{{tarball}}" ]; then
+        echo "onecli: tarball not found: {{tarball}}" >&2
+        exit 1
+    fi
+    docker --context {{context}} compose down
+    abs="$(cd "$(dirname "{{tarball}}")" && pwd)/$(basename "{{tarball}}")"
+    docker --context {{context}} run --rm \
+        -v onecli_pgdata:/dst/pgdata \
+        -v onecli_app-data:/dst/app-data \
+        -v "$(dirname "$abs")":/src:ro \
+        alpine \
+        sh -c "
+            if [ -n \"\$(ls -A /dst/pgdata 2>/dev/null)\" ] || [ -n \"\$(ls -A /dst/app-data 2>/dev/null)\" ]; then
+                echo 'onecli: target volumes are non-empty; refusing to clobber. Manually clear and retry.' >&2
+                exit 1
+            fi
+            cd /dst && tar xzf /src/$(basename "{{tarball}}")
+        "
+    docker --context {{context}} compose up -d

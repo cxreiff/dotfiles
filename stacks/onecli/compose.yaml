@@ -1,0 +1,49 @@
+name: onecli
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-onecli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onecli}
+      POSTGRES_DB: ${POSTGRES_DB:-onecli}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onecli}"]
+      interval: 5s
+      timeout: 3s
+      start_period: 15s
+      retries: 10
+    networks:
+      - onecli
+
+  onecli:
+    image: ghcr.io/onecli/onecli:${ONECLI_VERSION:-latest}
+    container_name: onecli
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${ONECLI_BIND_HOST:-127.0.0.1}:${ONECLI_APP_PORT:-10254}:10254"
+      - "${ONECLI_BIND_HOST:-127.0.0.1}:${ONECLI_GATEWAY_PORT:-10255}:10255"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-onecli}:${POSTGRES_PASSWORD:-onecli}@postgres:5432/${POSTGRES_DB:-onecli}
+      NEXT_PUBLIC_APP_URL: http://${ONECLI_BIND_HOST:-127.0.0.1}:${ONECLI_APP_PORT:-10254}
+      APP_URL: http://${ONECLI_BIND_HOST:-127.0.0.1}:${ONECLI_APP_PORT:-10254}
+    volumes:
+      - app-data:/app/data
+    env_file:
+      - .env
+    networks:
+      - onecli
+
+volumes:
+  pgdata:
+  app-data:
+
+networks:
+  onecli:
+    driver: bridge

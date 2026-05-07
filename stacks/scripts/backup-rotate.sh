@@ -12,7 +12,7 @@ set -euo pipefail
 backups="${HOME}/.volume-backups"
 mkdir -p "${backups}/daily" "${backups}/weekly" "${backups}/monthly"
 
-stacks=(adguard freshrss homebridge wallabag)
+stacks=(adguard freshrss homebridge onecli wallabag)
 today_iso="$(date +%Y-%m-%d)"
 dow="$(date +%u)"   # 1..7, 7 = Sunday
 dom="$(date +%d)"   # 01..31

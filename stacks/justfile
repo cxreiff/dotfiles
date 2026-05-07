@@ -1,6 +1,7 @@
 mod adguard
 mod freshrss
 mod homebridge
+mod onecli
 mod wallabag
 
 default:
@@ -10,9 +11,11 @@ up-all:
     just adguard up
     just freshrss up
     just homebridge up
+    just onecli up
     just wallabag up
 
 down-all:
+    just onecli down
     just wallabag down
     just homebridge down
     just freshrss down
@@ -22,18 +25,21 @@ ps-all:
     just adguard ps
     just freshrss ps
     just homebridge ps
+    just onecli ps
     just wallabag ps
 
 pull-all:
     just adguard pull
     just freshrss pull
     just homebridge pull
+    just onecli pull
     just wallabag pull
 
 backup-all:
     just adguard backup
     just freshrss backup
     just homebridge backup
+    just onecli backup
     just wallabag backup
     @./scripts/backup-rotate.sh
 
