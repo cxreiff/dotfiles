@@ -5,6 +5,15 @@
   <key>Label</key>
   <string>com.cxreiff.dotfiles.backup</string>
 
+  <!-- LaunchDaemon (system domain): fires the 4 AM backup without a GUI
+       login session (headless + FileVault host — see startup template).
+       Runs as the user so backups read the user's ~/.volumes and docker
+       contexts. -->
+  <key>UserName</key>
+  <string>__USER__</string>
+  <key>GroupName</key>
+  <string>staff</string>
+
   <key>ProgramArguments</key>
   <array>
     <string>__JUST__</string>

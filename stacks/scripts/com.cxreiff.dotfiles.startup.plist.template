@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cxreiff.dotfiles.startup</string>
+
+  <!-- LaunchDaemon (system domain): loads at system boot without a GUI
+       login session. This host is headless + FileVault, so no Aqua session
+       ever exists for a LaunchAgent to load into. Runs as the user so it
+       uses ~/.colima and the user's docker contexts, not root's. -->
+  <key>UserName</key>
+  <string>__USER__</string>
+  <key>GroupName</key>
+  <string>staff</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__STARTUP_SH__</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>__HOME__</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__LOGDIR__/com.cxreiff.dotfiles.startup.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOGDIR__/com.cxreiff.dotfiles.startup.err.log</string>
+</dict>
+</plist>

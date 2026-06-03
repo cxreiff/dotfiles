@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-05-07.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-06-02.
 
 ## Repo shape
 
@@ -9,7 +9,7 @@ Three independent areas, intentionally not unified:
 - `bare/` — legacy bare-repo dotfiles. **Unmanaged, untouched.** Do not edit unless the user explicitly asks; nothing in the active workflow reads from here.
 - `stow/` — GNU Stow packages, symlinked into `$HOME` for tools that read fixed paths.
 - `stacks/` — Docker Compose stacks. **Not stowed** — invoked in place via `just`.
-- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist template). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
+- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `startup.sh`, `startup-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist templates for the backup timer and the login autostart agent). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
 - `docs/` — operational references: `docs/migration-recovery.md` (clean-slate rebuild procedure), `docs/design-plans/` and `docs/implementation-plans/` (planning artifacts).
 
 The `dotfiles` shell alias (defined in `stow/base/.zshrc`) is the entry point for everything:
@@ -43,7 +43,8 @@ What's in the repo vs what's environment-specific:
 | `stow/colima/.colima/<profile>/colima.yaml` | Live VM disks under `~/.colima/_lima/`, qemu MAC, DHCP-leased IP |
 | (none — upstream compose is tracked at `stacks/onecli/compose.yaml`) | `onecli_pgdata` / `onecli_app-data` Docker named volumes inside the `agents` VM (the credential vault — intentionally not bind-mounted to the Mac filesystem) |
 | `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data) |
-| `~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` |
+| `/Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` (sudo) |
+| `/Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist` is per-machine | Installed by `dotfiles stacks startup-install` (sudo) |
 
 Things that look like "runtime drift" but are actually fine:
 - Bridged VM IP changing rarely (router reservation pins it; `dotfiles
@@ -83,7 +84,8 @@ dotfiles stacks ps-all            # status across stacks
 dotfiles stacks doctor            # ~22 read-only checks across 6 sections (run after non-trivial changes)
 
 dotfiles stacks backup-all        # per-stack backup + GFS rotation
-dotfiles stacks backup-install    # install ~/Library/LaunchAgents nightly 4 AM timer
+dotfiles stacks backup-install    # install nightly 4 AM backup LaunchDaemon (sudo)
+dotfiles stacks startup-install   # install boot autostart LaunchDaemon — all VMs + up-all (sudo)
 dotfiles stacks bridged-ip-changed  # re-coordinate every IP-coupled artifact
 
 dotfiles stacks <stack> up|down|restart|logs|ps|pull|shell
@@ -112,7 +114,7 @@ Three Colima profiles, each tuned for the workloads it carries:
 | `bridged` | `qemu` | bridged via `socket_vmnet`, real LAN IP (Colima's `network.mode: bridged`) | `adguard` (DNS source IPs), `homebridge` (HomeKit/mDNS) |
 | `agents` | `vz` | vzNAT (`network.mode: shared`) | `onecli` (credential vault), future agent-side services |
 
-Each VM is started and stopped individually via `vm-<name>-up` / `vm-<name>-down`. `shared` and `bridged` are the always-on home-services VMs; `agents` is started on demand so its CPU/RAM are only reserved while in use.
+Each VM is started and stopped individually via `vm-<name>-up` / `vm-<name>-down`. All three are brought up automatically at boot by the autostart LaunchDaemon (see "Boot autostart" below); `down` them individually when you want to reclaim a VM's CPU/RAM.
 
 Why `bridged` exists separately from `shared`: only `qemu + socket_vmnet bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to the LAN on macOS Colima — `vz` doesn't support bridged networking. Putting everything bridged would force qemu emulation for all services and expose every port to the LAN. The split keeps native vz performance for everything that doesn't need real LAN visibility.
 
@@ -143,8 +145,70 @@ When adding a new package, edit `stow/justfile` to add the package to **every ag
 
 - Per-stack `backup` recipes tar `~/.volumes/<stack>/` into `~/.volume-backups/daily/<stack>-YYYY-MM-DD.tgz`. Quiesce-needing stacks (`freshrss`, `wallabag`, `homebridge` — SQLite) wrap the tar in `down && up`; `adguard` stays up (its on-disk format is safe to read live).
 - `backup-rotate.sh` GFS-promotes daily → weekly (Sundays, kept 4) → monthly (1st of month, kept 3). `daily/` is capped at 7 per stack.
-- The launchd LaunchAgent installed by `dotfiles stacks backup-install` runs `dotfiles stacks backup-all` nightly at 04:00. Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. The plist Label is `com.cxreiff.dotfiles.backup`.
+- The launchd **LaunchDaemon** installed by `dotfiles stacks backup-install` runs `dotfiles stacks backup-all` nightly at 04:00. It's a daemon, not an agent (see "Boot autostart" — this host has no GUI session for an agent to load into). Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. The plist Label is `com.cxreiff.dotfiles.backup`.
 - `~/.volume-backups/` is gitignored runtime data; never commit a tarball.
+
+## Boot autostart — why LaunchDaemons, not LaunchAgents
+
+**This host is headless (administered over SSH) with FileVault on, so no
+Aqua GUI login session ever exists.** That single fact drives the whole
+autostart/backup design and is the #1 gotcha when something "doesn't start
+after a reboot":
+
+- **LaunchAgents (`~/Library/LaunchAgents`, `gui/$(id -u)` domain) never
+  load here** — they only load when a user logs into the desktop GUI, which
+  never happens. `launchctl bootstrap gui/$(id -u) …` fails with `125:
+  Domain does not support specified action` even from your own SSH shell.
+  (An earlier version of the backup timer was a LaunchAgent; it silently
+  stopped firing the first time the box rebooted without a GUI login.)
+- FileVault rules out the usual workaround (enable auto-login → GUI session
+  → agents load): auto-login is unavailable while FileVault is on.
+- Colima's `vz` VMs **do** start fine from a non-GUI context (they're
+  started over SSH all the time), so a daemon-as-user works.
+
+**Why keep FileVault (and not just disable it + auto-login, which is the
+more common headless recipe):** the `onecli` credential vault stores its
+`SECRET_ENCRYPTION_KEY` in the `app-data` named volume right next to the
+encrypted ciphertext in `pgdata`, both inside the `agents` VM disk image on
+the local disk. Key and ciphertext live together, so FileVault is the *only*
+at-rest protection against a stolen/imaged disk. This is a deliberate
+choice (2026-06-02). Consequence: a reboot halts at the FileVault unlock
+gate before any daemon runs. For planned remote reboots, unlock the next
+boot over SSH first: `sudo fdesetup authrestart`. Only unplanned power loss
+needs a physical/console unlock; after the unlock, the startup daemon fires
+normally.
+
+So both autostart and backups are **LaunchDaemons** in the `system` domain
+(`/Library/LaunchDaemons/`), loaded at system boot regardless of GUI login,
+installed and managed entirely over SSH with `sudo launchctl`. Each sets
+`UserName cxreiff` / `GroupName staff` so the process runs as the user
+(uses `~/.colima`, the user's docker contexts, `~/.volumes`), not as root.
+
+`dotfiles stacks startup-install` installs
+`/Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist` (Label
+`com.cxreiff.dotfiles.startup`, `RunAtLoad`). At boot it runs
+`scripts/startup.sh`, which brings up all three VMs (`vm-shared-up`,
+`vm-bridged-up`, `vm-agents-up`) then `up-all` — routed through the recipes,
+not raw `colima`/`docker`. Logs:
+`~/Library/Logs/com.cxreiff.dotfiles.startup.{out,err}.log`.
+
+- `colima start -p bridged` is non-interactive because `/etc/sudoers.d/colima`
+  grants `%staff` passwordless `socket_vmnet` (cxreiff is in `staff`).
+- VM-start failures abort the script; an `up-all` failure only warns (e.g.
+  `adguard up`'s tailnet-DNS hookup can race Tailscale at boot — re-run
+  `up-all` or check `doctor`).
+- The `*-install` recipes use `sudo` for the `/Library/LaunchDaemons` write
+  and `launchctl bootstrap system`. Run them as your normal user over SSH;
+  sudo prompts as needed.
+- If autostart/backups stop after a reboot, check the daemon is loaded:
+  `sudo launchctl print system/com.cxreiff.dotfiles.{startup,backup}`.
+  Manually re-trigger without rebooting:
+  `sudo launchctl kickstart -k system/com.cxreiff.dotfiles.startup`.
+- The orphan `homebrew.mxcl.colima` LaunchAgent that `brew install colima`
+  drops is deliberately **not** used — it runs `colima start -f` with no
+  `-p`, spinning up an unmanaged `default` profile (and stealing the active
+  Docker context, defeating `autoActivate: false`). It's renamed aside to
+  `homebrew.mxcl.colima.plist.orphan-disabled`; keep it disabled/removed.
 
 ## When editing
 

@@ -13,8 +13,10 @@ Three Colima VMs, each tuned for the workloads it carries:
 | `agents`   | `vz`   | vzNAT (`network.mode: shared`) | container host for agent workloads |
 
 Each VM is started and stopped individually via `vm-<name>-up` /
-`vm-<name>-down`. `shared` and `bridged` are the always-on home-services
-VMs; `agents` is started on demand.
+`vm-<name>-down`. All three are brought up automatically at boot once you
+install the autostart daemon (`dotfiles stacks startup-install`, see
+[Autostart at boot](#autostart-at-boot)); `down` a VM by hand when you want
+to reclaim its CPU/RAM.
 
 Why `bridged` is a separate VM from `shared`: only `qemu + socket_vmnet
 bridged` preserves source IPs and propagates multicast (mDNS/Bonjour) to
@@ -61,12 +63,20 @@ For each stack you want to run, follow that stack's README:
 - `wallabag/README.md` — read-it-later (shared VM, run `dotfiles stacks
   wallabag bootstrap` after first up)
 
-After all desired stacks are up, install the nightly backup timer:
+After all desired stacks are up, install the nightly backup timer and the
+boot autostart daemon (so VMs + stacks come back after a reboot):
 
 ```sh
-dotfiles stacks backup-install                         # ~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist
+dotfiles stacks backup-install                         # /Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist (sudo)
+dotfiles stacks startup-install                        # /Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist (sudo)
 dotfiles stacks doctor                                 # confirm everything's green
 ```
+
+Both are **LaunchDaemons**, not LaunchAgents, because this host is headless
++ FileVault — there's no GUI login session for an agent to load into. The
+`*-install` recipes use `sudo` for the install + `launchctl bootstrap
+system`; run them as your normal user over SSH. See
+[Autostart at boot](#autostart-at-boot).
 
 `doctor` runs read-only diagnostics (~12 checks across infrastructure,
 per-stack state, Tailscale failover state, IP coupling, .env keys, and
@@ -89,10 +99,12 @@ homebridge pairing identity). Run it after any non-trivial change.
 
 | Recipe | Effect |
 |---|---|
-| `up-all` | bring up adguard, freshrss, homebridge, wallabag |
-| `down-all` | reverse order: wallabag, homebridge, freshrss, adguard last (DNS-aware) |
+| `up-all` | bring up adguard, freshrss, homebridge, onecli, wallabag |
+| `down-all` | reverse order: onecli, wallabag, homebridge, freshrss, adguard last (DNS-aware) |
 | `ps-all` | container status across all stacks |
 | `pull-all` | pull latest images for all stacks |
+| `startup-install` | install the boot autostart daemon (all VMs + `up-all` at boot; sudo) |
+| `backup-install` | install the nightly 4 AM backup daemon (sudo) |
 
 ### Per-stack
 
@@ -115,15 +127,63 @@ recipe runs all four stacks then `backup-rotate.sh`:
 Schedule unattended nightly runs via launchd:
 
 ```sh
-dotfiles stacks backup-install     # installs ~/Library/LaunchAgents/com.cxreiff.dotfiles.backup.plist
-launchctl print gui/$(id -u)/com.cxreiff.dotfiles.backup    # confirm next start
+dotfiles stacks backup-install     # installs /Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist (sudo)
+sudo launchctl print system/com.cxreiff.dotfiles.backup     # confirm next start
 ```
+
+It's a LaunchDaemon (not a LaunchAgent) for the same reason as the autostart
+daemon — see [Autostart at boot](#autostart-at-boot).
 
 Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. `dotfiles stacks
 doctor` fails if the latest tarball for any stack is older than 36 hours.
 
 To restore on a fresh device, see
 [`docs/migration-recovery.md`](../docs/migration-recovery.md).
+
+## Autostart at boot
+
+Colima VMs don't survive a reboot on their own. **This host is headless
+(administered over SSH) with FileVault on, so there is no Aqua GUI login
+session** — which means a LaunchAgent would never load (agents only load on
+GUI login), and auto-login isn't available with FileVault. So autostart is a
+**LaunchDaemon** in the `system` domain instead: it loads at system boot
+regardless of GUI login and is managed entirely over SSH.
+
+`dotfiles stacks startup-install` installs a `RunAtLoad` LaunchDaemon
+(`/Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist`, Label
+`com.cxreiff.dotfiles.startup`) that runs as your user and executes
+`scripts/startup.sh` at boot: start all three VMs (`vm-shared-up`,
+`vm-bridged-up`, `vm-agents-up`) then `up-all`.
+
+```sh
+dotfiles stacks startup-install     # installs the daemon (sudo)
+sudo launchctl print system/com.cxreiff.dotfiles.startup    # confirm it's loaded
+```
+
+- **Rebooting remotely:** FileVault halts boot at the unlock gate before
+  any daemon runs (kept on because it's the only at-rest protection for the
+  `onecli` vault). For a planned remote reboot, unlock the next boot over
+  SSH first: `sudo fdesetup authrestart`. Only unplanned power loss needs a
+  physical/console unlock; the daemon fires normally once unlocked.
+- Logs land in `~/Library/Logs/com.cxreiff.dotfiles.startup.{out,err}.log`.
+- The daemon sets `UserName cxreiff` / `GroupName staff`, so it uses
+  `~/.colima` and the user's docker contexts (not root's).
+  `colima start -p bridged` is non-interactive because
+  `/etc/sudoers.d/colima` grants `%staff` passwordless `socket_vmnet`.
+- A VM that fails to start aborts the script; an `up-all` failure only
+  warns (most likely `adguard up`'s Tailscale-DNS hookup racing Tailscale
+  coming up at boot — re-run `dotfiles stacks up-all` or check `dotfiles
+  stacks doctor`).
+- Test it without rebooting (`-k` restarts the job):
+  ```sh
+  dotfiles stacks vm-agents-down                                  # least-disruptive VM to cycle
+  sudo launchctl kickstart -k system/com.cxreiff.dotfiles.startup # re-run the daemon
+  dotfiles stacks doctor                                          # agents VM + onecli back up?
+  ```
+- The orphan `homebrew.mxcl.colima` LaunchAgent that `brew install colima`
+  drops is **not** used here — it starts an unmanaged `default` profile
+  (and would steal the active docker context). It's renamed aside to
+  `homebrew.mxcl.colima.plist.orphan-disabled`; leave it disabled/removed.
 
 ## When the bridged VM IP changes
 

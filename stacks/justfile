@@ -46,6 +46,9 @@ backup-all:
 backup-install:
     @./scripts/backup-install.sh
 
+startup-install:
+    @./scripts/startup-install.sh
+
 vm-shared-up:
     colima start -p shared
 

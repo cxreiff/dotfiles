@@ -47,6 +47,7 @@ dotfiles stow setup    # or stow setup-base + stow setup-colima per Phase 8
 # 5. Re-create VMs from the stowed colima.yaml profiles
 dotfiles stacks vm-shared-up
 dotfiles stacks vm-bridged-up
+dotfiles stacks vm-agents-up
 
 # 6. Restore named-volume backups if you're recovering from a backup
 #    (otherwise skip — host bind mounts are already populated):
@@ -62,7 +63,14 @@ dotfiles stacks up-all
 #    the DHCP lease), re-coordinate:
 dotfiles stacks bridged-ip-changed   # follow the printed checklist
 
-# 9. Confirm
+# 9. Re-install the boot autostart + nightly backup LaunchDaemons (sudo).
+#    Required on a fresh device: this host is headless + FileVault, so
+#    nothing comes back after a reboot without these. See stacks/README.md
+#    "Autostart at boot".
+dotfiles stacks startup-install
+dotfiles stacks backup-install
+
+# 10. Confirm
 dotfiles stacks doctor
 ```
 
