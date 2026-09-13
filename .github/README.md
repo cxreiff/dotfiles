@@ -1,11 +1,28 @@
 # dotfiles
-Personal dotfiles for unix home directories, managed in source control via bare repositories.
 
-### setup
+Personal dotfiles and self-hosted service stacks for macOS, managed with
+GNU Stow, `just`, and Docker Compose on Colima.
 
-- https://www.atlassian.com/git/tutorials/dotfiles
+```
+dotfiles/
+├── archive/    legacy bare-repo dotfiles (frozen, unmanaged)
+├── stacks/     Docker compose stacks — opt-in (see stacks/README.md)
+├── stow/       Stow packages — symlinked into $HOME for tools that read fixed paths
+├── docs/       migration-recovery and other operational references
+└── justfile    root justfile (mod stacks, mod stow)
+```
 
-```curl -Lks https://raw.githubusercontent.com/cxreiff/dotfiles/main/.config/init.sh | /usr/bin/bash```
+Setup is staged. Most devices only need Stage 1.
 
-github token needs `repo`, `read:org`, and `gist`.
+1. **Stage 1 — universal** ([`README.md`](../README.md)): editor + shell
+   config via `dotfiles stow setup-base`.
+2. **Stage 2 — container support** ([`stacks/README.md`](../stacks/README.md)):
+   Colima VMs and the shared stack tooling, only on hosts that run stacks.
+3. **Stage 3 — per-stack** (`stacks/<name>/README.md`): first-run steps for
+   each stack you want.
 
+Everything is driven through the `dotfiles` shell alias:
+
+```sh
+alias dotfiles="just -f ~/Developer/dotfiles/justfile"
+```
