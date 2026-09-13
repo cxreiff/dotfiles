@@ -2,7 +2,7 @@
 
 ```
 dotfiles/
-├── bare/        legacy bare-repo dotfiles (unmanaged, untouched)
+├── archive/    legacy bare-repo dotfiles (frozen, unmanaged)
 ├── stacks/     Docker compose stacks — opt-in (see stacks/README.md)
 ├── stow/       Stow packages — symlinked into $HOME for tools that read fixed paths
 ├── docs/       migration-recovery and other operational references
@@ -67,5 +67,5 @@ dotfiles stow status-base       # dry-run for just base
 - Stow packages: `base` uses default folding (folder symlinks); other
   packages may need `--no-folding` if their target dir holds runtime
   state. See `stow/README.md`.
-- The `bare/` tree is frozen legacy. Nothing in the active workflow reads
-  from it.
+- The `archive/` tree is frozen legacy (the pre-Stow bare-repo layout).
+  Nothing in the active workflow reads from it.

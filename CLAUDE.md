@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Three independent areas, intentionally not unified:
 
-- `bare/` — legacy bare-repo dotfiles. **Unmanaged, untouched.** Do not edit unless the user explicitly asks; nothing in the active workflow reads from here.
+- `archive/` — legacy bare-repo dotfiles from before the move to Stow. **Frozen, unmanaged.** Do not edit unless the user explicitly asks; nothing in the active workflow reads from here.
 - `stow/` — GNU Stow packages, symlinked into `$HOME` for tools that read fixed paths.
 - `stacks/` — Docker Compose stacks. **Not stowed** — invoked in place via `just`.
 - `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `startup.sh`, `startup-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist templates for the backup timer and the login autostart agent). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
@@ -214,5 +214,5 @@ not raw `colima`/`docker`. Logs:
 
 - Cross-cutting changes (ports, new stack, new package) usually touch a justfile **and** a README — keep them in sync; READMEs are operational, not decorative.
 - Don't introduce manual `docker compose` / `tailscale serve` / `tailscale dns` invocations in docs or new recipes; route through the existing module structure.
-- The `bare/` tree is frozen. If a config under `bare/.config/<tool>/` needs to become live, the move is into `stow/base/.config/<tool>/` plus a `restow` — not editing in place.
+- The `archive/` tree is frozen. If a config under `archive/.config/<tool>/` needs to become live, the move is into `stow/base/.config/<tool>/` plus a `restow` — not editing in place.
 - After non-trivial changes, run `dotfiles stacks doctor` and fix any FAILs before declaring work complete. WARNs are informational (e.g., missing `.env` on a stack you don't run).
