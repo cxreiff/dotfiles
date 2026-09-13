@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-06-02.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-09-13.
 
 ## Repo shape
 
@@ -147,7 +147,7 @@ When adding a new package, edit `stow/justfile` to add the package to **every ag
 - **`internal_port`** — local app/forward port. Convention: `1` prefixed to `serve_port` (`8765` → `18765`, `8689` → `18689`).
 - The justfile is the source of truth for these. When changing a stack's port, the README usually lists the other places that must change in lockstep (e.g., for `adguard`: `internal_port` in justfile **and** `address:` in `~/.volumes/adguard/conf/AdGuardHome.yaml`; for `homebridge`: `internal_port` in justfile **and** `platforms[].port` in `~/.volumes/homebridge/config.json`).
 - `.env` is gitignored and kept `0600`; `.env.example` is the tracked template. The `.gitignore` allowlists `*.env.example` after blocking `*.env*` — keep that pattern intact.
-- `tailscale` is invoked via the absolute path `/Applications/Tailscale.app/Contents/MacOS/Tailscale` inside justfiles (the Homebrew CLI shim isn't assumed). The user's `.zshrc` aliases `tailscale` to the same path for interactive use.
+- `tailscale` is invoked via the absolute path `/Applications/Tailscale.app/Contents/MacOS/Tailscale` inside justfiles (the Homebrew CLI shim isn't assumed). Interactive shells use the `tailscale-cli` Homebrew shim on `PATH`; the old `.zshrc` alias to the .app binary was removed.
 
 ## Backups
 

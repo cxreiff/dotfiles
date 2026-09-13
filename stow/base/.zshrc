@@ -22,13 +22,15 @@ alias wrk='cd ~/Developer'
 alias dotfiles="just -f ~/Developer/dotfiles/justfile"
 
 alias zz='zellij'
+alias zars='zellij action rename-session'
+alias zart='zellij action rename-tab'
+alias zarp='zellij action rename-pane'
 
 alias cc='claude'
 alias cx='claude --dangerously-skip-permissions'
 
 alias suk='security unlock-keychain'
 alias adg='sudo /Applications/AdGuardHome/AdGuardHome -s'
-alias tailscale='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
 
 # completions
 fpath=("$HOME/.config/zsh/completions" $fpath)
@@ -54,3 +56,5 @@ esac
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
+
+source "$HOME/.config/token-meter/shell.sh"
