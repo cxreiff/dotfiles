@@ -34,10 +34,12 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 2
 fi
 
-vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+# $NF dotted-quad guard: with no DHCP lease on col0, `colima list` leaves
+# ADDRESS empty and $NF is the RUNTIME column ("docker").
+vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" && $NF ~ /^([0-9]+\.){3}[0-9]+$/ {print $NF}')
 if [ -z "$vm_ip" ]; then
-    echo "homebridge bootstrap: bridged VM not running" >&2
-    echo "  recover: dotfiles stacks vm-bridged" >&2
+    echo "homebridge bootstrap: bridged VM not running, or Running with no LAN IP (col0 DHCP lease missing)" >&2
+    echo "  recover: dotfiles stacks vm-bridged-down && dotfiles stacks vm-bridged-up" >&2
     exit 2
 fi
 

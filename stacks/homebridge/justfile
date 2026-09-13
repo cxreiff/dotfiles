@@ -54,8 +54,8 @@ bootstrap:
 serve:
     #!/usr/bin/env bash
     set -euo pipefail
-    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
-    if [ -z "$vm_ip" ]; then echo "bridged VM not running"; exit 1; fi
+    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" && $NF ~ /^([0-9]+\.){3}[0-9]+$/ {print $NF}')
+    if [ -z "$vm_ip" ]; then echo "bridged VM not running, or has no LAN IP (col0 DHCP lease missing — recover: vm-bridged-down && vm-bridged-up)"; exit 1; fi
     {{tailscale}} serve --bg --https={{serve_port}} "http://$vm_ip:{{internal_port}}"
 
 backup: down && up

@@ -18,9 +18,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # resolve.
 repo_root="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+# $NF dotted-quad guard: with no DHCP lease on col0, `colima list` leaves
+# ADDRESS empty and $NF is the RUNTIME column ("docker") — without the guard
+# that garbage would be sed'd into AGH bind_hosts and the serve mappings.
+vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" && $NF ~ /^([0-9]+\.){3}[0-9]+$/ {print $NF}')
 if [ -z "$vm_ip" ]; then
-    echo "bridged-ip-changed: bridged VM not running (run: dotfiles stacks vm-bridged)" >&2
+    echo "bridged-ip-changed: bridged VM not running, or Running with no LAN IP (col0 DHCP lease missing)" >&2
+    echo "  recover: dotfiles stacks vm-bridged-down && dotfiles stacks vm-bridged-up" >&2
     exit 1
 fi
 
