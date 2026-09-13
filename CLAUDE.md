@@ -9,7 +9,7 @@ Three independent areas, intentionally not unified:
 - `archive/` — legacy bare-repo dotfiles from before the move to Stow. **Frozen, unmanaged.** Do not edit unless the user explicitly asks; nothing in the active workflow reads from here.
 - `stow/` — GNU Stow packages, symlinked into `$HOME` for tools that read fixed paths.
 - `stacks/` — Docker Compose stacks. **Not stowed** — invoked in place via `just`.
-- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `startup.sh`, `startup-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist templates for the backup timer and the login autostart agent). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
+- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `startup.sh`, `startup-install.sh`, `dns-forward.sh`, `dns-forward-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist templates for the backup timer, the boot autostart daemon, and the dns-forward relay daemon). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
 - `docs/` — operational references: `docs/migration-recovery.md` (clean-slate rebuild procedure), `docs/design-plans/` and `docs/implementation-plans/` (planning artifacts).
 
 The `dotfiles` shell alias (defined in `stow/base/.zshrc`) is the entry point for everything:
@@ -45,6 +45,7 @@ What's in the repo vs what's environment-specific:
 | `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` (sudo) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist` is per-machine | Installed by `dotfiles stacks startup-install` (sudo) |
+| `/Library/LaunchDaemons/com.cxreiff.dotfiles.dns-forward.plist` is per-machine (bakes in node Tailscale IP + bridged VM IP) | Installed by `dotfiles stacks dns-forward-install` (sudo) |
 
 Things that look like "runtime drift" but are actually fine:
 - Bridged VM IP changing rarely (router reservation pins it; `dotfiles
@@ -86,6 +87,7 @@ dotfiles stacks doctor            # ~22 read-only checks across 6 sections (run 
 dotfiles stacks backup-all        # per-stack backup + GFS rotation
 dotfiles stacks backup-install    # install nightly 4 AM backup LaunchDaemon (sudo)
 dotfiles stacks startup-install   # install boot autostart LaunchDaemon — all VMs + up-all (sudo)
+dotfiles stacks dns-forward-install # install tailnet DNS relay LaunchDaemon — node-IP:53 -> AGH VM (adguard; sudo)
 dotfiles stacks bridged-ip-changed  # re-coordinate every IP-coupled artifact
 
 dotfiles stacks <stack> up|down|restart|logs|ps|pull|shell
@@ -101,6 +103,12 @@ Per-stack details: `stacks/<name>/README.md`. The `adguard` README documents a n
 ## DNS failover state machine
 
 `adguard up` and `adguard down` automatically toggle Tailscale Global Nameservers via `adguard/scripts/tailnet-dns.sh` (Tailscale REST API, requires `TAILSCALE_PAT` in `stacks/adguard/.env`). The `up` recipe wires `wait-healthy.sh && tailnet-dns.sh on` on a single shell line so a wait-healthy failure surfaces as the recipe's exit code (no half-state where AGH is unhealthy but tailnet NS already points at it). The `down` recipe flips off *before* `compose down` to keep the tailnet resolvable for the brief overlap.
+
+**Global NS "on" points at this node's Tailscale IP (`tailscale ip -4`), NOT the bridged VM's LAN IP.** AGH listens on the VM's LAN IP, which is only tailnet-reachable behind an approved subnet route — fragile: it breaks if a client doesn't accept routes, or if the remote network reuses `192.168.1.x`. The `dns-forward` LaunchDaemon (`stacks/scripts/dns-forward.sh`, installed by `dns-forward-install`) relays `node-IP:53` → `VM-IP:53` (socat UDP+TCP, runs as **root** to bind `:53` — the only stacks daemon that runs as root), so Global NS can point at a native `100.x` address every client always carries. `tailnet-dns.sh on` preflights the relay (`dig @node-ip`) and refuses to set Global NS if it's not answering — a dead relay must never become the tailnet's only resolver. The relay is therefore a hard dependency of the failover "on" state; `doctor`'s `--- DNS forwarder ---` section checks it. The `advertise` recipe / subnet-route dance is now **optional** (only for reaching the AGH admin UI by LAN IP over Tailscale) — DNS no longer needs it.
+
+**The `TAILSCALE_PAT` expires every 90 days** (last rotated 2026-08-24; next due ~2026-11-22). Expired → `tailnet-dns.sh` returns 401 → `adguard up` fails at boot → tailnet Global NS is left empty/stale, and `doctor` only shows `[WARN] tailnet-dns status unavailable`. If tailnet DNS is "mysteriously" not using AGH after a reboot, check this first: `dotfiles stacks adguard tailnet-dns-status`. Rotation: new token at https://login.tailscale.com/admin/settings/keys → `stacks/adguard/.env` → `dotfiles stacks adguard tailnet-dns-on`.
+
+The router's LAN DHCP advertises **two** DNS servers: AGH (`192.168.1.78`) first and the router (`192.168.1.1`) second as an unfiltered outage fallback — a deliberate 2026-08-24 trade-off (see `stacks/adguard/README.md` "Router-side configuration"). Some LAN traffic bypassing AGH is expected, not a bug.
 
 `doctor`'s "DNS failover" section cross-checks AGH container state vs the tailnet NS list and **fails** if AGH is Down but the tailnet NS still points at it (the bricked-DNS scenario). Don't add manual `tailscale dns` invocations to other places — route through the `tailnet-dns-*` recipes.
 
@@ -209,6 +217,15 @@ not raw `colima`/`docker`. Logs:
   `-p`, spinning up an unmanaged `default` profile (and stealing the active
   Docker context, defeating `autoActivate: false`). It's renamed aside to
   `homebrew.mxcl.colima.plist.orphan-disabled`; keep it disabled/removed.
+- The `homebrew.mxcl.socket_vmnet` LaunchDaemon is likewise deliberately
+  **stopped** (2026-07-26). Colima launches its own socket_vmnet
+  (`/opt/colima/bin`, bridged mode, via `/etc/sudoers.d/colima`); the brew
+  service ran an unused *shared*-mode instance whose vmnet gateway pulled in
+  InternetSharing/bootpd and bound mDNSResponder to wildcard `*:53`,
+  colliding with the dns-forward relay's bind and answering DNS probes as an
+  imposter whenever the relay was down (masked a dead relay for 7 weeks).
+  `brew install socket_vmnet` (the binary) is still required — only the
+  service must stay stopped. Do not `sudo brew services start socket_vmnet`.
 
 ## When editing
 

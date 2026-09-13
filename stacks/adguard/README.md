@@ -8,11 +8,16 @@ so DNS source IPs are preserved per-client.
 Prerequisites: Stage 2 setup complete (`dotfiles stow setup-colima` and `dotfiles stacks vm-up` already run).
 
 ```sh
-dotfiles stacks adguard up         # boot AGH (creates volume dirs, starts wizard on :3000)
+dotfiles stacks adguard up           # boot AGH (creates volume dirs, starts wizard on :3000)
 # complete wizard (see below)
-dotfiles stacks adguard serve      # expose via Tailscale at https://<host>.<tailnet>.ts.net:8689
-dotfiles stacks adguard advertise  # advertise VM IP as Tailscale subnet route
+dotfiles stacks adguard serve        # expose admin UI via Tailscale at https://<host>.<tailnet>.ts.net:8689
+dotfiles stacks dns-forward-install  # relay this node's Tailscale IP :53 -> AGH (for tailnet DNS; sudo)
 ```
+
+`dotfiles stacks adguard advertise` (advertise the VM LAN IP as a Tailscale
+subnet route) is **optional** — only needed if you want to reach the AGH
+admin UI by its LAN IP over Tailscale. Tailnet **DNS** no longer depends on
+it; see [Away-from-home DNS](#away-from-home-dns-the-node-ip-relay) below.
 
 ## First-run wizard
 
@@ -36,6 +41,45 @@ dotfiles stacks adguard advertise  # advertise VM IP as Tailscale subnet route
 ### Configure Devices / Open Dashboard
 - Informational. Continue. Admin UI moves to `http://<VM_IP>:18689`.
 
+## Away-from-home DNS (the node-IP relay)
+
+AGH listens inside the bridged VM on a **LAN IP** (e.g. `192.168.1.78`).
+That address is not on the tailnet, so a tailnet client (your phone away
+from home) can only reach it via an *approved subnet route* — and that's
+fragile two ways:
+
+- If the client doesn't accept subnet routes, queries to the VM IP go
+  nowhere. With Tailscale's "Override local DNS" on, the client has **no DNS
+  fallback**, so *all* name resolution dies (web/apps break) even though
+  tailnet IPs — like an SSH target at `100.x` — still work. That exact
+  asymmetry (SSH fine, everything else dead) is the tell.
+- If the remote network reuses `192.168.1.0/24` (most home/cafe routers do),
+  the client thinks the VM IP is a local host and never routes it over
+  Tailscale at all.
+
+**Fix:** the `dns-forward` LaunchDaemon (`dotfiles stacks
+dns-forward-install`) runs a socat relay on this Mac that forwards the
+node's **Tailscale IP** `:53` (UDP+TCP) to AGH at the VM IP `:53`. A native
+`100.x` node address is carried by *every* Tailscale client unconditionally
+— no subnet route, immune to the `192.168.1.x` collision. Global NS then
+points at the node IP (handled automatically by `tailnet-dns-on`, below),
+not the VM IP.
+
+```sh
+dotfiles stacks dns-forward-install   # install/repair the relay (sudo; bakes in node IP + VM IP)
+```
+
+- Runs as **root** (binding `:53` is privileged) — the only stacks daemon
+  that does; socat needs no user context. `brew install socat` is a Stage-2
+  prerequisite.
+- The relay's *target* is the bridged VM IP, so `bridged-ip-changed`
+  reinstalls it automatically when that IP changes.
+- `dotfiles stacks doctor`'s `--- DNS forwarder ---` check probes the relay
+  (`dig @<node-ip>`) and fails if it's installed but not answering.
+- Remove it with `sudo launchctl bootout
+  system/com.cxreiff.dotfiles.dns-forward && sudo rm
+  /Library/LaunchDaemons/com.cxreiff.dotfiles.dns-forward.plist`.
+
 ## DNS failover
 
 `adguard up`/`down` automatically toggle the tailnet's Global Nameservers
@@ -44,7 +88,7 @@ never strands devices on a dead resolver.
 
 ```sh
 dotfiles stacks adguard tailnet-dns-status   # current Global NS JSON
-dotfiles stacks adguard tailnet-dns-on       # set NS to bridged VM IP
+dotfiles stacks adguard tailnet-dns-on       # set NS to this node's Tailscale IP (the dns-forward relay)
 dotfiles stacks adguard tailnet-dns-off      # set NS to TAILNET_DNS_FALLBACK
 ```
 
@@ -166,17 +210,23 @@ DHCP DNS field semantics.
   - On Asus routers, set "Manual Assignment" master toggle to "Yes" or
     reservations won't be enforced.
 - **DHCP DNS** + **WAN DNS**: see "Router-side configuration (RT-AC68U,
-  stock ASUSWRT)" above for the corrected single-field config.
+  stock ASUSWRT)" above (two LAN DNS entries; WAN DNS anything but the AGH IP).
 
 ### Tailscale admin console
 
-After `dotfiles stacks adguard advertise` runs, two manual steps remain:
+**Global nameserver is set automatically** by `dotfiles stacks adguard
+tailnet-dns-on` (run on every `adguard up`) — it points Global NS at this
+node's Tailscale IP, served by the `dns-forward` relay. The only manual DNS
+step is toggling **"Override local DNS"** at
+<https://login.tailscale.com/admin/dns> if you want tailnet devices to use
+AGH even on cellular / other networks. (With Override on and the relay
+healthy, this is robust; the relay preflight in `tailnet-dns-on` refuses to
+point Global NS at a dead relay, so it can't strand devices.)
 
-1. **Approve subnet route** at <https://login.tailscale.com/admin/machines>
-   → find this host → "Edit route settings" → enable `<VM_IP>/32`.
-2. **Set Global nameserver** at <https://login.tailscale.com/admin/dns>
-   → "Global nameservers" → add `<VM_IP>`. Toggle "Override local DNS" if you
-   want Tailnet devices to use AGH even when on cellular / other networks.
+**Optional — subnet route approval** (only if you ran `adguard advertise` to
+reach the AGH admin UI by its LAN IP over Tailscale): approve it at
+<https://login.tailscale.com/admin/machines> → find this host → "Edit route
+settings" → enable `<VM_IP>/32`. Tailnet DNS does **not** need this.
 
 ## Changing the admin port later
 

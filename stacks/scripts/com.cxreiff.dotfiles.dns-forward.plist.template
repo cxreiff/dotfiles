@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cxreiff.dotfiles.dns-forward</string>
+
+  <!-- LaunchDaemon (system domain): loads at system boot without a GUI
+       login session (this host is headless + FileVault). Unlike the startup
+       and backup daemons this one runs as ROOT (no UserName) because binding
+       the privileged DNS port :53 requires it; socat is a pure network relay
+       and needs no user context (~/.colima, docker contexts, etc.). -->
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__DNS_FORWARD_SH__</string>
+    <string>__BIND__</string>
+    <string>__TARGET__</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <!-- Restart whenever a forwarder exits. At boot the bind IP (this node's
+       Tailscale address) may not exist yet until Tailscale comes up, so the
+       socat bind fails and the daemon exits; KeepAlive + ThrottleInterval
+       retries every 10s until the utun interface is assigned. -->
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>__LOGDIR__/com.cxreiff.dotfiles.dns-forward.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOGDIR__/com.cxreiff.dotfiles.dns-forward.err.log</string>
+</dict>
+</plist>

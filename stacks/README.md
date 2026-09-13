@@ -34,13 +34,22 @@ Prerequisites:
 - macOS host with admin/sudo (socket_vmnet needs sudo at install time).
 
 ```sh
-brew install colima docker socket_vmnet gettext jq tailscale-cli
-sudo brew services start socket_vmnet                  # bridged-VM networking
+brew install colima docker socket_vmnet gettext jq tailscale-cli socat
 
 dotfiles stow setup-colima                             # symlink ~/.colima/<profile>/colima.yaml
 dotfiles stacks vm-shared-up                           # start the shared VM
 dotfiles stacks vm-bridged-up                          # start the bridged VM
 ```
+
+Do **NOT** `sudo brew services start socket_vmnet` (despite the formula's
+caveat suggesting it). Colima launches its own copy of the binary
+(`/opt/colima/bin/socket_vmnet`, bridged mode on `en0`, via
+`/etc/sudoers.d/colima`) on `vm-bridged-up`; the Homebrew service runs a
+*shared*-mode instance nothing connects to, and its vmnet gateway drags in
+InternetSharing/bootpd and puts mDNSResponder on wildcard `*:53` — which
+collides with the dns-forward relay's `:53` bind and answers DNS probes
+when the relay is down, masking real failures (bitten 2026-06-09 →
+2026-07-26). `brew install socket_vmnet` (the binary) is still required.
 
 `brew install tailscale-cli` installs the CLI shim. The actual Tailscale
 .app must be installed separately from <https://tailscale.com/download>
@@ -69,6 +78,7 @@ boot autostart daemon (so VMs + stacks come back after a reboot):
 ```sh
 dotfiles stacks backup-install                         # /Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist (sudo)
 dotfiles stacks startup-install                        # /Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist (sudo)
+dotfiles stacks dns-forward-install                    # adguard only: tailnet DNS relay (sudo) — see adguard/README.md
 dotfiles stacks doctor                                 # confirm everything's green
 ```
 
@@ -198,8 +208,9 @@ Couplings that all reference the bridged VM IP:
 | AGH `bind_hosts:` | `~/.volumes/adguard/conf/AdGuardHome.yaml` | `bridged-ip-changed.sh` patches via sed |
 | AGH `serve` mapping `:8689` | `tailscale serve` state | `dotfiles stacks adguard serve` |
 | Homebridge `serve` mapping `:8767` | `tailscale serve` state | `dotfiles stacks homebridge serve` |
-| Subnet route advertisement | Tailscale node config | `dotfiles stacks adguard advertise` |
-| Tailscale Global Nameservers | Tailscale tailnet config | `dotfiles stacks adguard tailnet-dns-on` |
+| `dns-forward` relay **target** (VM IP) | `com.cxreiff.dotfiles.dns-forward.plist` | `dotfiles stacks dns-forward-install` |
+| Subnet route advertisement (optional — admin-UI-by-LAN-IP only) | Tailscale node config | `dotfiles stacks adguard advertise` |
+| Tailscale Global Nameservers (points at node IP, *not* VM IP) | Tailscale tailnet config | `dotfiles stacks adguard tailnet-dns-on` |
 | Router DHCP reservation | Router admin UI | **Manual** |
 | Tailscale admin route approval | Tailscale admin UI | **Manual** |
 

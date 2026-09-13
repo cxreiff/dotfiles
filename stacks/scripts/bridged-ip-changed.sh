@@ -69,7 +69,17 @@ echo
 echo "Re-advertising /32 subnet route ..."
 just -f "${repo_root}/justfile" stacks adguard advertise
 
-# 5. Refresh Global NS
+# 5. Reinstall the dns-forward relay (its TARGET is the bridged VM IP, which
+#    just changed). Skip on hosts that never installed it. Must run BEFORE
+#    the Global NS refresh, whose preflight probes the relay.
+dnsfwd_plist="/Library/LaunchDaemons/com.cxreiff.dotfiles.dns-forward.plist"
+if [ -f "$dnsfwd_plist" ]; then
+    echo
+    echo "Reinstalling dns-forward relay (target -> ${vm_ip}) ..."
+    just -f "${repo_root}/justfile" stacks dns-forward-install
+fi
+
+# 6. Refresh Global NS (points at this node's Tailscale IP / the relay)
 echo
 echo "Refreshing Tailscale Global Nameservers ..."
 just -f "${repo_root}/justfile" stacks adguard tailnet-dns-on

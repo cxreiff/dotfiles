@@ -17,6 +17,8 @@ case "$cmd" in
     *) echo "usage: tailnet-dns.sh on|off|status" >&2; exit 2 ;;
 esac
 
+TAILSCALE="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+
 # Source .env from the same dir as this script's parent (stacks/adguard/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 env_file="${SCRIPT_DIR}/../.env"
@@ -42,11 +44,23 @@ current_json="$(curl -fsS "${hdr[@]}" "$api" 2>&1)" || {
 }
 current="$(echo "$current_json" | jq -r '.dns | @json')"
 
-# For 'on' subcommand, resolve vm_ip BEFORE the wizard guard
+# For 'on' subcommand, resolve vm_ip (where AGH listens) and node_ip (this
+# node's Tailscale IP, where the dns-forward relay exposes AGH) BEFORE the
+# guards. Global NS points at node_ip — a native 100.x address every tailnet
+# client always carries — NOT the bridged VM's LAN IP (which is only reachable
+# behind an approved subnet route; see stacks/scripts/dns-forward.sh).
 if [ "$cmd" = "on" ]; then
-    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+    # $NF dotted-quad guard: with no DHCP lease on col0, `colima list` leaves
+    # ADDRESS empty and $NF is the RUNTIME column ("docker").
+    vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" && $NF ~ /^([0-9]+\.){3}[0-9]+$/ {print $NF}')
     if [ -z "$vm_ip" ]; then
-        echo "tailnet-dns: bridged VM not running (run: dotfiles stacks vm-bridged)" >&2
+        echo "tailnet-dns: bridged VM not running, or Running with no LAN IP (col0 DHCP lease missing)" >&2
+        echo "  recover: dotfiles stacks vm-bridged-down && dotfiles stacks vm-bridged-up" >&2
+        exit 2
+    fi
+    node_ip=$("$TAILSCALE" ip -4 2>/dev/null | head -1)
+    if [ -z "$node_ip" ]; then
+        echo "tailnet-dns: could not read this node's Tailscale IP (is Tailscale up?)" >&2
         exit 2
     fi
 fi
@@ -77,7 +91,18 @@ case "$cmd" in
             echo "  Re-run the wizard and pick \`col0\`, not All interfaces." >&2
             exit 0
         fi
-        target="[\"${vm_ip}\"]"
+
+        # dns-forward relay guard: Global NS will point at node_ip:53, served
+        # by the dns-forward LaunchDaemon relaying to AGH. If that relay isn't
+        # answering, pointing the tailnet at node_ip would brick all tailnet
+        # DNS — so probe it first and refuse rather than strand devices.
+        if ! dig +time=2 +tries=1 "@${node_ip}" google.com >/dev/null 2>&1; then
+            echo "tailnet-dns: dns-forward relay at ${node_ip}:53 not answering — refusing to set Global NS" >&2
+            echo "  Install/repair it: dotfiles stacks dns-forward-install" >&2
+            echo "  (check: sudo launchctl print system/com.cxreiff.dotfiles.dns-forward)" >&2
+            exit 3
+        fi
+        target="[\"${node_ip}\"]"
         ;;
 
     off)

@@ -49,6 +49,9 @@ backup-install:
 startup-install:
     @./scripts/startup-install.sh
 
+dns-forward-install:
+    @./scripts/dns-forward-install.sh
+
 vm-shared-up:
     colima start -p shared
 

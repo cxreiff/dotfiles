@@ -61,9 +61,14 @@ else
     off "docker context 'colima-agents' not registered"
 fi
 
-# 3. socket_vmnet daemon
-if pgrep -x socket_vmnet >/dev/null; then
-    pass "socket_vmnet daemon running"
+# 3. socket_vmnet daemon — must be Colima's bridged-mode instance
+# (/opt/colima/bin, started by `colima start -p bridged`), not just any
+# socket_vmnet: the Homebrew shared-mode LaunchDaemon also matches a bare
+# `pgrep -x socket_vmnet` but does nothing for the bridged VM.
+if pgrep -f 'socket_vmnet --vmnet-mode bridged' >/dev/null; then
+    pass "socket_vmnet daemon (bridged mode) running"
+elif pgrep -x socket_vmnet >/dev/null; then
+    fail "socket_vmnet running, but not Colima's bridged-mode instance (bridged VM networking will fail; start via: dotfiles stacks vm-bridged-up)"
 else
     fail "socket_vmnet daemon not running (bridged-profile networking will fail)"
 fi
@@ -159,11 +164,50 @@ for stack in adguard freshrss homebridge onecli wallabag; do
 done
 
 echo
+echo "--- DNS forwarder ---"
+
+# The dns-forward LaunchDaemon relays this node's Tailscale IP :53 -> the
+# bridged VM's AGH :53, so tailnet clients resolve via a native 100.x node IP
+# instead of the subnet-routed VM LAN IP. Global NS (DNS failover, below)
+# points at node_ip, so the relay is a hard dependency of that "on" state.
+node_ip=$("$TAILSCALE" ip -4 2>/dev/null | head -1)
+dnsfwd_plist="/Library/LaunchDaemons/com.cxreiff.dotfiles.dns-forward.plist"
+if [ ! -f "$dnsfwd_plist" ]; then
+    off "dns-forward daemon not installed (tailnet DNS relay; run: dotfiles stacks dns-forward-install)"
+elif [ -z "$node_ip" ]; then
+    warn "dns-forward installed but node Tailscale IP unreadable (is Tailscale up?)"
+else
+    # Process + probe cross-check. A dig answer alone is NOT proof the relay
+    # works: mDNSResponder holds wildcard *:53 whenever Internet Sharing
+    # machinery is up (e.g. a shared-mode vmnet daemon) and answers UDP
+    # probes on node_ip whenever socat is down — real but UNFILTERED
+    # answers, which masked a dead relay from 2026-06-09 to 2026-07-26.
+    # Healthy = both socat listeners exist AND the probe answers.
+    udp_pid=$(pgrep -f "socat.*UDP4-RECVFROM:53,bind=${node_ip}" | head -1)
+    tcp_pid=$(pgrep -f "socat.*TCP4-LISTEN:53,bind=${node_ip}" | head -1)
+    dig_ok=""
+    dig +time=2 +tries=1 "@${node_ip}" google.com >/dev/null 2>&1 && dig_ok=1
+
+    if [ -n "$udp_pid" ] && [ -n "$tcp_pid" ] && [ -n "$dig_ok" ]; then
+        pass "dns-forward relay answering at ${node_ip}:53 (socat UDP pid ${udp_pid}, TCP pid ${tcp_pid})"
+    elif [ -z "$udp_pid" ] && [ -z "$tcp_pid" ] && [ -n "$dig_ok" ]; then
+        fail "${node_ip}:53 answers but no socat relay is running — mDNSResponder *:53 imposter; tailnet DNS is bypassing AdGuard (check: sudo launchctl print system/com.cxreiff.dotfiles.dns-forward)"
+    elif [ -z "$udp_pid" ] || [ -z "$tcp_pid" ]; then
+        fail "dns-forward relay degraded (UDP socat: ${udp_pid:-down}, TCP socat: ${tcp_pid:-down}) — see ~/Library/Logs/com.cxreiff.dotfiles.dns-forward.err.log"
+    else
+        fail "dns-forward socat listeners running but ${node_ip}:53 not answering (bridged VM IP changed? AGH down?)"
+    fi
+fi
+
+echo
 echo "--- DNS failover ---"
 
 agh_state=$(docker --context colima-bridged inspect adguardhome \
     --format '{{.State.Running}}' 2>/dev/null || echo "false")
-vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" {print $NF}')
+# $NF ~ dotted-quad guard: when the bridged VM is Running but col0 has no
+# DHCP lease, `colima list` leaves ADDRESS empty and $NF is the RUNTIME
+# column ("docker") — vm_ip must come back empty, not garbage.
+vm_ip=$(colima list | awk '/^bridged[[:space:]]/ && $2 == "Running" && $NF ~ /^([0-9]+\.){3}[0-9]+$/ {print $NF}')
 
 tailnet_dns="${SCRIPT_DIR}/../adguard/scripts/tailnet-dns.sh"
 if [ -x "$tailnet_dns" ]; then
@@ -172,49 +216,58 @@ else
     ns_json=""
 fi
 
+# Global NS "on" target is this node's Tailscale IP (the dns-forward relay),
+# NOT the bridged VM IP — see "DNS forwarder" above and tailnet-dns.sh.
+on_target="[\"${node_ip}\"]"
 if [ -z "$ns_json" ]; then
     warn "tailnet-dns status unavailable (PAT missing or API unreachable)"
-elif [ "$agh_state" = "true" ] && [ "$ns_json" = "[\"${vm_ip}\"]" ]; then
-    pass "AGH Up + tailnet NS points at AGH (${vm_ip})"
-elif [ "$agh_state" = "true" ] && [ "$ns_json" != "[\"${vm_ip}\"]" ]; then
-    warn "AGH Up but tailnet NS = ${ns_json} (expected [\"${vm_ip}\"])"
-elif [ "$agh_state" = "false" ] && [ "$ns_json" = "[\"${vm_ip}\"]" ]; then
-    fail "AGH Down but tailnet NS still points at AGH — DNS bricked!"
+elif [ -z "$node_ip" ]; then
+    warn "node Tailscale IP unreadable — cannot evaluate tailnet NS (is Tailscale up?)"
+elif [ "$agh_state" = "true" ] && [ "$ns_json" = "$on_target" ]; then
+    pass "AGH Up + tailnet NS points at node relay (${node_ip})"
+elif [ "$agh_state" = "true" ] && [ "$ns_json" != "$on_target" ]; then
+    warn "AGH Up but tailnet NS = ${ns_json} (expected ${on_target})"
+elif [ "$agh_state" = "false" ] && [ "$ns_json" = "$on_target" ]; then
+    fail "AGH Down but tailnet NS still points at node relay — DNS bricked!"
 else
-    pass "AGH Down + tailnet NS pointed away from AGH (${ns_json})"
+    pass "AGH Down + tailnet NS pointed away from relay (${ns_json})"
 fi
 
 echo
 echo "--- IP coupling ---"
 
-# 1. AGH bind_hosts vs current VM IP
-agh_yaml="${HOME}/.volumes/adguard/conf/AdGuardHome.yaml"
-if [ -f "$agh_yaml" ]; then
-    bind=$(awk '
-        /^[[:space:]]+bind_hosts:/ { in_bh=1; next }
-        in_bh && /^[[:space:]]+- / { gsub(/^[[:space:]]+- /, ""); print; exit }
-    ' "$agh_yaml")
-    if [ "$bind" = "$vm_ip" ]; then
-        pass "AGH bind_hosts matches bridged VM IP (${vm_ip})"
-    else
-        fail "AGH bind_hosts is ${bind} but VM IP is ${vm_ip} (run: dotfiles stacks bridged-ip-changed)"
-    fi
+if [ -z "$vm_ip" ]; then
+    fail "bridged VM has no LAN IP (not Running, or col0 DHCP lease missing — recover: dotfiles stacks vm-bridged-down && dotfiles stacks vm-bridged-up); skipping IP-coupling checks"
 else
-    warn "AGH yaml not found at ${agh_yaml} (AGH never started?)"
-fi
-
-# 2/3. Tailscale serve mappings
-serve_status=$("$TAILSCALE" serve status 2>/dev/null || true)
-for port in 8689 8767; do
-    block=$(echo "$serve_status" | grep -A1 -E ":${port}[^0-9]" || true)
-    if [ -z "$block" ]; then
-        warn "tailscale serve has no mapping for :${port} (run: dotfiles stacks <stack> serve)"
-    elif echo "$block" | grep -qF "${vm_ip}"; then
-        pass "tailscale serve :${port} points at ${vm_ip}"
+    # 1. AGH bind_hosts vs current VM IP
+    agh_yaml="${HOME}/.volumes/adguard/conf/AdGuardHome.yaml"
+    if [ -f "$agh_yaml" ]; then
+        bind=$(awk '
+            /^[[:space:]]+bind_hosts:/ { in_bh=1; next }
+            in_bh && /^[[:space:]]+- / { gsub(/^[[:space:]]+- /, ""); print; exit }
+        ' "$agh_yaml")
+        if [ "$bind" = "$vm_ip" ]; then
+            pass "AGH bind_hosts matches bridged VM IP (${vm_ip})"
+        else
+            fail "AGH bind_hosts is ${bind} but VM IP is ${vm_ip} (run: dotfiles stacks bridged-ip-changed)"
+        fi
     else
-        fail "tailscale serve :${port} not pointing at ${vm_ip} (run: dotfiles stacks bridged-ip-changed)"
+        warn "AGH yaml not found at ${agh_yaml} (AGH never started?)"
     fi
-done
+
+    # 2/3. Tailscale serve mappings
+    serve_status=$("$TAILSCALE" serve status 2>/dev/null || true)
+    for port in 8689 8767; do
+        block=$(echo "$serve_status" | grep -A1 -E ":${port}[^0-9]" || true)
+        if [ -z "$block" ]; then
+            warn "tailscale serve has no mapping for :${port} (run: dotfiles stacks <stack> serve)"
+        elif echo "$block" | grep -qF "${vm_ip}"; then
+            pass "tailscale serve :${port} points at ${vm_ip}"
+        else
+            fail "tailscale serve :${port} not pointing at ${vm_ip} (run: dotfiles stacks bridged-ip-changed)"
+        fi
+    done
+fi
 
 echo
 echo "--- Stack identity & env ---"
