@@ -53,7 +53,15 @@ Setup:
 1. Generate a Tailscale PAT at
    <https://login.tailscale.com/admin/settings/keys>
    (90-day max expiry; the token inherits your account's tailnet permissions,
-   which on a tailnet you own/admin includes DNS read+write).
+   which on a tailnet you own/admin includes DNS read+write — the key UI
+   has no per-scope selector). **The token silently expires after 90
+   days.** When it does, `adguard up` fails at the `tailnet-dns on` step
+   with `API GET failed: … 401`, Global NS is left wherever it was, and
+   `doctor` only emits `[WARN] tailnet-dns status unavailable` — easy to
+   miss. Symptom seen 2026-08-24 after a reboot: tailnet Global NS empty,
+   nobody on the tailnet using AGH. Fix: regenerate the token, update
+   `.env`, run `dotfiles stacks adguard tailnet-dns-on`. Set a reminder
+   for ~80 days after each rotation (last rotated 2026-08-24).
 2. `cp .env.example .env && chmod 600 .env`; paste the PAT.
 
 Why the API and not Tailscale's multi-resolver fallback: Tailscale's
@@ -107,34 +115,39 @@ half-down state explicitly.
 
 ## Router-side configuration (RT-AC68U, stock ASUSWRT)
 
-Stock ASUSWRT on the RT-AC68U exposes a **single** LAN DHCP "DNS Server"
-field (no second slot, no "Advertise router's IP" toggle). DHCP Option 6
-multi-DNS is only available on Merlin firmware via `dnsmasq.conf.add` —
-not relevant here.
+Current stock ASUSWRT on the RT-AC68U advertises **two** LAN DHCP DNS
+servers (verified 2026-08-24: a fresh lease on this host carries
+`domain_name_server = {192.168.1.78, 192.168.1.1}`). An earlier version
+of this section claimed a single field — that was wrong / outdated.
 
 | Field | UI path | Value | Why |
 |---|---|---|---|
-| LAN DHCP DNS | LAN → DHCP Server → "DNS and WINS Server Setting" → DNS Server | bridged VM IP (e.g. `192.168.1.78`) | All LAN clients filter through AGH. |
-| WAN DNS | WAN → Internet Connection → "WAN DNS Setting" | `1.1.1.1` (and `1.0.0.1` if a second slot is shown) | The router's own outbound queries (DDNS, NTP, firmware checks) keep working when AGH is down. |
+| LAN DHCP DNS 1 | LAN → DHCP Server → "DNS and WINS Server Setting" → DNS Server | bridged VM IP (e.g. `192.168.1.78`) | All LAN clients filter through AGH. |
+| LAN DHCP DNS 2 / "Advertise router's IP" | same section | router IP (`192.168.1.1`) — **deliberate, see caveat** | Unfiltered fallback so the LAN keeps resolving when AGH/this host is down (e.g. after a power outage). |
+| WAN DNS | WAN → Internet Connection → "WAN DNS Setting" | Automatic (ISP) or `1.1.1.1` — anything **except** `192.168.1.78` | Only the router's own queries (DDNS, NTP, firmware checks) use this; it must not depend on AGH. |
+
+**Caveat on the second entry:** it is an unfiltered escape hatch. Clients
+do not strictly prefer the first server — macOS/iOS move to the next
+resolver after a timeout and stick with it for a while, Windows
+round-robins, some IoT devices use both — so a slice of LAN traffic will
+bypass AGH filtering and its query log unpredictably. This is accepted in
+exchange for not losing LAN DNS entirely when AGH is down (which is what
+happened after the 2026-08-23 power outage and forced ad-hoc router
+edits). If filtering coverage matters more than outage resilience, clear
+the second entry.
 
 Failure modes:
 
 - **AGH up, on-LAN client**: client queries the AGH VM IP via DHCP. Filtered
-  resolution. Normal operation.
+  resolution. Normal operation (modulo the caveat above).
 - **AGH down, on-tailnet client (any network)**: `dotfiles stacks adguard
   down` flips Tailscale Global Nameservers to the public fallback before
   stopping AGH (Phase 5). Tailnet devices keep resolving.
-- **AGH down, on-LAN client *not* on the tailnet**: client's single DHCP-
-  advertised DNS is unreachable. **DNS resolution stops** until AGH comes
-  back. This is a hardware constraint of stock ASUSWRT — there's no
-  router-advertised secondary to fall through to. OS-level DHCP-DNS
-  failover behavior is unreliable across platforms anyway (Windows can
-  hang minutes on a dead primary; iOS is sticky to first responder), so a
-  hypothetical second slot would not have made this materially better.
-  Mitigations: (a) keep planned AGH downtime short; (b) AGH's own
-  `fallback_dns` config covers AGH-upstream failures, which are the more
-  common outage; (c) if you ever need to take AGH down for an extended
-  window, manually set the LAN DHCP DNS field to `1.1.1.1` first.
+- **AGH down, on-LAN client *not* on the tailnet**: client falls through to
+  `192.168.1.1` (unfiltered) after its OS-specific timeout. Resolution
+  continues, slower at first. Mitigations still worth keeping: (a) keep
+  planned AGH downtime short; (b) AGH's own `fallback_dns` config covers
+  AGH-upstream failures, which are the more common outage.
 
 References: AdGuard Home Configuration wiki (`fallback_dns`); Pi-hole
 forum thread on ASUS LAN-vs-WAN DNS distinction; ASUS support FAQ on
