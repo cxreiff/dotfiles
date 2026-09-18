@@ -1,60 +1,12 @@
 
-# env
+source $HOME/.config/zsh/zshrc/shell.zsh
+source $HOME/.config/zsh/zshrc/prompt.zsh
+source $HOME/.config/zsh/zshrc/aliases.zsh
 
-export COLORTERM=truecolor
-export EDITOR=nvim
-export VISUAL=nvim
+source $HOME/.config/zsh/tools/cw.zsh
+source $HOME/.config/zsh/tools/token-meter.zsh
+source $HOME/.config/zsh/tools/boxclaude.zsh
+source $HOME/.config/zsh/tools/svr.zsh
 
-## command line prompt
-# PROMPT='%F{208}%n@mini%f %F{cyan}%~%f%(1V. %F{magenta}[%1v]%f.) %F{208}❯%f '
-PROMPT=$'\n%F{cyan}%~%f%(1V. %F{magenta}[%1v]%f.)\n%F{208}%n@mini%f %F{208}❯%f '
-precmd() { psvar=(); local b=$(git branch --show-current 2>/dev/null); [[ -n $b ]] && psvar[1]=$b; }
+[[ -f $HOME/.zshrc.local ]] && source $HOME/.zshrc.local
 
-export PATH="$HOME/.local/bin:$PATH"
-
-# aliases
-
-alias ls='ls -a'
-
-alias vi='nvim'
-alias zrc='vi ~/.zshrc && source ~/.zshrc'
-alias wrk='cd ~/Developer'
-alias dotfiles="just -f ~/Developer/dotfiles/justfile"
-
-alias zz='zellij'
-alias zars='zellij action rename-session'
-alias zart='zellij action rename-tab'
-alias zarp='zellij action rename-pane'
-
-alias cc='claude'
-alias cx='claude --dangerously-skip-permissions'
-
-alias suk='security unlock-keychain'
-alias adg='sudo /Applications/AdGuardHome/AdGuardHome -s'
-
-# completions
-fpath=("$HOME/.config/zsh/completions" $fpath)
-autoload -Uz compinit && compinit
-
-# scripts
-source "$HOME/.config/scripts/cw.zsh"
-
-# tool setup
-
-## fnm
-eval "$(fnm env --use-on-cd --shell zsh)"
-
-# pnpm
-export PNPM_HOME="/Users/cxreiff/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-
-
-source "$HOME/.config/token-meter/shell.sh"

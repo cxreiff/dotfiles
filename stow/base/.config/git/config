@@ -1,0 +1,21 @@
+[user]
+    name = cxreiff
+    email = cooper@cxreiff.com
+[core]
+    editor = nvim
+[init]
+    defaultBranch = main
+[push]
+    autoSetupRemote = true
+[diff]
+	algorithm = histogram
+[log]
+	date = iso
+
+[credential "https://github.com"]
+    helper = 
+    helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+    helper = 
+    helper = !/opt/homebrew/bin/gh auth git-credential
+

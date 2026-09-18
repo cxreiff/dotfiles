@@ -17,7 +17,7 @@ case "$cmd" in
     *) echo "usage: tailnet-dns.sh on|off|status" >&2; exit 2 ;;
 esac
 
-TAILSCALE="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+TAILSCALE="/opt/homebrew/bin/tailscale"
 
 # Source .env from the same dir as this script's parent (stacks/adguard/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -8,17 +8,29 @@ vim.opt.clipboard:append("unnamedplus")
 
 -- Use OSC 52 for clipboard when running over SSH so yanks reach the local
 -- system clipboard via the terminal emulator instead of the remote host.
-if vim.env.SSH_TTY then
+-- Tailscale SSH sets SSH_CONNECTION but not SSH_TTY, so check both.
+-- Paste does not use OSC 52: zellij does not answer OSC 52 queries and
+-- Alacritty only permits copy, so nvim would hang waiting for a reply.
+-- Instead, paste returns whatever was last copied from within nvim.
+if vim.env.SSH_TTY or vim.env.SSH_CONNECTION then
+  local osc52 = require("vim.ui.clipboard.osc52")
+  local last = { ["+"] = { {}, "v" }, ["*"] = { {}, "v" } }
+  local function copy(reg)
+    local send = osc52.copy(reg)
+    return function(lines, regtype)
+      last[reg] = { lines, regtype }
+      send(lines, regtype)
+    end
+  end
+  local function paste(reg)
+    return function()
+      return last[reg]
+    end
+  end
   vim.g.clipboard = {
     name = "OSC 52",
-    copy = {
-      ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
-      ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
-    },
-    paste = {
-      ["+"] = require("vim.ui.clipboard.osc52").paste("+"),
-      ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
-    },
+    copy = { ["+"] = copy("+"), ["*"] = copy("*") },
+    paste = { ["+"] = paste("+"), ["*"] = paste("*") },
   }
 end
 

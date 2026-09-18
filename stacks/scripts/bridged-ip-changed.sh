@@ -9,7 +9,7 @@
 #   other — sed, diff, just, or tailscale failed (set -euo pipefail)
 set -euo pipefail
 
-TAILSCALE="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+TAILSCALE="/opt/homebrew/bin/tailscale"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # repo root is two levels up from stacks/scripts/ (matches Phase 4 backup-install.sh).
 # Repo root's justfile has `mod stacks`, so `just -f <repo>/justfile stacks <recipe>`

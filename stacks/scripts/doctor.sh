@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/check.sh
 source "${SCRIPT_DIR}/lib/check.sh"
 
-TAILSCALE="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+TAILSCALE="/opt/homebrew/bin/tailscale"
 
 echo "--- Infrastructure ---"
 
@@ -92,7 +92,7 @@ fi
 if [ -x "$TAILSCALE" ]; then
     pass "tailscale CLI present at $TAILSCALE"
 else
-    fail "tailscale CLI missing at $TAILSCALE (install Tailscale.app)"
+    fail "tailscale CLI missing at $TAILSCALE (run: brew install tailscale)"
 fi
 
 echo

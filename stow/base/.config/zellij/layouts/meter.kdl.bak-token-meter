@@ -1,0 +1,73 @@
+// token-meter zellij layout: the built-in compact bar replaced by zjstatus,
+// with the Claude usage meter right-aligned on the bottom row.
+//
+// Template: install.sh replaces /Users/cxreiff and writes the result to
+// ~/.config/zellij/layouts/meter.kdl, selected via `default_layout "meter"`
+// in ~/.config/zellij/config.kdl. Colors mirror the "custom" theme there.
+layout {
+    default_tab_template {
+        children
+        pane size=1 borderless=true {
+            plugin location="zjstatus" {
+                color_bg      "#1a1a1a"
+                color_black   "#252525"
+                color_fg      "#b4b4b4"
+                color_dim     "#5a5a5a"
+                color_dimmer  "#464646"
+                color_red     "#d08670"
+                color_green   "#7bb099"
+                color_yellow  "#ffc591"
+                color_blue    "#8db4d4"
+                color_magenta "#ff968c"
+                color_orange  "#de9bc8"
+
+                format_left   "{mode}#[fg=$dim,bg=$bg] {session} {tabs}"
+                format_center ""
+                format_right  "{command_meter} "
+                format_space  "#[bg=$bg]"
+                format_hide_on_overlength "true"
+                format_precedence "lrc"
+
+                mode_normal       "#[fg=$black,bg=$green,bold] NORMAL "
+                mode_tmux         "#[fg=$black,bg=$yellow,bold] TMUX "
+                mode_locked       "#[fg=$black,bg=$red,bold] LOCKED "
+                mode_pane         "#[fg=$black,bg=$blue,bold] PANE "
+                mode_tab          "#[fg=$black,bg=$blue,bold] TAB "
+                mode_resize       "#[fg=$black,bg=$blue,bold] RESIZE "
+                mode_move         "#[fg=$black,bg=$blue,bold] MOVE "
+                mode_scroll       "#[fg=$black,bg=$blue,bold] SCROLL "
+                mode_enter_search "#[fg=$black,bg=$blue,bold] SEARCH "
+                mode_search       "#[fg=$black,bg=$blue,bold] SEARCH "
+                mode_session      "#[fg=$black,bg=$orange,bold] SESSION "
+                mode_rename_tab   "#[fg=$black,bg=$magenta,bold] RENAME "
+                mode_rename_pane  "#[fg=$black,bg=$magenta,bold] RENAME "
+                mode_prompt       "#[fg=$black,bg=$magenta,bold] PROMPT "
+                mode_default_to_mode "normal"
+
+                tab_normal              "#[fg=$dim,bg=$bg] {name} "
+                tab_normal_fullscreen   "#[fg=$dim,bg=$bg] {name} [] "
+                tab_normal_sync         "#[fg=$dim,bg=$bg] {name} <> "
+                tab_active              "#[fg=$fg,bg=$black,bold] {name} {floating_indicator}"
+                tab_active_fullscreen   "#[fg=$fg,bg=$black,bold] {name} {fullscreen_indicator}"
+                tab_active_sync         "#[fg=$fg,bg=$black,bold] {name} {sync_indicator}"
+                tab_rename              "#[fg=$magenta,bg=$black,bold] {name} "
+                tab_separator           ""
+                tab_sync_indicator      "<> "
+                tab_fullscreen_indicator "[] "
+                tab_floating_indicator  "~ "
+
+                // Claude usage meter, e.g. "5h +3%  7d -10%".
+                // The command runs outside a shell, so the path is absolute.
+                //   --no-fetch     never call the API from the bar; it only ever
+                //                  reads the cache Claude Code's statusLine fills.
+                //   --hide-stale   print nothing once the cache is older than
+                //                  180 s, i.e. no live Claude session is feeding
+                //                  it, so the bar goes blank instead of lying.
+                command_meter_command    "/Users/cxreiff/.local/bin/token-meter --format zjstatus --no-fetch --hide-stale 180"
+                command_meter_format     "{stdout}"
+                command_meter_interval   "60"
+                command_meter_rendermode "dynamic"
+            }
+        }
+    }
+}

@@ -20,7 +20,7 @@
 #   other — sed/plutil/sudo/launchctl failed (set -euo pipefail)
 set -euo pipefail
 
-TAILSCALE="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+TAILSCALE="/opt/homebrew/bin/tailscale"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 forward_sh="${SCRIPT_DIR}/dns-forward.sh"

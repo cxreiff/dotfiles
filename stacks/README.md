@@ -34,7 +34,7 @@ Prerequisites:
 - macOS host with admin/sudo (socket_vmnet needs sudo at install time).
 
 ```sh
-brew install colima docker socket_vmnet gettext jq tailscale-cli socat
+brew install colima docker socket_vmnet gettext jq tailscale socat
 
 dotfiles stow setup-colima                             # symlink ~/.colima/<profile>/colima.yaml
 dotfiles stacks vm-shared-up                           # start the shared VM
@@ -51,10 +51,18 @@ collides with the dns-forward relay's `:53` bind and answers DNS probes
 when the relay is down, masking real failures (bitten 2026-06-09 →
 2026-07-26). `brew install socket_vmnet` (the binary) is still required.
 
-`brew install tailscale-cli` installs the CLI shim. The actual Tailscale
-.app must be installed separately from <https://tailscale.com/download>
-or via `brew install --cask tailscale` — every justfile invokes the .app
-binary directly at `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+`brew install tailscale` installs the open-source `tailscaled` daemon and
+the `tailscale` CLI (not the Mac App Store / `.app` client — this host
+runs headless, so there is no GUI to host the app). Start the daemon once
+as a root LaunchDaemon and log in:
+
+```sh
+sudo brew services start tailscale
+sudo tailscale up --hostname=cxmini
+```
+
+Every justfile and script invokes the CLI by absolute path at
+`/opt/homebrew/bin/tailscale` (LaunchDaemons run with a minimal `PATH`).
 
 After Stage 2, both Colima VMs are running and Docker contexts
 `colima-shared` and `colima-bridged` exist.

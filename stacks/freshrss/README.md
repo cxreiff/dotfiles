@@ -20,7 +20,7 @@ dotfiles stacks freshrss serve   # expose via Tailscale at https://<host>.<tailn
 
 | Key | Purpose |
 |---|---|
-| `PUBLIC_HOST` | Tailscale MagicDNS hostname (e.g., `cxreiff-mini.faun-fir.ts.net`) |
+| `PUBLIC_HOST` | Tailscale MagicDNS hostname (e.g., `cxmini.faun-fir.ts.net`) |
 | `PUBLIC_PORT` | Tailscale-side HTTPS port (matches `serve_port` in justfile) |
 | `INTERNAL_PORT` | Mac localhost forward port (matches `internal_port`) |
 | `ADMIN_EMAIL` | Admin contact, used by FreshRSS install |

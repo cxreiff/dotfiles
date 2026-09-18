@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-09-13.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-09-14.
 
 ## Repo shape
 
@@ -25,7 +25,7 @@ The root `justfile` only does `mod stacks` / `mod stow`; all real recipes live i
 The top-level README is bifurcated; CLAUDE.md edits that touch setup must keep the same boundaries:
 
 - **Stage 1 (`README.md`)** — universal: `brew install just stow neovim ...` + `dotfiles stow setup-base`. Every device.
-- **Stage 2 (`stacks/README.md`)** — opt-in container support: brew Colima/Docker/socket_vmnet/tailscale-cli + `dotfiles stow setup-colima` + `dotfiles stacks vm-shared-up` + `dotfiles stacks vm-bridged-up`. Only on hosts that run stacks.
+- **Stage 2 (`stacks/README.md`)** — opt-in container support: brew Colima/Docker/socket_vmnet/tailscale + `dotfiles stow setup-colima` + `dotfiles stacks vm-shared-up` + `dotfiles stacks vm-bridged-up`. Only on hosts that run stacks.
 - **Stage 3** — per-stack first-run, documented in each `stacks/<name>/README.md`.
 
 `docs/migration-recovery.md` is the canonical clean-slate / fresh-device rebuild procedure (covers `colima delete && colima start` preserving the qemu-deterministic MAC, restore-from-tarball, and the bridged-IP recovery checklist).
@@ -147,7 +147,7 @@ When adding a new package, edit `stow/justfile` to add the package to **every ag
 - **`internal_port`** — local app/forward port. Convention: `1` prefixed to `serve_port` (`8765` → `18765`, `8689` → `18689`).
 - The justfile is the source of truth for these. When changing a stack's port, the README usually lists the other places that must change in lockstep (e.g., for `adguard`: `internal_port` in justfile **and** `address:` in `~/.volumes/adguard/conf/AdGuardHome.yaml`; for `homebridge`: `internal_port` in justfile **and** `platforms[].port` in `~/.volumes/homebridge/config.json`).
 - `.env` is gitignored and kept `0600`; `.env.example` is the tracked template. The `.gitignore` allowlists `*.env.example` after blocking `*.env*` — keep that pattern intact.
-- `tailscale` is invoked via the absolute path `/Applications/Tailscale.app/Contents/MacOS/Tailscale` inside justfiles (the Homebrew CLI shim isn't assumed). Interactive shells use the `tailscale-cli` Homebrew shim on `PATH`; the old `.zshrc` alias to the .app binary was removed.
+- Tailscale is the Homebrew `tailscale` formula (open-source `tailscaled` as a root LaunchDaemon via `brew services`), **not** Tailscale.app — the host is headless, so the GUI client was dropped (2026-09-14). `tailscale` is invoked via the absolute path `/opt/homebrew/bin/tailscale` inside justfiles and scripts because LaunchDaemons run with a minimal `PATH`. The node's Tailscale hostname is `cxmini` (MagicDNS `cxmini.faun-fir.ts.net`); the old node was `cxreiff-mini`. Switching daemons issued a **new node IP**, so anything that bakes in `tailscale ip -4` (the dns-forward plist, tailnet Global NS) must be reinstalled/re-pointed after such a switch.
 
 ## Backups
 

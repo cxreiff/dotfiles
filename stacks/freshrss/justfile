@@ -1,5 +1,5 @@
 context := "colima-shared"
-tailscale := "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+tailscale := "/opt/homebrew/bin/tailscale"
 serve_port := "8765"
 internal_port := "18765"
 volumes_dir := join(env("HOME"), ".volumes", "freshrss")

@@ -58,7 +58,7 @@ interface afterwards.
 
 | Key | Purpose |
 |---|---|
-| `PUBLIC_HOST` | Tailscale MagicDNS hostname (e.g., `cxreiff-mini.faun-fir.ts.net`) |
+| `PUBLIC_HOST` | Tailscale MagicDNS hostname (e.g., `cxmini.faun-fir.ts.net`) |
 | `PUBLIC_PORT` | Tailscale-side HTTPS port for the Config UI X (matches `serve_port`) |
 | `INTERNAL_PORT` | Port Config UI X listens on inside the bridged VM (matches `internal_port`) |
 | `BRIDGE_NAME` | Bridge name shown in the Home app |
