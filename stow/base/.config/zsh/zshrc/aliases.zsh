@@ -5,7 +5,6 @@ alias reset='tput reset'
 alias vv='nvim'
 alias vi='vv'
 
-alias ww='cd ~/Developer'
 alias crc='vv ~/.config/'
 alias zrc='vv ~/.config/zsh/zshrc && source ~/.zshrc'
 alias zrcl='vv ~/.zshrc.local && source ~/.zshrc.local'
@@ -19,7 +18,7 @@ alias mini='cxmini'
 alias cxcachy='ssh cxcachy'
 alias cachy='cxcachy'
 
-alias dotfiles="just -f ~/Developer/dotfiles/justfile"
+alias dotfiles="just -f $CX_WORKSPACE/dotfiles/justfile"
 alias df='dotfiles'
 
 alias zz='zellij'
