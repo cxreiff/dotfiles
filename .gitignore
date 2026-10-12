@@ -15,3 +15,5 @@ id_ecdsa
 # OS noise
 .DS_Store
 Thumbs.db
+
+.worktrees/
