@@ -1,0 +1,12 @@
+context := "colima-agents"
+tailscale := "/opt/homebrew/bin/tailscale"
+serve_port := "8768"
+internal_port := "18768"
+
+default:
+    @just --list
+
+# Create/complete .env (prompts for Discord values; generates WebUI/daemon
+# secrets; re-syncs the two onecli agent tokens). Never prints values.
+init-env:
+    @./scripts/init-env.sh

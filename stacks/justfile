@@ -1,4 +1,5 @@
 mod adguard
+mod connectome
 mod freshrss
 mod homebridge
 mod onecli

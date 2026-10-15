@@ -1,0 +1,85 @@
+name: connectome
+
+# connectome agent (decisions in docs/design-plans/2026-10-11-connectome-agent.md).
+# Two containers in the agents VM:
+#   connectome — trusted host (connectome-host + MCPL servers), holds the
+#                Discord token, WebUI credentials, its own onecli aoc_ token
+#                (HTTPS_PROXY) and the Codex stub (no real credential).
+#   shell      — untrusted: the agent's hands (term-sessions daemon). Holds
+#                only its own onecli token and the daemon token.
+# The ONLY volume mounted in both is `outbox`, read-only in connectome.
+# No env_file: each service gets exactly the variables listed (values from
+# .env via interpolation).
+
+x-hardening: &hardening
+  platform: linux/arm64
+  restart: unless-stopped
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  shell:
+    <<: *hardening
+    build:
+      context: ./build
+      dockerfile: shell.Dockerfile
+    image: connectome-shell:local
+    container_name: connectome-shell
+    hostname: shell
+    environment:
+      SESSION_SERVER_TOKEN: ${SESSION_SERVER_TOKEN:?run dotfiles stacks connectome init-env}
+      HTTPS_PROXY: http://x:${SHELL_ONECLI_TOKEN:?run dotfiles stacks connectome init-env}@gateway:10255
+      https_proxy: http://x:${SHELL_ONECLI_TOKEN}@gateway:10255
+      NO_PROXY: localhost,127.0.0.1
+      no_proxy: localhost,127.0.0.1
+    volumes:
+      - workspace:/workspace
+      - outbox:/workspace/outbox
+    networks:
+      - onecli-agents
+      - connectome
+
+  connectome:
+    <<: *hardening
+    build:
+      context: ./build
+      dockerfile: connectome.Dockerfile
+    image: connectome-host:local
+    container_name: connectome
+    depends_on:
+      shell:
+        condition: service_started
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai-codex}
+      LLM_MODEL: ${LLM_MODEL:?run dotfiles stacks connectome init-env}
+      DISCORD_TOKEN: ${DISCORD_TOKEN:?run dotfiles stacks connectome init-env}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:?run dotfiles stacks connectome init-env}
+      DISCORD_OPERATOR_ID: ${DISCORD_OPERATOR_ID:?run dotfiles stacks connectome init-env}
+      WEBUI_USER: ${WEBUI_USER:?run dotfiles stacks connectome init-env}
+      WEBUI_PASS: ${WEBUI_PASS:?run dotfiles stacks connectome init-env}
+      SESSION_SERVER_TOKEN: ${SESSION_SERVER_TOKEN:?run dotfiles stacks connectome init-env}
+      HTTPS_PROXY: http://x:${HOST_ONECLI_TOKEN:?run dotfiles stacks connectome init-env}@gateway:10255
+      https_proxy: http://x:${HOST_ONECLI_TOKEN}@gateway:10255
+      GATEWAY_WAIT_SECONDS: ${GATEWAY_WAIT_SECONDS:-120}
+    ports:
+      - "127.0.0.1:18768:18768"
+    volumes:
+      - state:/agent/state
+      - outbox:/agent/outbox:ro
+      - ./recipes:/agent/recipes:ro
+    networks:
+      - onecli-agents
+      - connectome
+
+volumes:
+  state:
+  workspace:
+  outbox:
+
+networks:
+  onecli-agents:
+    external: true
+  connectome:
+    driver: bridge
