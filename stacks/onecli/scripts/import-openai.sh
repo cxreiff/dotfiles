@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# stacks/onecli/scripts/import-openai.sh
+# One-time: run a DEDICATED `codex login --device-auth` into a throwaway
+# CODEX_HOME, upload its auth.json to onecli as the org `openai` secret (OAuth
+# mode; onecli derives host chatgpt.com and refreshes/persists rotated tokens
+# itself), then delete the throwaway login. That login must never be used
+# anywhere else: refresh-token rotation would invalidate one side.
+#
+# Exit codes: 0 ok; 1 secret already exists (pass --replace); 2 prereq; 3 API.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/api.sh
+source "${SCRIPT_DIR}/lib/api.sh"
+
+codex_bin=$(type -P codex || true)   # bypass the token-meter shell function
+[ -n "$codex_bin" ] || { echo "import-openai: codex CLI not found on PATH" >&2; exit 2; }
+
+existing=$(api GET /v1/org/secrets | jq -r '(if type=="array" then . else (.secrets // .data // []) end)[] | select(.type=="openai") | .id')
+if [ -n "$existing" ] && [ "${1:-}" != "--replace" ]; then
+    echo "import-openai: an openai secret already exists (${existing}); re-run with --replace to rotate it" >&2
+    exit 1
+fi
+
+tmp_home=$(mktemp -d); chmod 700 "$tmp_home"
+trap 'rm -rf "$tmp_home"' EXIT
+echo "import-openai: starting a dedicated ChatGPT device-code login (complete it in your browser)"
+# File store, so the dedicated login can't land in the macOS keychain.
+CODEX_HOME="$tmp_home" "$codex_bin" login --device-auth -c cli_auth_credentials_store="file"
+[ -s "$tmp_home/auth.json" ] || { echo "import-openai: login produced no auth.json" >&2; exit 3; }
+jq -e '.tokens.access_token and .tokens.refresh_token' "$tmp_home/auth.json" >/dev/null \
+    || { echo "import-openai: auth.json is not a ChatGPT OAuth login" >&2; exit 3; }
+
+body=$(jq -c '{name:"openai", type:"openai", valueSource:"inline", hostPattern:"chatgpt.com", value:(. | tojson)}' "$tmp_home/auth.json")
+for id in $existing; do api DELETE "/v1/org/secrets/${id}" >/dev/null; done
+created=$(api POST /v1/org/secrets "$body")
+unset body
+echo "import-openai: created secret $(jq -r '.id' <<<"$created") authMode=$(jq -r '.metadata.authMode // "?"' <<<"$created")"
+echo "import-openai: NOTE new LLM secrets auto-attach to every agent — run 'dotfiles stacks onecli policy' now to fix grants."
+# trap removes $tmp_home (the only copy of the dedicated login)
