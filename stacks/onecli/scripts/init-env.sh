@@ -34,9 +34,16 @@ gen() {
 }
 
 added=()
-for key in SECRET_ENCRYPTION_KEY BETTER_AUTH_SECRET GATEWAY_INTERNAL_SECRET; do
-    if grep -qE "^${key}=.+" "$env_file"; then
-        continue
+for key in SECRET_ENCRYPTION_KEY BETTER_AUTH_SECRET GATEWAY_INTERNAL_SECRET POSTGRES_PASSWORD; do
+    # For POSTGRES_PASSWORD, check if missing, empty, or equal to CHANGE_ME.
+    if [ "$key" = POSTGRES_PASSWORD ]; then
+        if grep -qE "^${key}=.+" "$env_file" && ! grep -qE "^${key}=\s*$|^${key}=CHANGE_ME" "$env_file"; then
+            continue
+        fi
+    else
+        if grep -qE "^${key}=.+" "$env_file"; then
+            continue
+        fi
     fi
     # Drop an empty `KEY=` line if present, then append a fresh value.
     tmp="$(mktemp "${env_file}.XXXXXX")"
