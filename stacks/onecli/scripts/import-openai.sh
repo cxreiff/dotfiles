@@ -34,15 +34,23 @@ jq -e '.tokens.access_token and .tokens.refresh_token' "$tmp_home/auth.json" >/d
 body=$(jq -c '{name:"openai", type:"openai", valueSource:"inline", hostPattern:"chatgpt.com", value:(. | tojson)}' "$tmp_home/auth.json")
 created=$(api POST /v1/org/secrets "$body") || { echo "import-openai: POST /v1/org/secrets failed; keeping auth.json at ${tmp_home}/auth.json for manual recovery" >&2; trap - EXIT; exit 3; }
 unset body
-for id in $existing; do api DELETE "/v1/org/secrets/${id}" >/dev/null; done
-secret_id=$(jq -r '.id' <<<"$created")
+secret_id=$(printf '%s' "$created" | jq -r '.id')
 echo "import-openai: created secret ${secret_id}"
 
-# Auto-reconcile grants: new LLM secrets auto-attach to every agent, so run
-# the grants-only reconciliation now. If it fails, operator must run it manually.
-if ! "${SCRIPT_DIR}/policy.sh" --grants-only; then
+# Delete existing openai secrets (if any); failures are recorded but don't stop the process.
+delete_failures=0
+for id in $existing; do
+    api DELETE "/v1/org/secrets/${id}" >/dev/null || delete_failures=$((delete_failures + 1))
+done
+
+# Reconcile grants: run the full policy (no --grants-only flag) which creates agents
+# if they don't exist, then reconciles grants. If it fails, operator must run it manually.
+if ! "${SCRIPT_DIR}/policy.sh"; then
     echo "import-openai: NOTE: secret created, but grants reconciliation failed — run 'dotfiles stacks onecli policy' now to fix grants." >&2
     exit 3
 fi
 echo "import-openai: reconciled grants (openai → connectome-host only)"
+
+# Exit non-zero if any DELETE failed.
+[ "$delete_failures" -eq 0 ] || exit 3
 # trap removes $tmp_home (the only copy of the dedicated login)
