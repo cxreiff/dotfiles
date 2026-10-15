@@ -1151,70 +1151,34 @@ Expected: a tarball path is printed, and api/web/gateway/postgres are `Up` again
 
 ---
 
-## Post-Review Fixes (2026-10-15)
+## Post-review fixes (2026-10-15)
 
-Code review identified issues in commits 3a2455f..HEAD. Fixes applied:
+The code blocks above are the original plan. Phase 2 code review (3 cycles) changed the shipped scripts as follows; the files in `stacks/onecli/` are authoritative.
 
-### [IMPORTANT 1] bootstrap.sh: cookie-jar cleanup and error capture
+**Execution deviations**
+- No default agent is auto-created on first session (Task 6 expectation); harmless, `policy` creates the two connectome agents.
+- `policy.sh`'s original `all_ids=$( { …; [ -n "$others" ] && printf …; } | …)` aborted under `set -e`/`pipefail` when there were no other rules; now `if … fi`.
 
-**Issue:** Two EXIT traps fought for control. Line 35 set `trap 'rm -rf "$jar_dir"' EXIT`, but line 53 replaced it with `trap 'rm -f "$resp_file"' EXIT`. Bash allows only one EXIT trap, so `$jar_dir` was never cleaned up.
+**compose.yaml / .env**
+- `env_file` removed from `x-common`: it handed every `.env` secret to every container (e.g. all secrets to `migrations`, `GATEWAY_INTERNAL_SECRET` to `web`). Containers now receive only their explicit `environment:` entries.
+- `POSTGRES_PASSWORD` has `:?` guards (also inside the `x-db-url` anchor); `init-env` generates it when missing/empty/`CHANGE_ME`, and warns that this is only safe before first `up` (postgres keeps the password it was initialised with). `.env.example` leaves it empty.
 
-Also, `auth_post()` function signature read `local out="${3:-}"` but callers passed the output file as arg 2, so `out` was always empty and error bodies were never captured.
+**justfile**
+- `import-openai *args` so `dotfiles stacks onecli import-openai --replace` works.
+- `policy rate_limit=""`: no argument keeps the current `cx-1` limit (looked up by rule name; API failure is fatal), 60 only on first creation.
+- `requests $minutes="15"`: the value arrives as an env var and is validated before use (no `{{…}}` interpolation into the script); no `@` prefix, which would echo a shebang recipe's body.
 
-**Fix:**
-- Line 41: Changed `local out="${3:-}"` to `local out="${2:-}"`
-- Lines 34-35: Created `resp_file` inside `jar_dir` and removed the second trap, keeping only one trap for both
-- Line 68: Changed here-string `jq … <<<$session` to `printf '%s' "$session" | jq …` to avoid secret exposure
+**bootstrap.sh**
+- Falls back to sign-in only when sign-up returns 422 or the body says the user exists; otherwise prints the sign-up status and body and exits 3.
+- The response file lives inside the cookie-jar dir; a single EXIT trap removes both.
 
-**Verification:** Error responses are now captured and printed; the jar directory is cleaned up after each run.
+**import-openai.sh**
+- POSTs the new secret before deleting old ones; on POST failure the throwaway `auth.json` is kept and its path printed.
+- Then runs full `policy.sh` (works on a fresh vault where agents don't exist yet), exiting 3 if it fails. Failed DELETEs of old secrets are collected and reported by id, with exit 3 at the end.
 
-### [MINOR 1] import-openai: calls non-existent --grants-only in fresh vault
+**policy.sh**
+- `--grants-only` mode (grants step only).
+- Grant step handles every `type=="openai"` secret; agent list must be a non-empty array containing `connectome-host`, and each grants response must have an array `.secrets`, else exit 3 (no checks inside `if` conditions that could mask failures).
 
-**Issue:** Line 43 called `policy.sh --grants-only`, but on a fresh vault (first run), agents don't exist yet. Policy can only reconcile grants if agents exist. Task 7 (import-openai) runs before Task 8 (policy), so agents are created by policy.sh itself.
-
-**Fix:** Line 43 changed to call full `policy.sh` (no `--grants-only` flag), which creates agents if missing, then reconciles grants. Removed the `--grants-only` mode references from the script.
-
-### [MINOR 2] import-openai: failed DELETE stops policy reconciliation
-
-**Issue:** Line 37 deleted existing secrets under `set -e`:
-```bash
-for id in $existing; do api DELETE "/v1/org/secrets/${id}" >/dev/null; done
-```
-If any DELETE failed, the script exited before running policy reconciliation. Also, policy.sh only handled the first openai secret via `head -1`.
-
-**Fix:**
-- Lines 37-40: Wrapped DELETE in `|| warn` pattern to record failures but continue
-- Lines 43-46: Always run policy reconciliation (no early exit)
-- Final check: Exit non-zero if any DELETE failed
-- policy.sh lines 112-144: Now loops over ALL openai secrets (not just `head -1`) to grant/revoke
-
-### [MINOR 3] policy.sh: unused rate in --grants-only mode
-
-**Issue:** Lines 23-36 set `rate=""` and `rate_provided=false` even in `--grants-only` mode, where rate is never used.
-
-**Fix:** Lines 26-35: Simplified condition — only set and validate rate when NOT in `--grants-only` mode.
-
-### [MINOR 4] policy.sh: weak grants response validation
-
-**Issue:** Lines 113, 117, 121 used `grep` and `if jq -e` to validate, but errors were swallowed by the if condition. Agents response was never validated to contain connectome-host.
-
-**Fix:** Lines 113-144: Replaced weak checks with strict jq validation outside any if:
-- Validate agents list is a non-empty array containing connectome-host (fatal if missing)
-- Validate each agent's grants response has `has("secrets") and (.secrets|type=="array")` (fatal otherwise)
-- Loop over ALL openai secrets for each agent (not just first one)
-
-### [MINOR 5] Secret-bearing here-strings in multiple scripts
-
-**Issue:** bootstrap.sh line 71 (`jq … <<<$session`), import-openai.sh line 38 (`jq … <<<$created`), and policy.sh lines 85, 91, 117 used here-strings with API responses containing secrets.
-
-**Fix:** Changed all to `printf '%s' "$var" | jq …` to avoid exposing secrets on the command line.
-
-### [MINOR 6] init-env.sh: outdated comments and missing warnings
-
-**Issue:** Header and justfile comment said "three secrets" but init-env.sh now handles four (including POSTGRES_PASSWORD). No warning when POSTGRES_PASSWORD is regenerated on an existing vault (breaks DB auth).
-
-**Fix:**
-- init-env.sh header (lines 3-6): Updated to mention all four variables
-- init-env.sh lines 38-43: Added comment warning that regenerating POSTGRES_PASSWORD breaks DB auth if pgdata exists
-- init-env.sh lines 65-75: Added stderr warning when POSTGRES_PASSWORD is generated on an existing vault
-- justfile line 30-31: Updated comment to list all four variables
+**Secret hygiene**
+- bash 3.2 (`/bin/bash`) writes here-string bodies to a temp file, so secret-bearing bodies and API responses (`$creds`, `$body`, `$session`, `$created`, grants) are piped via `printf '%s' … |` instead of `<<<`. Remaining `<<<` uses carry only rule specs and probe output.

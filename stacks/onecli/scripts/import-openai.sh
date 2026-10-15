@@ -38,9 +38,9 @@ secret_id=$(printf '%s' "$created" | jq -r '.id')
 echo "import-openai: created secret ${secret_id}"
 
 # Delete existing openai secrets (if any); failures are recorded but don't stop the process.
-delete_failures=0
+failed_ids=""
 for id in $existing; do
-    api DELETE "/v1/org/secrets/${id}" >/dev/null || delete_failures=$((delete_failures + 1))
+    api DELETE "/v1/org/secrets/${id}" >/dev/null || failed_ids="${failed_ids} ${id}"
 done
 
 # Reconcile grants: run the full policy (no --grants-only flag) which creates agents
@@ -51,6 +51,10 @@ if ! "${SCRIPT_DIR}/policy.sh"; then
 fi
 echo "import-openai: reconciled grants (openai → connectome-host only)"
 
-# Exit non-zero if any DELETE failed.
-[ "$delete_failures" -eq 0 ] || exit 3
+# Exit non-zero if any DELETE failed: the old secret is still in the vault and
+# policy has just granted it to connectome-host alongside the new one.
+if [ -n "$failed_ids" ]; then
+    echo "import-openai: could not delete old openai secret(s):${failed_ids}; delete them manually (onecli secrets), then re-run 'dotfiles stacks onecli policy'" >&2
+    exit 3
+fi
 # trap removes $tmp_home (the only copy of the dedicated login)

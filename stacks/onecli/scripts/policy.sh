@@ -76,25 +76,25 @@ if [ "$grants_only" = false ]; then
   {name:"cx-5-wham-reset-credits",    action:"allow", enabled:true, targets:[$t5]},
   {name:"cx-6-block-openai-hosts",    action:"block", enabled:true, targets:[$b1,$b2,$b3,$b4]}
 ]')
-list_rules() { api GET /v1/org/policy/rules | jq -c 'if type=="array" then . else (.rules // .data // []) end'; }
-existing=$(list_rules)
-ordered=()
-while IFS= read -r spec; do
-    name=$(printf '%s' "$spec" | jq -r .name)
-    id=$(printf '%s' "$existing" | jq -r --arg n "$name" '.[] | select(.name==$n) | .id')
-    if [ -z "$id" ]; then
-        id=$(api POST /v1/org/policy/rules "$spec" | jq -r '.id // .rule.id')
-        echo "policy: created rule ${name}"
-    else
-        api PATCH "/v1/org/policy/rules/${id}" "$(printf '%s' "$spec" | jq -c 'del(.name)')" >/dev/null
-    fi
-    ordered+=("$id")
-done < <(jq -c '.[]' <<<"$specs")
-# Ours first (in table order), then any other pre-existing rules after them.
-others=$(list_rules | jq -r --argjson ours "$(printf '%s\n' "${ordered[@]}" | jq -R . | jq -cs .)" '.[] | select(.id as $i | $ours | index($i) | not) | .id')
-all_ids=$( { printf '%s\n' "${ordered[@]}"; if [ -n "$others" ]; then printf '%s\n' "$others"; fi; } | jq -R . | jq -cs .)
-api PUT /v1/org/policy/rules/order "$(jq -cn --argjson ids "$all_ids" '{orderedIds:$ids}')" >/dev/null
-echo "policy: ${#ordered[@]} rules in order; rule 1 limit ${rate}/hour"
+    list_rules() { api GET /v1/org/policy/rules | jq -c 'if type=="array" then . else (.rules // .data // []) end'; }
+    existing=$(list_rules)
+    ordered=()
+    while IFS= read -r spec; do
+        name=$(printf '%s' "$spec" | jq -r .name)
+        id=$(printf '%s' "$existing" | jq -r --arg n "$name" '.[] | select(.name==$n) | .id')
+        if [ -z "$id" ]; then
+            id=$(api POST /v1/org/policy/rules "$spec" | jq -r '.id // .rule.id')
+            echo "policy: created rule ${name}"
+        else
+            api PATCH "/v1/org/policy/rules/${id}" "$(printf '%s' "$spec" | jq -c 'del(.name)')" >/dev/null
+        fi
+        ordered+=("$id")
+    done < <(jq -c '.[]' <<<"$specs")
+    # Ours first (in table order), then any other pre-existing rules after them.
+    others=$(list_rules | jq -r --argjson ours "$(printf '%s\n' "${ordered[@]}" | jq -R . | jq -cs .)" '.[] | select(.id as $i | $ours | index($i) | not) | .id')
+    all_ids=$( { printf '%s\n' "${ordered[@]}"; if [ -n "$others" ]; then printf '%s\n' "$others"; fi; } | jq -R . | jq -cs .)
+    api PUT /v1/org/policy/rules/order "$(jq -cn --argjson ids "$all_ids" '{orderedIds:$ids}')" >/dev/null
+    echo "policy: ${#ordered[@]} rules in order; rule 1 limit ${rate}/hour"
 fi
 
 # --- 3. grants: only connectome-host holds the openai secret ---

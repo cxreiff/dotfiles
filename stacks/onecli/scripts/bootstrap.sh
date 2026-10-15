@@ -37,17 +37,10 @@ trap 'rm -rf "$jar_dir"' EXIT
 creds=$(OB_EMAIL="$email" OB_PASS="$password" jq -cn '{email:env.OB_EMAIL, password:env.OB_PASS, name:(env.OB_EMAIL|split("@")[0])}')
 unset password
 
-auth_post() {  # auth_post <sign-up|sign-in> [output-file]
-    local out="${2:-}"
-    if [ -n "$out" ]; then
-        printf '%s' "$creds" | curl -sS -o "$out" -w '%{http_code}' -c "$jar" -b "$jar" \
-            -H 'Content-Type: application/json' --data-binary @- \
-            "${ONECLI_API}/auth/$1/email"
-    else
-        printf '%s' "$creds" | curl -sS -o /dev/null -w '%{http_code}' -c "$jar" -b "$jar" \
-            -H 'Content-Type: application/json' --data-binary @- \
-            "${ONECLI_API}/auth/$1/email"
-    fi
+auth_post() {  # auth_post <sign-up|sign-in> <output-file>
+    printf '%s' "$creds" | curl -sS -o "$2" -w '%{http_code}' -c "$jar" -b "$jar" \
+        -H 'Content-Type: application/json' --data-binary @- \
+        "${ONECLI_API}/auth/$1/email"
 }
 code=$(auth_post sign-up "$resp_file")
 if [ "$code" -lt 400 ]; then
