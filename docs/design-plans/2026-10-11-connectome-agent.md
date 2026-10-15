@@ -1,7 +1,10 @@
 # Connectome Agent Design
 
 **Status:** Approved by the user 2026-10-11 (revision 5, after adversarial
-review rounds 1–3 and the spike). [Decisions](#decisions-made-by-the-user)
+review rounds 1–3 and the spike). Revision 6 (2026-10-12) adds acceptance
+criteria, "Done when" lines, phase markers and the usage-cap calibration step,
+and moves [onecli identities](#onecli-identities) into Phase 1; no design
+decision changed. [Decisions](#decisions-made-by-the-user)
 are the user's; [Proposed design](#proposed-design) is the approved plan.
 
 ## Summary
@@ -297,7 +300,10 @@ relative to those repos.
 
 ## Proposed design
 
+<!-- START_PHASE_0 -->
 ### Phase 0 — pause and decommission nanoclaw
+
+*Infrastructure; verified operationally.*
 
 1. Pause now (user-approved, needs the user's sudo):
    `sudo launchctl disable system/com.nanoclaw-v2-0aae9b3d && sudo launchctl bootout system/com.nanoclaw-v2-0aae9b3d`.
@@ -305,7 +311,15 @@ relative to those repos.
    archive `~/Developer/nanoclaw` state as the user sees fit. Its v1 grants and
    `aoc_` tokens die with the v1 vault.
 
+**Done when:** connectome-agent.AC1.1–AC1.3 hold (daemon gone, image gone,
+no nanoclaw process).
+<!-- END_PHASE_0 -->
+
+<!-- START_PHASE_1 -->
 ### Phase 1 — onecli v2, fresh vault
+
+*Infrastructure plus policy; verified operationally and by gateway probes
+(curl through `gateway:10255` from a throwaway container on `onecli-agents`).*
 
 1. Final v1 backup kept as an archive (`~/.volume-backups/archive/onecli-v1-final.tgz`,
    outside GFS rotation). Then `down`, remove `onecli_pgdata`/`onecli_app-data`.
@@ -322,9 +336,65 @@ relative to those repos.
 5. Vault content: the `openai` secret in OAuth mode from a **dedicated**
    `codex login` uploaded to onecli, after which that login is not used
    elsewhere (refresh-token rotation would invalidate one side).
-6. Agents and rules (see [onecli identities](#onecli-identities)).
+6. Agents and rules (see [onecli identities](#onecli-identities)). Rule 1 is
+   created with a **provisional** limit of 60 requests/hour, so the hard
+   ceiling exists before any agent traffic; the final value is set by the
+   Phase 2 [usage-cap calibration](#usage-cap-calibration-bring-up).
 
+### onecli identities
+
+In onecli 2.12, **policy rules are org-wide** (org rules refuse agent
+identities; the per-workspace rules API returns 410), and **per-agent scoping
+comes only from secret grants**. New LLM secrets **auto-attach to every
+agent** (and new agents get every existing LLM secret), so grants must be
+corrected explicitly after any secret or agent is created.
+
+Org rules (apply to every agent; lower priority evaluated first; created in
+this order or fixed with `PUT /v1/org/policy/rules/order`):
+
+| # | Target | Action |
+|---|---|---|
+| 1 | Network `chatgpt.com` `POST /backend-api/codex/responses*` | allow + `rateLimit`/`rateLimitWindow` (hard usage ceiling; counted per rule × agent token; in-memory, resets on gateway restart) |
+| 2 | Network `chatgpt.com` `/backend-api/codex/*` | allow |
+| 3 | Network `chatgpt.com` `GET /backend-api/wham/usage` | allow (quota meter via codex `account/rateLimits/read`) |
+| 4 | Network `chatgpt.com` `GET /backend-api/wham/accounts/check` | allow (**required**: Codex workspace routing discovery) |
+| 5 | Network `chatgpt.com` `GET /backend-api/wham/rate-limit-reset-credits` | allow (optional; meter asks for it, non-fatal if blocked) |
+| 6 | Network `chatgpt.com`, `*.chatgpt.com`, `*.openai.com` (incl. `auth.openai.com`), `api.openai.com` | block |
+
+Grants: `connectome-host` ← `openai` (OAuth); `connectome-shell` ← nothing
+(remove the auto-attached `openai` grant; doctor asserts the shell has no
+LLM grant). Without an LLM grant the gateway itself refuses the shell on
+`chatgpt.com` (401 `access_restricted`), including bypass paths.
+
+The synthetic stub refresh on `auth.openai.com` is answered before policy, so
+rule 6 doesn't break it but does make any real login fail closed.
+
+**Path rules are defense-in-depth only.** The spike showed the gateway
+matches the **raw** path: `GET /backend-api/codex/../me` and
+`/backend-api/codex/%2e%2e/me` pass rule 2, chatgpt.com normalizes them, and
+they return the account profile **with credentials injected**. Prefix globs
+can't express "contains `..`", so policy can't close it. The real boundary
+is that only the `connectome` container holds the host `aoc_` token (no
+generic HTTP tool in the host; discord attachment patch, decision 21). To
+report upstream to onecli (normalize or reject dot-segments before rule
+matching).
+
+**Usage caps, soft to hard (decision 20):** reminder floor 15 min (local
+patch) → wake `rate_limit` on heartbeat events (drops bursts before
+inference; agent-mutable) → onecli rule 1 rate limit (hard; when saturated,
+chat replies also fail until the window rolls) → ChatGPT per-app weekly cap.
+Subscription usage is quota, not dollars: exhausting it blocks the user's own
+Codex use until the window resets.
+
+**Done when:** connectome-agent.AC2.1–AC2.8 and AC3.1–AC3.6 hold. AC3.7
+(final rule-1 limit) completes in Phase 2.
+<!-- END_PHASE_1 -->
+
+<!-- START_PHASE_2 -->
 ### Phase 2 — `stacks/connectome`
+
+*Functionality; verified by image build tests, a smoke test against the
+running stack, and an end-to-end Discord turn.*
 
 Two containers, both `platform: linux/arm64`, in the `agents` VM
 (`--context colima-agents`). They share no volume except the read-only-in-host `outbox` (decision 13, 21).
@@ -482,52 +552,33 @@ patches:
     `send_message` with `files: [{path: "/proc/self/environ"}]` and with a
     symlink out of the outbox are both refused. *(build test)*
 
-### onecli identities
+#### Usage-cap calibration (bring-up)
 
-In onecli 2.12, **policy rules are org-wide** (org rules refuse agent
-identities; the per-workspace rules API returns 410), and **per-agent scoping
-comes only from secret grants**. New LLM secrets **auto-attach to every
-agent** (and new agents get every existing LLM secret), so grants must be
-corrected explicitly after any secret or agent is created.
+Last step of Phase 2, once the stack answers on Discord (decision 18; resolves
+the values the spike deferred):
+1. Measure through the gateway's request log, with the provisional rule-1
+   limit in place: `responses` POSTs per tool-using turn (a turn that runs
+   ≥ 3 shell commands), and per heartbeat tick. Also check whether events
+   arriving in a burst coalesce into one inference.
+2. Set rule 1 to about 2–3× expected peak: measured requests per turn ×
+   the operator's expected peak turns per window.
+3. Set the heartbeat wake `rate_limit` from the same measurements. Start
+   from 6 tokens, refilling 1 per 10 min, and adjust.
+4. Set a ChatGPT per-app weekly cap for this login (operator, in ChatGPT
+   settings).
+5. Record the measurements, the chosen values and the date in
+   `stacks/connectome/README.md`.
 
-Org rules (apply to every agent; lower priority evaluated first; created in
-this order or fixed with `PUT /v1/org/policy/rules/order`):
+**Done when:** connectome-agent.AC3.7 and AC4–AC10 hold. The image build
+tests and the stack smoke test pass, and an operator DM gets an agent reply
+over Discord.
+<!-- END_PHASE_2 -->
 
-| # | Target | Action |
-|---|---|---|
-| 1 | Network `chatgpt.com` `POST /backend-api/codex/responses*` | allow + `rateLimit`/`rateLimitWindow` (hard usage ceiling; counted per rule × agent token; in-memory, resets on gateway restart) |
-| 2 | Network `chatgpt.com` `/backend-api/codex/*` | allow |
-| 3 | Network `chatgpt.com` `GET /backend-api/wham/usage` | allow (quota meter via codex `account/rateLimits/read`) |
-| 4 | Network `chatgpt.com` `GET /backend-api/wham/accounts/check` | allow (**required**: Codex workspace routing discovery) |
-| 5 | Network `chatgpt.com` `GET /backend-api/wham/rate-limit-reset-credits` | allow (optional; meter asks for it, non-fatal if blocked) |
-| 6 | Network `chatgpt.com`, `*.chatgpt.com`, `*.openai.com` (incl. `auth.openai.com`), `api.openai.com` | block |
-
-Grants: `connectome-host` ← `openai` (OAuth); `connectome-shell` ← nothing
-(remove the auto-attached `openai` grant; doctor asserts the shell has no
-LLM grant). Without an LLM grant the gateway itself refuses the shell on
-`chatgpt.com` (401 `access_restricted`), including bypass paths.
-
-The synthetic stub refresh on `auth.openai.com` is answered before policy, so
-rule 6 doesn't break it but does make any real login fail closed.
-
-**Path rules are defense-in-depth only.** The spike showed the gateway
-matches the **raw** path: `GET /backend-api/codex/../me` and
-`/backend-api/codex/%2e%2e/me` pass rule 2, chatgpt.com normalizes them, and
-they return the account profile **with credentials injected**. Prefix globs
-can't express "contains `..`", so policy can't close it. The real boundary
-is that only the `connectome` container holds the host `aoc_` token (no
-generic HTTP tool in the host; discord attachment patch, decision 21). To
-report upstream to onecli (normalize or reject dot-segments before rule
-matching).
-
-**Usage caps, soft to hard (decision 20):** reminder floor 15 min (local
-patch) → wake `rate_limit` on heartbeat events (drops bursts before
-inference; agent-mutable) → onecli rule 1 rate limit (hard; when saturated,
-chat replies also fail until the window rolls) → ChatGPT per-app weekly cap.
-Subscription usage is quota, not dollars: exhausting it blocks the user's own
-Codex use until the window resets.
-
+<!-- START_PHASE_3 -->
 ### Phase 3 — operations integration
+
+*Infrastructure and tooling; verified operationally and by `doctor` (lint
+checks verified against deliberately broken fixtures).*
 
 - **`stacks/justfile`:** `up-all` … `onecli up` → `connectome up`;
   `down-all`: `connectome down` before `onecli down`; `ps-all`, `pull-all`
@@ -564,6 +615,10 @@ Codex use until the window resets.
   exposures), CLAUDE.md (onecli key/FileVault paragraph,
   Reproducible-vs-runtime table, Colima table, stack lists),
   `docs/migration-recovery.md`.
+
+**Done when:** connectome-agent.AC11–AC13 hold, and `dotfiles stacks doctor`
+reports no FAIL on the live system.
+<!-- END_PHASE_3 -->
 
 ### Spike results (2026-10-11)
 
@@ -626,10 +681,117 @@ login it held) was torn down afterwards; Phase 1 starts from a fresh login.
   see each other's sessions (`session.list`) → add one `shell-<name>`
   container per persona when personas get distinct trust or credentials.
 
+## Acceptance Criteria
+
+Every criterion is derived from the [Proposed design](#proposed-design).
+"Invariant N" refers to the numbered security invariants in Phase 2.
+
+### connectome-agent.AC1: nanoclaw is decommissioned (Phase 0)
+- **connectome-agent.AC1.1 Success:** `sudo launchctl print system/com.nanoclaw-v2-0aae9b3d` reports the service is not found, and `/Library/LaunchDaemons/com.nanoclaw-v2-0aae9b3d.plist` does not exist.
+- **connectome-agent.AC1.2 Success:** `docker --context colima-agents image ls` lists no `nanoclaw-agent-v2-0aae9b3d` image.
+- **connectome-agent.AC1.3 Success:** no nanoclaw node process is running on the Mac.
+
+### connectome-agent.AC2: onecli v2 runs on a fresh vault (Phase 1)
+- **connectome-agent.AC2.1 Success:** `~/.volume-backups/archive/onecli-v1-final.tgz` exists, and a `backup-rotate.sh` run leaves it untouched.
+- **connectome-agent.AC2.2 Success:** the v1 `onecli_pgdata`/`onecli_app-data` volumes were removed before first v2 start; the running vault holds no v1 agents, grants or secrets.
+- **connectome-agent.AC2.3 Success:** every onecli image is pinned to `2.12.0`, and every onecli container reports architecture `arm64`.
+- **connectome-agent.AC2.4 Success:** `dotfiles stacks onecli up` exits 0 with `api`, `web`, `gateway` healthy and `onecli-migrations` exited 0 (or, if compose `--wait` rejects the exited one-shot, the recipe waits on `api web gateway` only and still exits 0).
+- **connectome-agent.AC2.5 Failure:** with any of `SECRET_ENCRYPTION_KEY`, `BETTER_AUTH_SECRET`, `GATEWAY_INTERNAL_SECRET` missing from `.env`, `up` fails before starting containers and names the missing variable.
+- **connectome-agent.AC2.6 Success:** `init-env` on a `.env` lacking the three secrets adds all three and leaves `.env` at mode 0600. A second run changes no value, and neither run prints a secret value to stdout or stderr. Each run prints the password-manager escrow reminder.
+- **connectome-agent.AC2.7 Success:** the `bootstrap` recipe contains no v1 local-mode logic, and the host onecli CLI, pointed at `http://127.0.0.1:10256` with the operator API key, lists agents.
+- **connectome-agent.AC2.8 Success:** the vault holds an `openai` secret in OAuth mode, sourced from a dedicated `codex login` that no longer exists anywhere else on the Mac.
+
+### connectome-agent.AC3: onecli identities and policy (Phases 1–2)
+- **connectome-agent.AC3.1 Success:** agents `connectome-host` and `connectome-shell` exist with distinct `aoc_` tokens.
+- **connectome-agent.AC3.2 Success:** the org rules match the [onecli identities](#onecli-identities) table (targets, actions, order 1–6), and rule 1 carries a rate limit.
+- **connectome-agent.AC3.3 Success:** `connectome-host` is granted `openai`, and `connectome-shell` has no LLM grant.
+- **connectome-agent.AC3.4 Failure:** a request to `chatgpt.com` through the gateway with the shell token returns 401 `access_restricted`, including `/backend-api/codex/../me`.
+- **connectome-agent.AC3.5 Failure:** with the host token, `GET chatgpt.com/backend-api/me` and any `api.openai.com` request return 403 `blocked_by_policy`.
+- **connectome-agent.AC3.6 Failure:** a CONNECT to the gateway without a valid `aoc_` token returns 407.
+- **connectome-agent.AC3.7 Success:** rule 1's limit and the heartbeat wake `rate_limit` are set from the Phase 2 calibration. The per-app weekly ChatGPT cap is set, and the measurements and chosen values are recorded in `stacks/connectome/README.md`.
+
+### connectome-agent.AC4: reproducible sources and images (Phase 2)
+- **connectome-agent.AC4.1 Failure:** `build` refuses when any clone under `~/Developer/connectome/` has uncommitted changes, naming the clone.
+- **connectome-agent.AC4.2 Success:** `build` writes `stacks/connectome/sources.lock` with each source's SHA (connectome-host at or after `406dcc1`), the pinned term-sessions-mcp version, and the subject of each local patch commit — no patch content.
+- **connectome-agent.AC4.3 Success:** both images are `linux/arm64`, and their system trust stores contain the CA served by the running `onecli-gateway` (fingerprints equal).
+- **connectome-agent.AC4.4 Success:** the `connectome` image runs a real Node (not the Bun symlink) for MCP servers, and includes the built WebUI and the pinned Codex CLI.
+- **connectome-agent.AC4.5 Failure:** with the heartbeat-mcpl patch applied, creating a recurring reminder under 900 s is refused.
+
+### connectome-agent.AC5: host container hardening and layout (Phase 2)
+- **connectome-agent.AC5.1 Success:** `connectome` and `shell` both run as a non-root uid with `cap_drop: ALL` and `no-new-privileges`.
+- **connectome-agent.AC5.2 Failure:** as the connectome uid, creating or modifying any file directly in `/agent/cwd`, including `mcpl-servers.agent.json`, fails. `/agent/cwd` contains only the `mcpl-servers.json` and `logs` symlinks (invariant 3).
+- **connectome-agent.AC5.3 Failure:** writes under `/agent/recipes` fail (read-only mount).
+- **connectome-agent.AC5.4 Success:** after a forced inference failure, `/agent/state/logs/failures.log` exists and is non-empty.
+- **connectome-agent.AC5.5 Success:** on first start `/agent/state/heartbeat/config.json` is seeded with `{"intervalSeconds": 14400}`. After the agent calls `heartbeat_configure`, the file's content changes.
+- **connectome-agent.AC5.6 Success:** with the gateway down, the entrypoint waits a bounded time for `gateway:10255`, then exits non-zero with a clear message. Stale `ipc.sock`/`headless.pid` files under child `dataDir`s are deleted at start.
+- **connectome-agent.AC5.7 Failure:** no onecli user API key is present in either container's environment or filesystem (invariant 6).
+- **connectome-agent.AC5.8 Failure:** no secret (Discord token, WebUI password, `aoc_` tokens, `SESSION_SERVER_TOKEN`) appears in any process's `/proc/*/cmdline` in either container (invariant 5).
+
+### connectome-agent.AC6: model path through onecli (Phase 2)
+- **connectome-agent.AC6.1 Success:** `provision-codex` writes `codex/auth.json` into the `state` volume: host uid, mode 0600, `tokens.account_id` = the real ChatGPT account id, and no real access or refresh token. It also writes `codex/config.toml` from the tracked template.
+- **connectome-agent.AC6.2 Success:** an inference via the `openai-codex` provider with `LLM_MODEL` from `.env` returns a reply, and the gateway log shows the request on the host identity.
+- **connectome-agent.AC6.3 Success:** connectome start-up produces no `blocked_by_policy` responses in the gateway log (apps, plugins, analytics and otel are off).
+- **connectome-agent.AC6.4 Success:** the WebUI quota meter shows usage, read from `wham/usage`.
+
+### connectome-agent.AC7: Discord connector (Phase 2)
+- **connectome-agent.AC7.1 Success:** a DM from the operator's Discord user gets an agent reply, and a message in the whitelisted guild channel is received.
+- **connectome-agent.AC7.2 Failure:** a DM from any other user, and a message from a non-whitelisted guild, produce no inference and no reply.
+- **connectome-agent.AC7.3 Failure:** `filters_update`, `create_text_channel` and `delete_channel` are not in the agent's tool list. No `DISCORD_FILTERS_FILE` is set (invariant 8).
+- **connectome-agent.AC7.4 Success:** a regular file staged in `/workspace/outbox` is sent as a Discord attachment.
+- **connectome-agent.AC7.5 Failure:** `send_message` with `files: [{path: "/proc/self/environ"}]` is refused. So is a symlink in the outbox pointing outside it, and, with `DISCORD_ATTACHMENT_ROOT` unset, every attachment (invariant 10).
+- **connectome-agent.AC7.6 Success:** watermark, DM-notice and muted-channel state files live under `/agent/state/discord/` and survive a container restart.
+
+### connectome-agent.AC8: WebUI (Phase 2)
+- **connectome-agent.AC8.1 Success:** the WebUI is published only on `127.0.0.1:18768` in the VM, and `dotfiles stacks connectome serve` makes it reachable at `https://cxmini.faun-fir.ts.net:8768` with working live (WebSocket) updates.
+- **connectome-agent.AC8.2 Failure:** a request without valid basic-auth credentials gets 401, including from the `shell` container.
+- **connectome-agent.AC8.3 Failure:** an `observers--grant` call fails, and `observers.json` stays `{"observers":[]}` (invariant 9).
+
+### connectome-agent.AC9: shell container (Phase 2)
+- **connectome-agent.AC9.1 Success:** `shell` provides node, tsc, cargo/rustc, python3, pip, uv, rg, fd, jq, git, gh and build-essential, running natively on arm64.
+- **connectome-agent.AC9.2 Failure:** `sudo` in `shell` cannot gain root.
+- **connectome-agent.AC9.3 Success:** the agent runs a command in `shell` through term-sessions and sees its output, and `git clone` of a public HTTPS repo through the gateway succeeds (CA trust works).
+- **connectome-agent.AC9.4 Failure:** `shell` cannot read the `state` volume. `outbox` is the only volume mounted in both containers, and it is `:ro` in `connectome` (invariant 4).
+- **connectome-agent.AC9.5 Success:** files the agent creates in `/workspace` persist across a `shell` restart.
+
+### connectome-agent.AC10: heartbeat and usage caps (Phase 2)
+- **connectome-agent.AC10.1 Success:** heartbeat ticks reach the agent: `modules.wake.policies` has a `rate_limit` rule for `source: "heartbeat"` before any skip rule, and `enabledFeatureSets` includes `heartbeat`.
+- **connectome-agent.AC10.2 Failure:** a burst of heartbeat events beyond the wake `rate_limit` tokens is dropped without inference.
+- **connectome-agent.AC10.3 Failure:** once rule 1's limit is exhausted within its window, further `responses` POSTs through the gateway are refused.
+
+### connectome-agent.AC11: operations integration (Phase 3)
+- **connectome-agent.AC11.1 Success:** `up-all` starts `onecli` before `connectome`. If one stack fails, it continues with the rest, prints a summary naming each failed stack, and exits non-zero if any failed.
+- **connectome-agent.AC11.2 Success:** `down-all` stops `connectome` before `onecli`, and `ps-all`/`pull-all` include `connectome`.
+- **connectome-agent.AC11.3 Failure:** `onecli down` refuses while connectome containers exist, and `connectome up` without the `onecli-agents` network fails with "run `dotfiles stacks onecli up` first".
+- **connectome-agent.AC11.4 Success:** `connectome logs` shows `$DATA_DIR/headless.log` and `logs/failures.log`.
+- **connectome-agent.AC11.5 Success:** `connectome backup` uses `compose stop`/`start`, never `down`/`up`, and writes `~/.volume-backups/daily/connectome-YYYY-MM-DD.tgz` containing `state` and `workspace`. It first prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` past its size cap.
+- **connectome-agent.AC11.6 Success:** `backup-all` backs up `connectome` before `onecli`, and the onecli tarball contains ciphertext and the CA but not `SECRET_ENCRYPTION_KEY`.
+- **connectome-agent.AC11.7 Failure:** `connectome restore <tarball>` refuses when the target volumes are non-empty. On empty volumes it restores a working stack.
+- **connectome-agent.AC11.8 Success:** after a reboot (FileVault unlock), the startup daemon brings up the `agents` VM, onecli and connectome without intervention.
+
+### connectome-agent.AC12: doctor and invariant lints (Phase 3)
+- **connectome-agent.AC12.1 Success:** on the healthy live system, `doctor` reports PASS for each check:
+  - onecli api, web and gateway healthy; migrations exited 0;
+  - gateway CA owned by the gateway uid; image CA fingerprint = gateway CA;
+  - `onecli-agents` exists with `connectome` and `shell` attached;
+  - connectome volumes present; backup age;
+  - `.env` mode 0600 for every stack;
+  - the shell has no LLM grant;
+  - all invariant lints.
+- **connectome-agent.AC12.2 Failure:** each lint FAILs on a fixture that violates exactly its invariant (1, 2, 4, 6, 7, 8, 9).
+- **connectome-agent.AC12.3 Failure:** `doctor` FAILs on a CA fingerprint mismatch, and on any stack `.env` with mode other than 0600.
+- **connectome-agent.AC12.4 Success:** `llm-calls`/`headless.log` over their size thresholds produce a WARN, not a FAIL.
+- **connectome-agent.AC12.5 Success:** lints read `.env` key names only, never values.
+
+### connectome-agent.AC13: documentation (Phase 3)
+- **connectome-agent.AC13.1 Success:** `stacks/onecli/README.md` describes v2 (auth, key location, threat model). `stacks/connectome/README.md` covers sources and patches, provisioning, calibration values and known exposures.
+- **connectome-agent.AC13.2 Success:** CLAUDE.md no longer refers to nanoclaw or onecli v1. Its onecli key/FileVault paragraph, Reproducible-vs-runtime table, Colima table and stack lists include connectome.
+- **connectome-agent.AC13.3 Success:** `docs/migration-recovery.md` covers rebuilding onecli v2 and connectome on a fresh device, including manual re-application of local patches.
+
 ## Open questions
 
-None blocking. Values deferred to the spike: rule-1 rate limit, heartbeat
-wake `rate_limit` numbers, ChatGPT per-app weekly cap.
+None blocking. The values the spike deferred (rule-1 rate limit, heartbeat
+wake `rate_limit` numbers, ChatGPT per-app weekly cap) are set by the Phase 2
+[usage-cap calibration](#usage-cap-calibration-bring-up) step (AC3.7).
 
 ## Appendix A: onecli v2 compose
 
