@@ -1,113 +1,64 @@
 #!/usr/bin/env bash
 # stacks/onecli/scripts/bootstrap.sh
-# Trigger lazy local-admin creation in the onecli container, mint an API
-# key for the host CLI, and persist it via `onecli auth login`. Idempotent.
+# onecli v2 fresh-vault bootstrap (no browser): sign up — or sign in if the
+# account exists — the operator account, fetch the user API key, and point
+# the host onecli CLI at http://127.0.0.1:10256. Registration is open in v2
+# with no switch, so run this immediately after the first `up`.
+# Idempotent: exits early if the CLI already holds a working key.
 #
-# Onecli runs in AUTH_MODE=local (no NEXTAUTH_SECRET → single-user
-# local-admin, hardcoded admin@localhost). The first authenticated HTTP
-# hit lazy-creates the user, organization, project, and an API key.
-# This script does that hit, then registers the resulting key with the
-# host `onecli` CLI so `onecli secrets list` works from any shell.
-#
-# Exit codes:
-#   0 — success (bootstrap done, or already done idempotently)
-#   1 — unexpected state (script can't safely proceed without human input)
-#   2 — missing prerequisite (.env, container, host CLI, jq)
-#   3 — upstream failure (HTTP error, CLI error)
+# Exit codes: 0 ok; 2 missing prerequisite; 3 API failure.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-env_file="${SCRIPT_DIR}/../.env"
-context="colima-agents"
+# shellcheck source=lib/api.sh
+source "${SCRIPT_DIR}/lib/api.sh"
 
-# --- Preflight: host tools ---
-for tool in onecli jq curl; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-        echo "onecli bootstrap: '${tool}' not on PATH" >&2
-        case "$tool" in
-            onecli) echo "  recover: curl -fsSL onecli.sh/cli/install | sh" >&2 ;;
-            jq|curl) echo "  recover: brew install ${tool}" >&2 ;;
-        esac
-        exit 2
-    fi
+for tool in "$ONECLI_BIN" jq curl; do
+    command -v "$tool" >/dev/null || { echo "bootstrap: $tool not found" >&2; exit 2; }
 done
 
-# --- Preflight: .env exists and isn't set up for oauth ---
-if [ ! -f "$env_file" ]; then
-    echo "onecli bootstrap: ${env_file} missing" >&2
-    echo "  recover: cp .env.example .env && chmod 600 .env && fill in" >&2
-    exit 2
-fi
-
-# env_file: injects every .env key into the container. A NEXTAUTH_SECRET
-# entry would flip onecli into oauth mode, which this stack isn't
-# configured for — 401 every request, no usable bootstrap path.
-if grep -qE '^NEXTAUTH_SECRET=' "$env_file"; then
-    echo "onecli bootstrap: this stack runs in AUTH_MODE=local, but" >&2
-    echo "  ${env_file} sets NEXTAUTH_SECRET (which forces oauth mode)." >&2
-    echo "  recover: remove the NEXTAUTH_SECRET line, then re-run:" >&2
-    echo "           dotfiles stacks onecli down && dotfiles stacks onecli up" >&2
-    echo "           dotfiles stacks onecli bootstrap" >&2
-    exit 1
-fi
-
-# --- Resolve gateway URL from .env (with the same defaults compose uses) ---
-set -a; source "$env_file"; set +a
-bind_host="${ONECLI_BIND_HOST:-127.0.0.1}"
-app_port="${ONECLI_APP_PORT:-10254}"
-url="http://${bind_host}:${app_port}"
-
-# --- Preflight: container running ---
-if ! docker --context "$context" compose ps --status running 2>/dev/null \
-        | grep -qE '\bonecli\b'; then
-    echo "onecli bootstrap: onecli container not running on ${context}" >&2
-    echo "  recover: dotfiles stacks vm-agents-up && dotfiles stacks onecli up" >&2
-    exit 2
-fi
-
-# --- Wait for the dashboard to respond ---
-echo "Waiting for onecli to respond at ${url}..."
-deadline=$(($(date +%s) + 60))
-until curl -fsS -o /dev/null "${url}/api/health" 2>/dev/null; do
-    if [ "$(date +%s)" -ge "$deadline" ]; then
-        echo "onecli bootstrap: gateway did not become ready within 60s" >&2
-        echo "  recover: dotfiles stacks onecli logs" >&2
-        exit 2
-    fi
-    sleep 2
+until curl -fsS -o /dev/null "${ONECLI_API}/v1/health" 2>/dev/null; do
+    [ "${waited:=0}" -ge 60 ] && { echo "bootstrap: API not healthy at ${ONECLI_API} (run: dotfiles stacks onecli up)" >&2; exit 2; }
+    sleep 2; waited=$((waited + 2))
 done
 
-# --- Mint / fetch the API key ---
-# In local mode, GET /api/user/api-key triggers lazy create (user, org,
-# project, default agent, api_key) on first call and returns the same
-# key on every subsequent call.
-echo "Fetching local-admin API key..."
-api_key_json=$(curl -fsS "${url}/api/user/api-key" 2>&1) || {
-    echo "onecli bootstrap: GET /api/user/api-key failed" >&2
-    echo "${api_key_json}" >&2
-    echo "  If the response is 401/AUTH_REQUIRED: NEXTAUTH_SECRET is leaking" >&2
-    echo "  in from somewhere (.env or shell). Fix and re-run." >&2
-    exit 3
+"$ONECLI_BIN" config set api-host "$ONECLI_API" >/dev/null
+if operator_key >/dev/null 2>&1 && api GET /v1/user >/dev/null 2>&1; then
+    echo "bootstrap: host CLI already authenticated against ${ONECLI_API}; nothing to do"
+    exit 0
+fi
+
+read -r -p "onecli operator email: " email
+read -r -s -p "onecli operator password (min 8 chars): " password; echo
+
+jar_dir=$(mktemp -d); chmod 700 "$jar_dir"; jar="${jar_dir}/cookies"
+trap 'rm -rf "$jar_dir"' EXIT
+# Password via env, not jq argv.
+creds=$(OB_EMAIL="$email" OB_PASS="$password" jq -cn '{email:env.OB_EMAIL, password:env.OB_PASS, name:(env.OB_EMAIL|split("@")[0])}')
+unset password
+
+auth_post() {  # auth_post <sign-up|sign-in>
+    curl -sS -o /dev/null -w '%{http_code}' -c "$jar" -b "$jar" \
+        -H 'Content-Type: application/json' --data-binary @- \
+        "${ONECLI_API}/auth/$1/email" <<<"$creds"
 }
-
-api_key=$(echo "$api_key_json" | jq -r '.apiKey // empty')
-if [ -z "$api_key" ]; then
-    echo "onecli bootstrap: API response had no .apiKey field" >&2
-    echo "${api_key_json}" >&2
-    exit 3
+code=$(auth_post sign-up)
+if [ "$code" -ge 400 ]; then
+    code=$(auth_post sign-in)
+    [ "$code" -lt 400 ] || { echo "bootstrap: sign-up and sign-in both failed (HTTP ${code})" >&2; exit 3; }
+    echo "bootstrap: signed in to existing account"
+else
+    echo "bootstrap: registered operator account ${email}"
 fi
 
-# --- Register with the host CLI (idempotent) ---
-echo "Configuring host CLI..."
-onecli config set api-host "$url" >/dev/null
-onecli auth login --api-key "$api_key" >/dev/null
+# First session call provisions org, workspace and the user API key.
+session=$(curl -fsS -b "$jar" "${ONECLI_API}/v1/auth/session") || { echo "bootstrap: /v1/auth/session failed" >&2; exit 3; }
+ws=$(jq -r '.workspaceId // .session.workspaceId // empty' <<<"$session")
+key=$(curl -fsS -b "$jar" ${ws:+-H "X-Workspace-Id: $ws"} "${ONECLI_API}/v1/user/api-key" | jq -r '.apiKey // empty')
+case "$key" in oc_*) ;; *) echo "bootstrap: could not read user API key" >&2; exit 3 ;; esac
 
-# --- Verify ---
-if ! onecli secrets list >/dev/null 2>&1; then
-    echo "onecli bootstrap: 'onecli secrets list' failed after auth login" >&2
-    echo "  recover: onecli auth status; check ~/.onecli/credentials/" >&2
-    exit 3
-fi
-
-echo "Bootstrap complete. 'onecli secrets list' is now available from the host."
-exit 0
+# The CLI only accepts the key as a flag. This is a brief Mac-local argv
+# exposure, the same as the v1 flow; containers never see this key.
+"$ONECLI_BIN" auth login --api-key "$key" >/dev/null
+unset key
+"$ONECLI_BIN" agents list >/dev/null && echo "bootstrap: host CLI authenticated; 'onecli agents list' works"
