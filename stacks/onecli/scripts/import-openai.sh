@@ -42,6 +42,12 @@ failed_ids=""
 for id in $existing; do
     api DELETE "/v1/org/secrets/${id}" >/dev/null || failed_ids="${failed_ids} ${id}"
 done
+# Report now, so the ids are named even if the policy step below fails too.
+# The old secret stays in the vault and policy grants it to connectome-host
+# alongside the new one.
+if [ -n "$failed_ids" ]; then
+    echo "import-openai: could not delete old openai secret(s):${failed_ids}; delete them manually (onecli secrets), then re-run 'dotfiles stacks onecli policy'" >&2
+fi
 
 # Reconcile grants: run the full policy (no --grants-only flag) which creates agents
 # if they don't exist, then reconciles grants. If it fails, operator must run it manually.
@@ -51,10 +57,6 @@ if ! "${SCRIPT_DIR}/policy.sh"; then
 fi
 echo "import-openai: reconciled grants (openai → connectome-host only)"
 
-# Exit non-zero if any DELETE failed: the old secret is still in the vault and
-# policy has just granted it to connectome-host alongside the new one.
-if [ -n "$failed_ids" ]; then
-    echo "import-openai: could not delete old openai secret(s):${failed_ids}; delete them manually (onecli secrets), then re-run 'dotfiles stacks onecli policy'" >&2
-    exit 3
-fi
+# Exit non-zero if any DELETE failed (reported above).
+[ -z "$failed_ids" ] || exit 3
 # trap removes $tmp_home (the only copy of the dedicated login)
