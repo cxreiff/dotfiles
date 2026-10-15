@@ -29,8 +29,6 @@ else
     if [ -n "${1:-}" ]; then
         rate="$1"
         rate_provided=true
-    fi
-    if [ -n "$rate" ]; then
         [[ "$rate" =~ ^[0-9]+$ ]] && [ "$rate" -ge 1 ] || { echo "policy: rate must be a positive integer" >&2; exit 2; }
     fi
 fi
@@ -82,13 +80,13 @@ list_rules() { api GET /v1/org/policy/rules | jq -c 'if type=="array" then . els
 existing=$(list_rules)
 ordered=()
 while IFS= read -r spec; do
-    name=$(jq -r .name <<<"$spec")
-    id=$(jq -r --arg n "$name" '.[] | select(.name==$n) | .id' <<<"$existing")
+    name=$(printf '%s' "$spec" | jq -r .name)
+    id=$(printf '%s' "$existing" | jq -r --arg n "$name" '.[] | select(.name==$n) | .id')
     if [ -z "$id" ]; then
         id=$(api POST /v1/org/policy/rules "$spec" | jq -r '.id // .rule.id')
         echo "policy: created rule ${name}"
     else
-        api PATCH "/v1/org/policy/rules/${id}" "$(jq -c 'del(.name)' <<<"$spec")" >/dev/null
+        api PATCH "/v1/org/policy/rules/${id}" "$(printf '%s' "$spec" | jq -c 'del(.name)')" >/dev/null
     fi
     ordered+=("$id")
 done < <(jq -c '.[]' <<<"$specs")
@@ -100,23 +98,38 @@ echo "policy: ${#ordered[@]} rules in order; rule 1 limit ${rate}/hour"
 fi
 
 # --- 3. grants: only connectome-host holds the openai secret ---
-openai_id=$(api GET /v1/org/secrets | jq -r '(if type=="array" then . else (.secrets // .data // []) end)[] | select(.type=="openai") | .id' | head -1)
-if [ -z "$openai_id" ]; then
+openai_ids=$(api GET /v1/org/secrets | jq -r '(if type=="array" then . else (.secrets // .data // []) end)[] | select(.type=="openai") | .id')
+if [ -z "$openai_ids" ]; then
     echo "policy: no openai secret yet (run: dotfiles stacks onecli import-openai); grants skipped" >&2
     exit 0
 fi
-host_id=$(agent_field connectome-host id)
-api PUT "/v1/agents/${host_id}/grants/secrets/${openai_id}" '{}' >/dev/null
+
+# Validate agents list and require connectome-host to exist.
 agents_list=$(api GET /v1/agents) || exit 3
+# Strict validation: must be array, non-empty, and contain connectome-host.
+printf '%s' "$agents_list" | jq -e 'if type=="array" then . elif type=="object" then (.agents // .data // []) else empty end | if length > 0 then . else empty end' >/dev/null || \
+    { echo "policy: agents list is empty or invalid" >&2; exit 3; }
+host_id=$(printf '%s' "$agents_list" | jq -r '(if type=="array" then . else (.agents // .data // []) end)[] | select(.identifier=="connectome-host") | .id' | head -1)
+[ -n "$host_id" ] || { echo "policy: connectome-host agent not found; run 'dotfiles stacks onecli policy' without --grants-only to create agents" >&2; exit 3; }
+
+# Grant each openai secret to the host.
+for openai_id in $openai_ids; do
+    api PUT "/v1/agents/${host_id}/grants/secrets/${openai_id}" '{}' >/dev/null
+done
+
+# Remove openai grants from all non-host agents.
 while read -r aid; do
     grants=$(api GET "/v1/agents/${aid}/grants") || exit 3
-    if [ -z "$grants" ] || ! grep -q '"secrets"' <<<"$grants"; then
-        echo "policy: agent ${aid} grants response missing .secrets key" >&2
-        exit 3
-    fi
-    if jq -e --arg s "$openai_id" '.secrets[]? | select(.secretId==$s)' <<<"$grants" >/dev/null; then
-        api DELETE "/v1/agents/${aid}/grants/secrets/${openai_id}" >/dev/null
-        echo "policy: removed openai grant from agent ${aid}"
-    fi
+    # Validate grants response structure.
+    printf '%s' "$grants" | jq -e 'has("secrets") and (.secrets|type=="array")' >/dev/null || \
+        { echo "policy: agent ${aid} grants response missing .secrets array" >&2; exit 3; }
+    # Remove each openai secret grant from this agent.
+    for openai_id in $openai_ids; do
+        count=$(printf '%s' "$grants" | jq -r --arg s "$openai_id" '[.secrets[]|select(.secretId==$s)]|length')
+        if [ "$count" -gt 0 ]; then
+            api DELETE "/v1/agents/${aid}/grants/secrets/${openai_id}" >/dev/null
+            echo "policy: removed openai grant from agent ${aid}"
+        fi
+    done
 done < <(printf '%s' "$agents_list" | jq -r '(if type=="array" then . else (.agents // .data // []) end)[] | select(.identifier!="connectome-host") | .id')
 echo "policy: grants reconciled (openai → connectome-host only)"
