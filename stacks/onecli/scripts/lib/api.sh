@@ -27,9 +27,9 @@ api() {
     out=$(mktemp)
     # A transport failure (API down) must not look like an empty success.
     if [ -n "$body" ]; then
-        code=$(curl -sS -o "$out" -w '%{http_code}' -X "$method" "${ONECLI_API}${api_path}" \
+        code=$(printf '%s' "$body" | curl -sS -o "$out" -w '%{http_code}' -X "$method" "${ONECLI_API}${api_path}" \
             -K <(printf 'header = "Authorization: Bearer %s"\n' "$key") \
-            -H 'Content-Type: application/json' --data-binary @- <<<"$body") \
+            -H 'Content-Type: application/json' --data-binary @-) \
             || { echo "onecli API unreachable at ${ONECLI_API}" >&2; rm -f "$out"; return 3; }
     else
         code=$(curl -sS -o "$out" -w '%{http_code}' -X "$method" "${ONECLI_API}${api_path}" \

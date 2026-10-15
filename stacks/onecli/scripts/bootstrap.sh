@@ -37,18 +37,33 @@ trap 'rm -rf "$jar_dir"' EXIT
 creds=$(OB_EMAIL="$email" OB_PASS="$password" jq -cn '{email:env.OB_EMAIL, password:env.OB_PASS, name:(env.OB_EMAIL|split("@")[0])}')
 unset password
 
-auth_post() {  # auth_post <sign-up|sign-in>
-    curl -sS -o /dev/null -w '%{http_code}' -c "$jar" -b "$jar" \
-        -H 'Content-Type: application/json' --data-binary @- \
-        "${ONECLI_API}/auth/$1/email" <<<"$creds"
+auth_post() {  # auth_post <sign-up|sign-in> [output-file]
+    local out="${3:-}"
+    if [ -n "$out" ]; then
+        printf '%s' "$creds" | curl -sS -o "$out" -w '%{http_code}' -c "$jar" -b "$jar" \
+            -H 'Content-Type: application/json' --data-binary @- \
+            "${ONECLI_API}/auth/$1/email"
+    else
+        printf '%s' "$creds" | curl -sS -o /dev/null -w '%{http_code}' -c "$jar" -b "$jar" \
+            -H 'Content-Type: application/json' --data-binary @- \
+            "${ONECLI_API}/auth/$1/email"
+    fi
 }
-code=$(auth_post sign-up)
-if [ "$code" -ge 400 ]; then
-    code=$(auth_post sign-in)
-    [ "$code" -lt 400 ] || { echo "bootstrap: sign-up and sign-in both failed (HTTP ${code})" >&2; exit 3; }
-    echo "bootstrap: signed in to existing account"
-else
+resp_file=$(mktemp)
+trap 'rm -f "$resp_file"' EXIT
+code=$(auth_post sign-up "$resp_file")
+if [ "$code" -lt 400 ]; then
     echo "bootstrap: registered operator account ${email}"
+else
+    # Only fall back to sign-in if the user already exists (422) or the body mentions "exist".
+    if [ "$code" = 422 ] || grep -qi exist "$resp_file"; then
+        code=$(auth_post sign-in "$resp_file")
+        [ "$code" -lt 400 ] || { echo "bootstrap: sign-up and sign-in both failed (HTTP ${code}): $(head -c 200 "$resp_file")" >&2; exit 3; }
+        echo "bootstrap: signed in to existing account"
+    else
+        echo "bootstrap: sign-up failed (HTTP ${code}): $(head -c 200 "$resp_file")" >&2
+        exit 3
+    fi
 fi
 
 # First session call provisions org, workspace and the user API key.
