@@ -18,7 +18,7 @@ codex_bin=$(type -P codex || true)   # bypass the token-meter shell function
 
 existing=$(api GET /v1/org/secrets | jq -r '(if type=="array" then . else (.secrets // .data // []) end)[] | select(.type=="openai") | .id')
 if [ -n "$existing" ] && [ "${1:-}" != "--replace" ]; then
-    echo "import-openai: an openai secret already exists (${existing}); re-run with --replace to rotate it" >&2
+    echo "import-openai: an openai secret already exists (${existing}); re-run with: dotfiles stacks onecli import-openai --replace" >&2
     exit 1
 fi
 
@@ -32,9 +32,17 @@ jq -e '.tokens.access_token and .tokens.refresh_token' "$tmp_home/auth.json" >/d
     || { echo "import-openai: auth.json is not a ChatGPT OAuth login" >&2; exit 3; }
 
 body=$(jq -c '{name:"openai", type:"openai", valueSource:"inline", hostPattern:"chatgpt.com", value:(. | tojson)}' "$tmp_home/auth.json")
-for id in $existing; do api DELETE "/v1/org/secrets/${id}" >/dev/null; done
-created=$(api POST /v1/org/secrets "$body")
+created=$(api POST /v1/org/secrets "$body") || { echo "import-openai: POST /v1/org/secrets failed; keeping auth.json at ${tmp_home}/auth.json for manual recovery" >&2; trap - EXIT; exit 3; }
 unset body
-echo "import-openai: created secret $(jq -r '.id' <<<"$created") authMode=$(jq -r '.metadata.authMode // "?"' <<<"$created")"
-echo "import-openai: NOTE new LLM secrets auto-attach to every agent — run 'dotfiles stacks onecli policy' now to fix grants."
+for id in $existing; do api DELETE "/v1/org/secrets/${id}" >/dev/null; done
+secret_id=$(jq -r '.id' <<<"$created")
+echo "import-openai: created secret ${secret_id}"
+
+# Auto-reconcile grants: new LLM secrets auto-attach to every agent, so run
+# the grants-only reconciliation now. If it fails, fall back to the NOTE.
+if "${SCRIPT_DIR}/policy.sh" --grants-only 2>/dev/null; then
+    echo "import-openai: reconciled grants (openai → connectome-host only)"
+else
+    echo "import-openai: NOTE new LLM secrets auto-attach to every agent — run 'dotfiles stacks onecli policy' now to fix grants." >&2
+fi
 # trap removes $tmp_home (the only copy of the dedicated login)
