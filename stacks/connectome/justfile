@@ -10,3 +10,12 @@ default:
 # secrets; re-syncs the two onecli agent tokens). Never prints values.
 init-env:
     @./scripts/init-env.sh
+
+# Build both images from ~/Developer/connectome clones (refuses dirty trees),
+# copy the gateway CA in, and write sources.lock.
+build:
+    @./scripts/build.sh
+
+# Static assertions against the built images.
+image-test:
+    @./scripts/image-test.sh
