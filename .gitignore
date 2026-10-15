@@ -17,3 +17,7 @@ id_ecdsa
 Thumbs.db
 
 .worktrees/
+
+# connectome build staging (git archives of local clones + per-vault CA)
+stacks/connectome/build/src/
+stacks/connectome/build/gateway-ca.crt
