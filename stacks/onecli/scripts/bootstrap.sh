@@ -31,14 +31,14 @@ fi
 read -r -p "onecli operator email: " email
 read -r -s -p "onecli operator password (min 8 chars): " password; echo
 
-jar_dir=$(mktemp -d); chmod 700 "$jar_dir"; jar="${jar_dir}/cookies"
+jar_dir=$(mktemp -d); chmod 700 "$jar_dir"; jar="${jar_dir}/cookies" resp_file="${jar_dir}/response"
 trap 'rm -rf "$jar_dir"' EXIT
 # Password via env, not jq argv.
 creds=$(OB_EMAIL="$email" OB_PASS="$password" jq -cn '{email:env.OB_EMAIL, password:env.OB_PASS, name:(env.OB_EMAIL|split("@")[0])}')
 unset password
 
 auth_post() {  # auth_post <sign-up|sign-in> [output-file]
-    local out="${3:-}"
+    local out="${2:-}"
     if [ -n "$out" ]; then
         printf '%s' "$creds" | curl -sS -o "$out" -w '%{http_code}' -c "$jar" -b "$jar" \
             -H 'Content-Type: application/json' --data-binary @- \
@@ -49,8 +49,6 @@ auth_post() {  # auth_post <sign-up|sign-in> [output-file]
             "${ONECLI_API}/auth/$1/email"
     fi
 }
-resp_file=$(mktemp)
-trap 'rm -f "$resp_file"' EXIT
 code=$(auth_post sign-up "$resp_file")
 if [ "$code" -lt 400 ]; then
     echo "bootstrap: registered operator account ${email}"
@@ -68,7 +66,7 @@ fi
 
 # First session call provisions org, workspace and the user API key.
 session=$(curl -fsS -b "$jar" "${ONECLI_API}/v1/auth/session") || { echo "bootstrap: /v1/auth/session failed" >&2; exit 3; }
-ws=$(jq -r '.workspaceId // .session.workspaceId // empty' <<<"$session")
+ws=$(printf '%s' "$session" | jq -r '.workspaceId // .session.workspaceId // empty')
 key=$(curl -fsS -b "$jar" ${ws:+-H "X-Workspace-Id: $ws"} "${ONECLI_API}/v1/user/api-key" | jq -r '.apiKey // empty')
 case "$key" in oc_*) ;; *) echo "bootstrap: could not read user API key" >&2; exit 3 ;; esac
 
