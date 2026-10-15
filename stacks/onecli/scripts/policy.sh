@@ -65,7 +65,7 @@ while IFS= read -r spec; do
 done < <(jq -c '.[]' <<<"$specs")
 # Ours first (in table order), then any other pre-existing rules after them.
 others=$(list_rules | jq -r --argjson ours "$(printf '%s\n' "${ordered[@]}" | jq -R . | jq -cs .)" '.[] | select(.id as $i | $ours | index($i) | not) | .id')
-all_ids=$( { printf '%s\n' "${ordered[@]}"; [ -n "$others" ] && printf '%s\n' "$others"; } | jq -R . | jq -cs .)
+all_ids=$( { printf '%s\n' "${ordered[@]}"; if [ -n "$others" ]; then printf '%s\n' "$others"; fi; } | jq -R . | jq -cs .)
 api PUT /v1/org/policy/rules/order "$(jq -cn --argjson ids "$all_ids" '{orderedIds:$ids}')" >/dev/null
 echo "policy: ${#ordered[@]} rules in order; rule 1 limit ${rate}/hour"
 
