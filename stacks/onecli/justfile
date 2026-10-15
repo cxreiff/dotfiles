@@ -57,7 +57,7 @@ probe:
 # Gateway request log for the last N minutes (allowed requests are NOT in
 # `docker logs onecli-gateway`; they live in Postgres request_logs).
 # Columns: time, agent_id, method, host, path, status. Read-only.
-@requests $minutes="15":
+requests $minutes="15":
     #!/usr/bin/env bash
     set -euo pipefail
     [[ "$minutes" =~ ^[0-9]+$ ]] || { echo "requests: minutes must be an integer" >&2; exit 2; }
