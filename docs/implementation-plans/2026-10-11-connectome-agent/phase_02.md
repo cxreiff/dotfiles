@@ -1155,60 +1155,66 @@ Expected: a tarball path is printed, and api/web/gateway/postgres are `Up` again
 
 Code review identified issues in commits 3a2455f..HEAD. Fixes applied:
 
-### [Critical] policy.sh pipeline exit propagation
+### [IMPORTANT 1] bootstrap.sh: cookie-jar cleanup and error capture
 
-**Issue:** Lines 105-106 attempted to pipe a variable as a command:
+**Issue:** Two EXIT traps fought for control. Line 35 set `trap 'rm -rf "$jar_dir"' EXIT`, but line 53 replaced it with `trap 'rm -f "$resp_file"' EXIT`. Bash allows only one EXIT trap, so `$jar_dir` was never cleaned up.
+
+Also, `auth_post()` function signature read `local out="${3:-}"` but callers passed the output file as arg 2, so `out` was always empty and error bodies were never captured.
+
+**Fix:**
+- Line 41: Changed `local out="${3:-}"` to `local out="${2:-}"`
+- Lines 34-35: Created `resp_file` inside `jar_dir` and removed the second trap, keeping only one trap for both
+- Line 68: Changed here-string `jq … <<<$session` to `printf '%s' "$session" | jq …` to avoid secret exposure
+
+**Verification:** Error responses are now captured and printed; the jar directory is cleaned up after each run.
+
+### [MINOR 1] import-openai: calls non-existent --grants-only in fresh vault
+
+**Issue:** Line 43 called `policy.sh --grants-only`, but on a fresh vault (first run), agents don't exist yet. Policy can only reconcile grants if agents exist. Task 7 (import-openai) runs before Task 8 (policy), so agents are created by policy.sh itself.
+
+**Fix:** Line 43 changed to call full `policy.sh` (no `--grants-only` flag), which creates agents if missing, then reconciles grants. Removed the `--grants-only` mode references from the script.
+
+### [MINOR 2] import-openai: failed DELETE stops policy reconciliation
+
+**Issue:** Line 37 deleted existing secrets under `set -e`:
 ```bash
-agents_list=$(api GET /v1/agents) || exit 3
-agents_list | jq -r …     # ← agents_list is a variable, not a command
+for id in $existing; do api DELETE "/v1/org/secrets/${id}" >/dev/null; done
 ```
-This fails with "command not found" (rc 127); the jq exit code doesn't propagate to main shell.
+If any DELETE failed, the script exited before running policy reconciliation. Also, policy.sh only handled the first openai secret via `head -1`.
 
-**Fix:** Use process substitution to ensure jq exit codes bubble up in the main shell, not a subshell:
-```bash
-while read -r aid; do
-  …
-done < <(printf '%s' "$agents_list" | jq -r …)
-```
+**Fix:**
+- Lines 37-40: Wrapped DELETE in `|| warn` pattern to record failures but continue
+- Lines 43-46: Always run policy reconciliation (no early exit)
+- Final check: Exit non-zero if any DELETE failed
+- policy.sh lines 112-144: Now loops over ALL openai secrets (not just `head -1`) to grant/revoke
 
-### [Important] Rate limit preservation ineffective
+### [MINOR 3] policy.sh: unused rate in --grants-only mode
 
-**Issue 2a:** `justfile` recipe `policy rate_limit="60":` always passed 60, making the "preserve existing limit" path unreachable.
+**Issue:** Lines 23-36 set `rate=""` and `rate_provided=false` even in `--grants-only` mode, where rate is never used.
 
-**Fix:** Change to `policy rate_limit="":` (empty default). When no arg given, nothing is passed to policy.sh; explicit values override.
+**Fix:** Lines 26-35: Simplified condition — only set and validate rate when NOT in `--grants-only` mode.
 
-**Issue 2b:** `policy.sh` read `[0].rateLimit` (positional first rule) instead of by rule name. On API failure, silently fell back to 60, masking real errors.
+### [MINOR 4] policy.sh: weak grants response validation
 
-**Fix:** Look up `cx-1-codex-responses-limit` by name. Use 60 only on first creation (rule doesn't exist yet). API failure is now fatal (no silent fallback).
+**Issue:** Lines 113, 117, 121 used `grep` and `if jq -e` to validate, but errors were swallowed by the if condition. Agents response was never validated to contain connectome-host.
 
-**Issue 2c:** Rules section half-indented; `rate_provided` logic unclear.
+**Fix:** Lines 113-144: Replaced weak checks with strict jq validation outside any if:
+- Validate agents list is a non-empty array containing connectome-host (fatal if missing)
+- Validate each agent's grants response has `has("secrets") and (.secrets|type=="array")` (fatal otherwise)
+- Loop over ALL openai secrets for each agent (not just first one)
 
-**Fix:** Consistent indentation; simplified rate initialization: `rate=""` then set only if provided or looked up.
+### [MINOR 5] Secret-bearing here-strings in multiple scripts
 
-**Issue 2d:** `--grants-only` mode set `rate=60` (misleading, unused).
+**Issue:** bootstrap.sh line 71 (`jq … <<<$session`), import-openai.sh line 38 (`jq … <<<$created`), and policy.sh lines 85, 91, 117 used here-strings with API responses containing secrets.
 
-**Fix:** Don't set rate in --grants-only mode; omit the initialization.
+**Fix:** Changed all to `printf '%s' "$var" | jq …` to avoid exposing secrets on the command line.
 
-### [Important] import-openai error handling
+### [MINOR 6] init-env.sh: outdated comments and missing warnings
 
-**Issue:** Line 43 swallowed stderr and continued on policy.sh failure:
-```bash
-if "${SCRIPT_DIR}/policy.sh" --grants-only 2>/dev/null; then
-    echo "reconciled…"
-else
-    echo "NOTE…" >&2  # Printed but script continued (exit 0)
-fi
-```
-Secret was created but grants were silently not reconciled.
+**Issue:** Header and justfile comment said "three secrets" but init-env.sh now handles four (including POSTGRES_PASSWORD). No warning when POSTGRES_PASSWORD is regenerated on an existing vault (breaks DB auth).
 
-**Fix:** Don't discard stderr; fail loudly and exit 3 on policy.sh failure. Operator must run policy manually:
-```bash
-if ! "${SCRIPT_DIR}/policy.sh" --grants-only; then
-    echo "NOTE: secret created, but grants reconciliation failed…" >&2
-    exit 3
-fi
-```
-
-### [Minor] Documentation update
-
-This section now reflects the three fixes above. All fixes verified with bash -n static checks and justfile -n parameter passing validation.
+**Fix:**
+- init-env.sh header (lines 3-6): Updated to mention all four variables
+- init-env.sh lines 38-43: Added comment warning that regenerating POSTGRES_PASSWORD breaks DB auth if pgdata exists
+- init-env.sh lines 65-75: Added stderr warning when POSTGRES_PASSWORD is generated on an existing vault
+- justfile line 30-31: Updated comment to list all four variables
