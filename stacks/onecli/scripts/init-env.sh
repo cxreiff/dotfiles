@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # stacks/onecli/scripts/init-env.sh
 # Idempotently ensure stacks/onecli/.env holds the three onecli v2 secrets
-# (SECRET_ENCRYPTION_KEY, BETTER_AUTH_SECRET, GATEWAY_INTERNAL_SECRET).
-# Existing non-empty values are never changed. Values are never printed.
-# Always leaves .env at mode 0600.
+# (SECRET_ENCRYPTION_KEY, BETTER_AUTH_SECRET, GATEWAY_INTERNAL_SECRET) plus
+# POSTGRES_PASSWORD. Existing non-empty values are never changed.
+# Values are never printed. Always leaves .env at mode 0600.
 #
 # Usage: init-env.sh            (operates on stacks/onecli/.env)
 #        ONECLI_ENV_FILE=<path> init-env.sh   (alternate file; used by tests)
@@ -36,6 +36,8 @@ gen() {
 added=()
 for key in SECRET_ENCRYPTION_KEY BETTER_AUTH_SECRET GATEWAY_INTERNAL_SECRET POSTGRES_PASSWORD; do
     # For POSTGRES_PASSWORD, check if missing, empty, or equal to CHANGE_ME.
+    # WARNING: regenerating POSTGRES_PASSWORD breaks DB auth if pgdata already exists
+    # (postgres initializes with the password it was created with and never changes it).
     if [ "$key" = POSTGRES_PASSWORD ]; then
         if grep -qE "^${key}=.+" "$env_file" && ! grep -qE "^${key}=\s*$|^${key}=CHANGE_ME" "$env_file"; then
             continue
@@ -64,6 +66,12 @@ fi
 
 if [ "${#added[@]}" -gt 0 ]; then
     echo "init-env: generated ${added[*]} in $(basename "$env_file") (values not shown)"
+    # Warn if POSTGRES_PASSWORD was generated on an existing vault.
+    if [[ "${added[*]}" =~ POSTGRES_PASSWORD ]]; then
+        if [ -n "$(docker --context colima-agents volume ls --format '{{.Name}}' --filter name='^onecli_pgdata$' 2>/dev/null || true)" ]; then
+            echo "init-env: WARNING — POSTGRES_PASSWORD was regenerated, but postgres keeps the password it was initialised with. This breaks authentication if pgdata already exists. Only safe before the first 'up' on a fresh vault." >&2
+        fi
+    fi
 else
     echo "init-env: all onecli secrets already present; nothing changed"
 fi

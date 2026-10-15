@@ -27,8 +27,8 @@ pull:
 shell:
     docker --context {{context}} compose exec api sh
 
-# Generate SECRET_ENCRYPTION_KEY / BETTER_AUTH_SECRET / GATEWAY_INTERNAL_SECRET
-# into .env if absent (never prints values); chmod 600. Idempotent.
+# Generate SECRET_ENCRYPTION_KEY / BETTER_AUTH_SECRET / GATEWAY_INTERNAL_SECRET /
+# POSTGRES_PASSWORD into .env if absent (never prints values); chmod 600. Idempotent.
 init-env:
     @./scripts/init-env.sh
 
