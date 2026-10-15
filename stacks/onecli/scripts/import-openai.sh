@@ -39,10 +39,10 @@ secret_id=$(jq -r '.id' <<<"$created")
 echo "import-openai: created secret ${secret_id}"
 
 # Auto-reconcile grants: new LLM secrets auto-attach to every agent, so run
-# the grants-only reconciliation now. If it fails, fall back to the NOTE.
-if "${SCRIPT_DIR}/policy.sh" --grants-only 2>/dev/null; then
-    echo "import-openai: reconciled grants (openai → connectome-host only)"
-else
-    echo "import-openai: NOTE new LLM secrets auto-attach to every agent — run 'dotfiles stacks onecli policy' now to fix grants." >&2
+# the grants-only reconciliation now. If it fails, operator must run it manually.
+if ! "${SCRIPT_DIR}/policy.sh" --grants-only; then
+    echo "import-openai: NOTE: secret created, but grants reconciliation failed — run 'dotfiles stacks onecli policy' now to fix grants." >&2
+    exit 3
 fi
+echo "import-openai: reconciled grants (openai → connectome-host only)"
 # trap removes $tmp_home (the only copy of the dedicated login)

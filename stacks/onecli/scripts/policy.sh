@@ -22,17 +22,17 @@ source "${SCRIPT_DIR}/lib/api.sh"
 
 grants_only=false
 rate_provided=false
+rate=""
 if [ "${1:-}" = "--grants-only" ]; then
     grants_only=true
-    rate=60
 else
     if [ -n "${1:-}" ]; then
         rate="$1"
         rate_provided=true
-    else
-        rate=60
     fi
-    [[ "$rate" =~ ^[0-9]+$ ]] && [ "$rate" -ge 1 ] || { echo "policy: rate must be a positive integer" >&2; exit 2; }
+    if [ -n "$rate" ]; then
+        [[ "$rate" =~ ^[0-9]+$ ]] && [ "$rate" -ge 1 ] || { echo "policy: rate must be a positive integer" >&2; exit 2; }
+    fi
 fi
 
 if [ "$grants_only" = false ]; then
@@ -45,20 +45,25 @@ if [ "$grants_only" = false ]; then
     done
 
     # --- 2. org rules (name → desired spec), in evaluation order ---
-# Rule shape (validations/policy.ts): {name, action: allow|block, enabled,
-# rateLimit?, rateLimitWindow?, targets: [{kind: network, hostPattern,
-# pathPattern?, method?}]}. No `identities` = applies to every agent (org
-# rules); a rate limit is a modifier on an allow (design rule 1).
-net() { jq -cn --arg h "$1" --arg p "${2:-}" --arg m "${3:-}" \
-    '{kind:"network", hostPattern:$h} + (if $p != "" then {pathPattern:$p} else {} end) + (if $m != "" then {method:$m} else {} end)'; }
+    # Rule shape (validations/policy.ts): {name, action: allow|block, enabled,
+    # rateLimit?, rateLimitWindow?, targets: [{kind: network, hostPattern,
+    # pathPattern?, method?}]}. No `identities` = applies to every agent (org
+    # rules); a rate limit is a modifier on an allow (design rule 1).
+    net() { jq -cn --arg h "$1" --arg p "${2:-}" --arg m "${3:-}" \
+        '{kind:"network", hostPattern:$h} + (if $p != "" then {pathPattern:$p} else {} end) + (if $m != "" then {method:$m} else {} end)'; }
 
-# If rate was not explicitly provided (using default), preserve any existing rule 1 limit.
-if [ "$rate_provided" = false ]; then
-    existing_rate=$(api GET /v1/org/policy/rules 2>/dev/null | jq -r '(if type=="array" then . else (.rules // .data // []) end)[0].rateLimit? // "60"' || echo 60)
-    rate="$existing_rate"
-fi
+    # If rate was not explicitly provided, look up the existing rule 1 limit by name.
+    # On first creation (rule doesn't exist), default to 60.
+    if [ "$rate_provided" = false ]; then
+        existing_rate=$(api GET /v1/org/policy/rules | jq -r --arg n "cx-1-codex-responses-limit" '(if type=="array" then . else (.rules // .data // []) end)[] | select(.name==$n) | .rateLimit? // empty')
+        if [ -n "$existing_rate" ]; then
+            rate="$existing_rate"
+        else
+            rate=60
+        fi
+    fi
 
-specs=$(jq -cn --argjson rate "$rate" \
+    specs=$(jq -cn --argjson rate "$rate" \
     --argjson t1 "$(net chatgpt.com '/backend-api/codex/responses*' POST)" \
     --argjson t2 "$(net chatgpt.com '/backend-api/codex/*')" \
     --argjson t3 "$(net chatgpt.com /backend-api/wham/usage GET)" \
@@ -103,7 +108,6 @@ fi
 host_id=$(agent_field connectome-host id)
 api PUT "/v1/agents/${host_id}/grants/secrets/${openai_id}" '{}' >/dev/null
 agents_list=$(api GET /v1/agents) || exit 3
-agents_list | jq -r '(if type=="array" then . else (.agents // .data // []) end)[] | select(.identifier!="connectome-host") | .id' |
 while read -r aid; do
     grants=$(api GET "/v1/agents/${aid}/grants") || exit 3
     if [ -z "$grants" ] || ! grep -q '"secrets"' <<<"$grants"; then
@@ -114,5 +118,5 @@ while read -r aid; do
         api DELETE "/v1/agents/${aid}/grants/secrets/${openai_id}" >/dev/null
         echo "policy: removed openai grant from agent ${aid}"
     fi
-done
+done < <(printf '%s' "$agents_list" | jq -r '(if type=="array" then . else (.agents // .data // []) end)[] | select(.identifier!="connectome-host") | .id')
 echo "policy: grants reconciled (openai → connectome-host only)"

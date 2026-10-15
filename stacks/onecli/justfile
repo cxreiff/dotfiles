@@ -44,8 +44,9 @@ import-openai *args:
     @./scripts/import-openai.sh {{args}}
 
 # Create/update the connectome agents, org policy rules and secret grants.
-# Idempotent. Optional arg overrides rule 1's hourly request limit.
-policy rate_limit="60":
+# Idempotent. Optional arg overrides rule 1's hourly request limit; omit to keep
+# the current limit (60 on first creation).
+policy rate_limit="":
     @./scripts/policy.sh {{rate_limit}}
 
 # Gateway probes (throwaway curl container on onecli-agents) for the
