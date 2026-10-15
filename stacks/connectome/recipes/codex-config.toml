@@ -1,0 +1,13 @@
+# Codex app-server config for the connectome container (copied into
+# CODEX_HOME by `dotfiles stacks connectome provision-codex`). Turning these
+# off avoids start-up calls (/backend-api/ps/…, ab.chatgpt.com) that onecli
+# rule 6 would block.
+[features]
+apps = false
+plugins = false
+
+[analytics]
+enabled = false
+
+[otel]
+metrics_exporter = "none"

@@ -1,0 +1,64 @@
+{
+  "name": "connectome",
+  "description": "cxmini Discord agent (dotfiles stacks/connectome). Shell work happens in the separate `shell` container via term-sessions.",
+  "agent": {
+    "name": "cx",
+    "provider": "${LLM_PROVIDER:-openai-codex}",
+    "model": "${LLM_MODEL}",
+    "systemPrompt": "You are cx, a helpful assistant reachable over Discord. You have a Linux shell (separate container, reached through the terminal-session tools) with a persistent /workspace. To send a file on Discord, write it under /workspace/outbox in the shell and attach it by its path under /agent/outbox (same file, read-only view). You cannot read or change your own configuration files."
+  },
+  "mcpServers": {
+    "discord": {
+      "command": "/opt/node/bin/node",
+      "args": ["/opt/mcpl/discord-mcpl/dist/src/index.js"],
+      "env": {
+        "DISCORD_TOKEN": "${DISCORD_TOKEN}",
+        "DISCORD_GUILD_ID": "${DISCORD_GUILD_ID}",
+        "DISCORD_DM_USERS": "${DISCORD_OPERATOR_ID}",
+        "DISCORD_ADMIN_USERS": "${DISCORD_OPERATOR_ID}",
+        "DISCORD_WATERMARK_FILE": "/agent/state/discord/watermark.json",
+        "DISCORD_DM_NOTICES_FILE": "/agent/state/discord/dm-notices.json",
+        "DISCORD_MUTED_CHANNELS_FILE": "/agent/state/discord/muted-channels.json",
+        "DISCORD_ATTACHMENT_ROOT": "/agent/outbox"
+      },
+      "disabledTools": ["filters_update", "create_text_channel", "delete_channel"]
+    },
+    "heartbeat": {
+      "command": "/opt/node/bin/node",
+      "args": ["/opt/mcpl/heartbeat-mcpl/dist/src/index.js", "--stdio"],
+      "env": {
+        "HEARTBEAT_CONFIG_FILE": "/agent/state/heartbeat/config.json",
+        "HEARTBEAT_REMINDERS_FILE": "/agent/state/heartbeat/reminders.json"
+      },
+      "enabledFeatureSets": ["heartbeat"]
+    },
+    "shell": {
+      "command": "/opt/node/bin/node",
+      "args": ["/opt/mcpl/term-sessions/node_modules/term-sessions-mcp/dist/src/mcp/mcp-stdio-server.js"],
+      "env": {
+        "SESSION_SERVER_HOST": "shell",
+        "SESSION_SERVER_PORT": "3100",
+        "SESSION_SERVER_TOKEN": "${SESSION_SERVER_TOKEN}"
+      }
+    }
+  },
+  "modules": {
+    "workspace": false,
+    "wake": {
+      "policies": [
+        {
+          "name": "heartbeat-rate-limit",
+          "match": { "scope": ["mcpl:push-event"], "source": "heartbeat" },
+          "behavior": { "rate_limit": { "tokens": 6, "refillIntervalMs": 600000 } }
+        }
+      ]
+    },
+    "webui": {
+      "port": 18768,
+      "host": "0.0.0.0",
+      "basicAuth": { "username": "${WEBUI_USER}", "password": "${WEBUI_PASS}" },
+      "allowedOrigins": ["https://cxmini.faun-fir.ts.net:8768"],
+      "observersSurface": "utilities"
+    }
+  }
+}
