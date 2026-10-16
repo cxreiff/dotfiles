@@ -10,7 +10,7 @@
   "mcpServers": {
     "discord": {
       "command": "/opt/node/bin/node",
-      "args": ["/opt/mcpl/discord-mcpl/dist/src/index.js"],
+      "args": ["/opt/mcpl/discord-mcpl/dist/src/index.js", "--stdio"],
       "env": {
         "DISCORD_TOKEN": "${DISCORD_TOKEN}",
         "DISCORD_GUILD_ID": "${DISCORD_GUILD_ID}",
