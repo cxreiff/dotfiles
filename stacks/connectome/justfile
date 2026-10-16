@@ -62,3 +62,11 @@ logs:
 
 serve:
     {{tailscale}} serve --bg --https={{serve_port}} http://localhost:{{internal_port}}
+
+# Smoke test against the running stack (restarts containers; restores state).
+smoke:
+    @./scripts/smoke.sh
+
+# AC5.4: briefly stop the gateway; the operator DMs; expect a failures.log record.
+force-failure:
+    @./scripts/force-failure.sh
