@@ -19,3 +19,9 @@ build:
 # Static assertions against the built images.
 image-test:
     @./scripts/image-test.sh
+
+# Write the onecli Codex stub (+ real account id) and codex config.toml into
+# the state volume. Run once after build; re-run to recover. Never use the
+# WebUI "log in again" action.
+provision-codex:
+    @./scripts/provision-codex.sh
