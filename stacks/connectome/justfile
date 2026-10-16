@@ -25,3 +25,40 @@ image-test:
 # WebUI "log in again" action.
 provision-codex:
     @./scripts/provision-codex.sh
+
+# Fails clearly if onecli (which owns the onecli-agents network) is not up.
+up:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker --context {{context}} network inspect onecli-agents >/dev/null 2>&1; then
+        echo "connectome: network onecli-agents missing — run \`dotfiles stacks onecli up\` first" >&2
+        exit 1
+    fi
+    docker --context {{context}} compose up -d
+
+down:
+    docker --context {{context}} compose down
+
+restart:
+    docker --context {{context}} compose restart
+
+ps:
+    docker --context {{context}} compose ps -a
+
+# Images are built locally; refresh the base images so the next build uses them.
+pull:
+    docker --context {{context}} pull node:22-bookworm
+    docker --context {{context}} pull oven/bun:1-debian
+    docker --context {{context}} pull mcr.microsoft.com/devcontainers/typescript-node:22-bookworm
+
+# Interactive shell in the agent's `shell` container.
+shell:
+    docker --context {{context}} exec -it connectome-shell bash
+
+# --headless sends stdout/stderr to $DATA_DIR/headless.log (docker logs is
+# empty past the entrypoint), so tail the files inside the container.
+logs:
+    docker --context {{context}} exec connectome sh -c 'touch /agent/state/logs/failures.log; tail -n 50 -F /agent/state/data/headless.log /agent/state/logs/failures.log'
+
+serve:
+    {{tailscale}} serve --bg --https={{serve_port}} http://localhost:{{internal_port}}
