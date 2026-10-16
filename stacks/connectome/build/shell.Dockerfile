@@ -27,7 +27,7 @@ COPY gateway-ca.crt /usr/local/share/ca-certificates/onecli-gateway.crt
 RUN update-ca-certificates
 # No sudo: remove the devcontainer's passwordless entry and the binary.
 RUN rm -f /etc/sudoers.d/* \
- && apt-get purge -y sudo \
+ && SUDO_FORCE_REMOVE=yes apt-get purge -y sudo \
  && ! command -v sudo
 RUN mkdir -p /workspace/outbox && chown -R node:node /workspace
 USER node
