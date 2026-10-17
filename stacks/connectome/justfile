@@ -102,8 +102,10 @@ backup:
         -v connectome_state:/src/state:ro \
         -v connectome_workspace:/src/workspace:ro \
         -v "{{backups_dir}}":/dst \
-        alpine sh -c "cd /src && tar czf /dst/$(basename "$dst") state workspace"
-    # Plaintext agent state / the gateway CA key: owner-only.
+        alpine sh -c "umask 077 && cd /src && tar czf /dst/$(basename "$dst") state workspace"
+    # Plaintext agent state / the gateway CA key: owner-only. The umask in the
+    # container sets it at creation (a host-side chmod can be undone when the
+    # VM flushes the file's attributes back over virtiofs); chmod as a backstop.
     chmod 600 "$dst"
     echo "$dst"
 
