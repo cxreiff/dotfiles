@@ -22,7 +22,12 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /uvx /usr/local/bin/
 ARG TERM_SESSIONS_VERSION=1.6.0
-RUN npm install -g --omit=dev "term-sessions-mcp@${TERM_SESSIONS_VERSION}"
+# Locked install from the same lockfile as the connectome image; the version
+# must match the one build.sh records in sources.lock.
+COPY term-sessions /opt/term-sessions
+RUN cd /opt/term-sessions && PUPPETEER_SKIP_DOWNLOAD=1 npm ci --omit=dev \
+ && test "$(node -p "require('./node_modules/term-sessions-mcp/package.json').version")" = "${TERM_SESSIONS_VERSION}" \
+ && ln -s /opt/term-sessions/node_modules/.bin/session-server /usr/local/bin/session-server
 COPY gateway-ca.crt /usr/local/share/ca-certificates/onecli-gateway.crt
 RUN update-ca-certificates
 # No sudo: remove the devcontainer's passwordless entry and the binary.

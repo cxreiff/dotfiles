@@ -39,51 +39,29 @@ prompt() {  # prompt KEY "question" [hidden] [default]
 prompt LLM_MODEL "Codex model id" "" "gpt-6-luna"
 prompt DISCORD_TOKEN "Discord bot token (hidden)" hidden
 
-# Validate and prompt for DISCORD_OPERATOR_ID with re-prompting on bad input
+# Discord ids. A username in DISCORD_OPERATOR_ID silently drops every DM, so
+# both are validated. An existing value in .env is checked, never rewritten;
+# a missing one is prompted for until valid, and only a valid value is written.
 id_val() { grep -E "^$1=" "$env_file" | head -1 | cut -d= -f2-; }
-validate_operator_id() {
-    local pre_existing=! has DISCORD_OPERATOR_ID
-    while true; do
-        prompt DISCORD_OPERATOR_ID "Operator Discord user id (numeric: Developer Mode → Copy User ID; not your username)"
-        if [[ "$(id_val DISCORD_OPERATOR_ID)" =~ ^[0-9]{17,20}$ ]]; then
-            return 0
-        fi
-        if [ "$pre_existing" -eq 0 ]; then
-            # Pre-existing bad value in .env; don't re-prompt, just error
-            echo "init-env: DISCORD_OPERATOR_ID must be a numeric Discord user id, got '$(id_val DISCORD_OPERATOR_ID)'; fix it in .env" >&2
-            exit 2
-        fi
-        # Re-prompt if the value came from this run's prompt
-        echo "init-env: DISCORD_OPERATOR_ID must be a numeric Discord user id; please try again" >&2
-        # Remove the bad value so prompt() will ask again
-        grep -vE "^DISCORD_OPERATOR_ID=" "$env_file" > "$env_file.tmp"
-        mv "$env_file.tmp" "$env_file"
+prompt_id() {  # prompt_id KEY "question" REGEX "format description"
+    local key="$1" question="$2" re="$3" fmt="$4" v
+    if has "$key"; then
+        [[ "$(id_val "$key")" =~ $re ]] \
+            || { echo "init-env: $key must be $fmt, got '$(id_val "$key")'; fix it in .env" >&2; exit 2; }
+        return 0
+    fi
+    while :; do
+        read -r -p "$question: " v || { echo; echo "init-env: $key is required" >&2; exit 2; }
+        [[ "$v" =~ $re ]] && break
+        echo "init-env: $key must be $fmt; try again" >&2
     done
+    set_key "$key" "$v"; echo "init-env: set $key"
 }
 
-# Validate and prompt for DISCORD_GUILD_ID with re-prompting on bad input
-validate_guild_id() {
-    local pre_existing=! has DISCORD_GUILD_ID
-    while true; do
-        prompt DISCORD_GUILD_ID "Discord guild:channel whitelist (numeric ids, e.g. 1234…:5678…)"
-        if [[ "$(id_val DISCORD_GUILD_ID)" =~ ^[0-9]{17,20}:[0-9]{17,20}(\+[0-9]{17,20})*$ ]]; then
-            return 0
-        fi
-        if [ "$pre_existing" -eq 0 ]; then
-            # Pre-existing bad value in .env; don't re-prompt, just error
-            echo "init-env: DISCORD_GUILD_ID must be <guild id>:<channel id>[+<channel id>…], got '$(id_val DISCORD_GUILD_ID)'; fix it in .env" >&2
-            exit 2
-        fi
-        # Re-prompt if the value came from this run's prompt
-        echo "init-env: DISCORD_GUILD_ID must be <guild id>:<channel id>[+<channel id>…]; please try again" >&2
-        # Remove the bad value so prompt() will ask again
-        grep -vE "^DISCORD_GUILD_ID=" "$env_file" > "$env_file.tmp"
-        mv "$env_file.tmp" "$env_file"
-    done
-}
-
-validate_operator_id
-validate_guild_id
+prompt_id DISCORD_GUILD_ID "Discord guild:channel whitelist (numeric ids, e.g. 1234…:5678…)" \
+    '^[0-9]{17,20}:[0-9]{17,20}(\+[0-9]{17,20})*$' "<guild id>:<channel id>[+<channel id>…]"
+prompt_id DISCORD_OPERATOR_ID "Operator Discord user id (numeric: Developer Mode → Copy User ID; not your username)" \
+    '^[0-9]{17,20}$' "a numeric Discord user id"
 has WEBUI_USER || { set_key WEBUI_USER operator; echo "init-env: set WEBUI_USER=operator"; }
 has WEBUI_PASS || { set_key WEBUI_PASS "$(openssl rand -hex 32)"; echo "init-env: generated WEBUI_PASS"; }
 has SESSION_SERVER_TOKEN || { set_key SESSION_SERVER_TOKEN "$(openssl rand -hex 32)"; echo "init-env: generated SESSION_SERVER_TOKEN"; }

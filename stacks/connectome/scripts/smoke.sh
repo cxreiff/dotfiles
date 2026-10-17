@@ -37,7 +37,27 @@ heartbeat_cfg() {  # heartbeat_cfg HOURS: set the persisted interval via the hea
         /opt/node/bin/node /opt/connectome-tests/mcp-call.mjs heartbeat_configure \
         "{\"intervalHours\":$1}" -- /opt/node/bin/node /opt/mcpl/heartbeat-mcpl/dist/src/index.js --stdio >/dev/null 2>&1
 }
-restore_heartbeat_config() { running connectome && heartbeat_cfg 4; }
+# The MCP children (discord, heartbeat, term-sessions) spawn after the
+# container is Running; checks that scan processes must wait for them.
+wait_children() {
+    local _ n
+    for _ in $(seq 1 60); do
+        n=$(X connectome sh -c 'for p in /proc/[0-9]*; do tr "\0" " " < $p/cmdline 2>/dev/null; echo; done' 2>/dev/null \
+            | grep -cE 'discord-mcpl/dist|heartbeat-mcpl/dist|mcp-stdio-server' || true)
+        [ "${n:-0}" -ge 3 ] && return 0
+        sleep 2
+    done
+    return 1
+}
+# Set 4 h back and restart connectome so the live heartbeat server (which
+# holds its config in memory) rereads it. No-op when already 4 h.
+restore_heartbeat_config() {
+    running connectome || return 0
+    X connectome grep -q '"intervalSeconds": 14400' /agent/state/heartbeat/config.json && return 0
+    heartbeat_cfg 4 || true
+    D restart connectome >/dev/null 2>&1 || true
+    wait_children || true
+}
 restore_stack() {  # gateway first (connectome's entrypoint waits for it), then connectome
     D start onecli-gateway >/dev/null 2>&1 || true
     local _
@@ -47,6 +67,7 @@ restore_stack() {  # gateway first (connectome's entrypoint waits for it), then 
     done
     D start connectome >/dev/null 2>&1 || true
     for _ in $(seq 1 30); do running connectome && break; sleep 1; done
+    wait_children || true
 }
 
 check_ac5_1() {
@@ -128,6 +149,10 @@ check_ac5_5() {
         return
     fi
     heartbeat_cfg 4 || true
+    # The live heartbeat server holds its config in memory: restart so it
+    # rereads 14400.
+    D restart connectome >/dev/null
+    wait_children || true
     if X connectome grep -q '"intervalSeconds": 14400' /agent/state/heartbeat/config.json; then
         pass "AC5.5"
     else
@@ -156,7 +181,8 @@ check_ac5_6_wait() {
     # Time only the compose run.
     local before_time after_time elapsed output
     before_time=$(date +%s)
-    output=$(D compose -f "$stack_dir/compose.yaml" run --rm --no-deps -e GATEWAY_WAIT_SECONDS=6 connectome 2>&1 || true)
+    local rc
+    output=$(D compose -f "$stack_dir/compose.yaml" run --rm --no-deps -e GATEWAY_WAIT_SECONDS=6 connectome 2>&1) && rc=0 || rc=$?
     after_time=$(date +%s)
     elapsed=$((after_time - before_time))
 
@@ -165,10 +191,11 @@ check_ac5_6_wait() {
         fail "AC5.6-wait (could not restore gateway/connectome)"
         return
     fi
-    if echo "$output" | grep -q 'unreachable after 6s' && [ "$elapsed" -lt 20 ]; then
+    # entrypoint.sh exits 4 when the gateway stays unreachable.
+    if [ "$rc" -eq 4 ] && echo "$output" | grep -q 'unreachable after 6s' && [ "$elapsed" -lt 20 ]; then
         pass "AC5.6-wait"
     else
-        fail "AC5.6-wait (elapsed=$elapsed, 'unreachable' found: $(echo "$output" | grep -c 'unreachable after 6s' || echo 0))"
+        fail "AC5.6-wait (rc=$rc want 4, elapsed=$elapsed, 'unreachable' found: $(echo "$output" | grep -c 'unreachable after 6s' || echo 0))"
     fi
 }
 
@@ -203,6 +230,7 @@ smoke_secrets_file=""
 rm_secrets_file() { [ -z "$smoke_secrets_file" ] || rm -f "$smoke_secrets_file"; }
 check_ac5_8() {
     if ! running connectome connectome-shell; then fail "AC5.8 (containers not running)"; return; fi
+    if ! wait_children; then fail "AC5.8 (MCP children not running; cmdline scan would be vacuous)"; return; fi
     local secrets_file
     secrets_file=$(umask 077; mktemp)
     smoke_secrets_file="$secrets_file"
