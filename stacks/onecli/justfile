@@ -89,8 +89,8 @@ backup:
         docker --context {{context}} compose start \
             || echo "onecli: WARNING: restart after backup failed (dotfiles stacks onecli up)" >&2
     }
-    docker --context {{context}} compose stop
     trap restart EXIT
+    docker --context {{context}} compose stop
     mkdir -p "{{backups_dir}}"
     dst="{{backups_dir}}/onecli-$(date +%Y-%m-%d).tgz"
     docker --context {{context}} run --rm \

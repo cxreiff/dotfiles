@@ -326,7 +326,7 @@ else
     if operator_key >/dev/null 2>&1; then
         shell_id=$(agent_field connectome-shell id 2>/dev/null || true)
         if [ -z "$shell_id" ]; then
-            fail "connectome-shell agent not found in onecli (run: dotfiles stacks onecli policy)"
+            fail "connectome-shell agent not found, or the onecli API is unreachable (run: dotfiles stacks onecli policy)"
         else
             # The shell is granted nothing at all (design: connectome-shell ← nothing),
             # so count every secret grant. Fail closed: an API error or a response

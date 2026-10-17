@@ -86,8 +86,8 @@ backup:
         docker --context {{context}} compose start \
             || echo "connectome: WARNING: restart after backup failed (dotfiles stacks connectome up)" >&2
     }
-    docker --context {{context}} compose stop
     trap restart EXIT
+    docker --context {{context}} compose stop
     docker --context {{context}} run --rm -v connectome_state:/s alpine sh -c '
         find /s/data -maxdepth 1 -name "llm-calls.*.jsonl" -mtime +14 -print -delete
         log=/s/data/headless.log
