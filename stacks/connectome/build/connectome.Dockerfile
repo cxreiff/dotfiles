@@ -32,8 +32,11 @@ RUN cd heartbeat-mcpl && npm ci && npm run build \
  && npm prune --omit=dev
 
 ARG TERM_SESSIONS_VERSION=1.6.0
-COPY build/term-sessions /opt/term-sessions
-RUN cd /opt/term-sessions && npm ci --omit=dev
+# Locked install (term-sessions/package-lock.json); the version must match the
+# one build.sh records in sources.lock.
+COPY term-sessions /opt/term-sessions
+RUN cd /opt/term-sessions && npm ci --omit=dev \
+ && test "$(node -p "require('./node_modules/term-sessions-mcp/package.json').version")" = "${TERM_SESSIONS_VERSION}"
 
 COPY src/connectome-host ./connectome-host
 # postinstall builds the WebUI into dist/web but swallows failures — assert it.
