@@ -80,17 +80,19 @@ Images are built from local clones in `~/Developer/connectome/` at the SHAs in
 | `heartbeat-mcpl` | anima-research/heartbeat-mcpl | `local` |
 | `voice-kit` | anima-research/voice-kit | `main` |
 
-Local patches:
+Local patches (11 commits; `grep '^patch' sources.lock` is authoritative). Three
+functional changes, the rest are follow-up fixes and tests to them:
 
-- **heartbeat-mcpl** — `local: refuse reminders below a 900 s floor` (refused,
-  not clamped).
-- **discord-mcpl** — `local: confine attachments to DISCORD_ATTACHMENT_ROOT
-  (fd-verified)`. Worth proposing upstream.
-- **connectome-host** — `local: recipe-configurable subagent maxDepth and
-  maxExecutionMs`.
-- **connectome-host** — `local: empty optional subagent inputs mean not given`
-  (the model fills every tool field, so `model: ""` used to reach the provider
-  verbatim instead of the default).
+- **heartbeat-mcpl** (2): reminders below a 900 s floor are refused, not
+  clamped; tool descriptions match the floor.
+- **discord-mcpl** (6): attachments are confined to `DISCORD_ATTACHMENT_ROOT`,
+  checked on the opened file descriptor (symlinks, `/proc`, `..`, FIFOs and
+  directories refused), read with a bounded loop so a growing file cannot pass
+  the 25 MiB cap; plus test hardening. Worth proposing upstream.
+- **connectome-host** (3): `modules.subagents` accepts `maxDepth` and
+  `maxExecutionMs` from the recipe; empty optional spawn/fork inputs
+  (`model: ""`, `maxTokens: 0`, `tools: []`, …) mean "not given", so the recipe
+  defaults apply (`tools: []` therefore means all tools, not none).
 
 On a fresh device, clone each upstream, create `local` from the base SHA in
 `sources.lock`, and re-apply the patches by hand (cherry-pick from a backup of
