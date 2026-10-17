@@ -2,6 +2,7 @@ context := "colima-agents"
 tailscale := "/opt/homebrew/bin/tailscale"
 serve_port := "8768"
 internal_port := "18768"
+backups_dir := join(env("HOME"), ".volume-backups", "daily")
 
 default:
     @just --list
@@ -59,6 +60,76 @@ logs:
 serve:
     {{tailscale}} serve --bg --https={{serve_port}} http://localhost:{{internal_port}}
 
+# Quiesce with stop/start (never down/up), prune llm-calls.*.jsonl older than
+# 14 days, cap headless.log (keep the last 10 MiB once it passes 50 MiB),
+# then tar the state + workspace volumes. No-op when the agents VM is down.
+backup:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker --context {{context}} info >/dev/null 2>&1; then
+        echo "connectome: agents VM not running, skipping backup"
+        exit 0
+    fi
+    docker --context {{context}} compose stop
+    trap 'docker --context {{context}} compose start' EXIT
+    docker --context {{context}} run --rm -v connectome_state:/s alpine sh -c '
+        find /s/data -maxdepth 1 -name "llm-calls.*.jsonl" -mtime +14 -print -delete
+        log=/s/data/headless.log
+        if [ -f "$log" ] && [ "$(stat -c %s "$log")" -gt 52428800 ]; then
+            tail -c 10485760 "$log" > /s/data/.headless.tail && cat /s/data/.headless.tail > "$log" && rm -f /s/data/.headless.tail
+            echo "truncated headless.log to last 10 MiB"
+        fi'
+    mkdir -p "{{backups_dir}}"
+    dst="{{backups_dir}}/connectome-$(date +%Y-%m-%d).tgz"
+    docker --context {{context}} run --rm \
+        -v connectome_state:/src/state:ro \
+        -v connectome_workspace:/src/workspace:ro \
+        -v "{{backups_dir}}":/dst \
+        alpine sh -c "cd /src && tar czf /dst/$(basename "$dst") state workspace"
+    echo "$dst"
+
+# Restore state + workspace from a tarball; refuses non-empty volumes.
+restore tarball:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker --context {{context}} info >/dev/null 2>&1; then
+        echo "connectome: agents VM not running (run dotfiles stacks vm-agents-up)" >&2
+        exit 1
+    fi
+    [ -f "{{tarball}}" ] || { echo "connectome: tarball not found: {{tarball}}" >&2; exit 1; }
+    docker --context {{context}} compose stop 2>/dev/null || true
+    # On refusal/failure, bring the (untouched) stack back.
+    trap 'docker --context {{context}} compose start 2>/dev/null || true' ERR
+    abs="$(cd "$(dirname "{{tarball}}")" && pwd)/$(basename "{{tarball}}")"
+    # Fresh device: create the volumes with compose's labels (adopted by
+    # compose without warnings) and WITHOUT image copy-up — `compose create`
+    # would pre-populate workspace with the shell image's outbox/ dir and the
+    # emptiness check below would then refuse.
+    for v in state workspace; do
+        docker --context {{context}} volume inspect "connectome_${v}" >/dev/null 2>&1 \
+            || docker --context {{context}} volume create \
+                --label com.docker.compose.project=connectome \
+                --label com.docker.compose.volume="${v}" "connectome_${v}" >/dev/null
+    done
+    docker --context {{context}} run --rm \
+        -v connectome_state:/dst/state \
+        -v connectome_workspace:/dst/workspace \
+        -v "$(dirname "$abs")":/src:ro \
+        alpine sh -c "
+            # An existing-but-unused workspace may hold only an empty outbox/
+            # mountpoint (copied up from the shell image); treat that as empty.
+            if [ -n \"\$(ls -A /dst/state 2>/dev/null)\" ] \
+               || [ -n \"\$(ls -A /dst/workspace 2>/dev/null | grep -vx outbox)\" ] \
+               || [ -n \"\$(ls -A /dst/workspace/outbox 2>/dev/null)\" ]; then
+                echo 'connectome: target volumes are non-empty; refusing to clobber. Manually clear and retry.' >&2
+                exit 1
+            fi
+            cd /dst && tar xzpf /src/$(basename "{{tarball}}")"
+    trap - ERR
+    # cwd is stacks/connectome (this module's dir), so `just up` resolves the
+    # connectome justfile; {{justfile()}} would be the ROOT justfile.
+    just up
+
 # Smoke test against the running stack (restarts containers; restores state).
 smoke:
     @./scripts/smoke.sh
@@ -74,3 +145,11 @@ set-heartbeat-rate tokens refill_ms:
 # AC10.3: exhaust a temporary 2/hour rule 1 and expect the gateway refusal.
 ratelimit-check:
     @./scripts/ratelimit-check.sh
+
+# Static security-invariant lints (also run by `dotfiles stacks doctor`).
+lint:
+    @./scripts/lint.sh
+
+# Prove each lint fails on a fixture violating exactly its invariant.
+lint-test:
+    @./scripts/lint-test.sh
