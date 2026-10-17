@@ -43,6 +43,9 @@ services:
 
   connectome:
     <<: *hardening
+    # Graceful shutdown (sessions, sqlite) can outlast the 10 s default,
+    # e.g. when a stop lands while the host is still starting up.
+    stop_grace_period: 30s
     build:
       context: ./build
       dockerfile: connectome.Dockerfile

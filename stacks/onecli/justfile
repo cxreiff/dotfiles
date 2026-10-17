@@ -73,8 +73,24 @@ backup:
         echo "onecli: agents VM not running, skipping backup"
         exit 0
     fi
+    # Volumes missing (stack never provisioned / cleared): nothing to back up.
+    # Skip rather than let `docker run -v` create empty unlabelled volumes and
+    # write an empty tarball that rotation would keep.
+    for v in onecli_pgdata onecli_app-data; do
+        docker --context {{context}} volume inspect "$v" >/dev/null 2>&1 \
+            || { echo "onecli: volume $v missing, skipping backup"; exit 0; }
+    done
+    # Restart only what was running (an intentionally stopped stack stays
+    # stopped), and never fail the recipe on the restart: a failed backup-all
+    # step would skip every later stack's backup and the rotation.
+    running=$(docker --context {{context}} compose ps -q --status running)
+    restart() {
+        [ -n "$running" ] || return 0
+        docker --context {{context}} compose start \
+            || echo "onecli: WARNING: restart after backup failed (dotfiles stacks onecli up)" >&2
+    }
     docker --context {{context}} compose stop
-    trap 'docker --context {{context}} compose start' EXIT
+    trap restart EXIT
     mkdir -p "{{backups_dir}}"
     dst="{{backups_dir}}/onecli-$(date +%Y-%m-%d).tgz"
     docker --context {{context}} run --rm \
