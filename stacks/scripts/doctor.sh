@@ -121,6 +121,13 @@ if docker --context colima-agents info >/dev/null 2>&1; then
             fail "onecli named volume '$vol' missing in colima-agents (run: dotfiles stacks onecli up)"
         fi
     done
+    for vol in connectome_state connectome_workspace connectome_outbox; do
+        if echo "$onecli_volumes" | grep -qx "$vol"; then
+            pass "connectome named volume '$vol' present in colima-agents"
+        else
+            fail "connectome named volume '$vol' missing in colima-agents (run: dotfiles stacks connectome up)"
+        fi
+    done
 else
     off "onecli volumes not checked (colima-agents not running)"
 fi
@@ -133,11 +140,11 @@ agents_up=0
 if docker --context colima-agents info >/dev/null 2>&1; then
     agents_up=1
 fi
-for stack in adguard freshrss homebridge onecli wallabag; do
-    # onecli's backup recipe is a no-op when colima-agents is down, so
+for stack in adguard connectome freshrss homebridge onecli wallabag; do
+    # onecli's and connectome's backup recipes are no-ops when colima-agents is down, so
     # the >36h rule would FAIL daily on hosts that keep agents off.
     # Report [OFF] in that case; otherwise apply the normal rule.
-    if [ "$stack" = "onecli" ] && [ "$agents_up" -eq 0 ]; then
+    if { [ "$stack" = "onecli" ] || [ "$stack" = "connectome" ]; } && [ "$agents_up" -eq 0 ]; then
         off "${stack} backup-age skipped (colima-agents not running)"
         continue
     fi
@@ -270,6 +277,83 @@ else
 fi
 
 echo
+echo "--- Agents (onecli + connectome) ---"
+
+# Image CA files to compare with the gateway CA; overridable for the
+# AC12.3 fixture test (DOCTOR_CONNECTOME_IMAGES="img1 img2").
+connectome_images="${DOCTOR_CONNECTOME_IMAGES:-connectome-host:local connectome-shell:local}"
+llm_warn_mb="${DOCTOR_LLM_CALLS_WARN_MB:-500}"
+hlog_warn_mb="${DOCTOR_HEADLESS_LOG_WARN_MB:-50}"
+A="docker --context colima-agents"
+if ! $A info >/dev/null 2>&1; then
+    off "agents checks skipped (colima-agents not running)"
+else
+    for n in onecli-api onecli-web onecli-gateway; do
+        h=$($A inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$n" 2>/dev/null || echo missing)
+        [ "$h" = healthy ] && pass "$n healthy" || fail "$n is ${h} (run: dotfiles stacks onecli up)"
+    done
+    m=$($A inspect -f '{{.State.Status}} {{.State.ExitCode}}' onecli-migrations 2>/dev/null || echo "missing -")
+    [ "$m" = "exited 0" ] && pass "onecli-migrations exited 0" || fail "onecli-migrations: ${m}"
+
+    gw_uid=$($A exec onecli-gateway id -u 2>/dev/null || echo "?")
+    ca_uid=$($A exec onecli-gateway stat -c %u /app/data/gateway/ca.pem 2>/dev/null || echo "??")
+    [ "$gw_uid" = "$ca_uid" ] && pass "gateway CA owned by gateway uid (${gw_uid})" \
+        || fail "gateway CA owner uid ${ca_uid} != gateway uid ${gw_uid}"
+
+    gw_ca=$($A exec onecli-gateway cat /app/data/gateway/ca.pem 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+    for img in $connectome_images; do
+        if ! $A image inspect "$img" >/dev/null 2>&1; then
+            fail "image ${img} missing (run: dotfiles stacks connectome build)"; continue
+        fi
+        img_ca=$($A run --rm --network none --entrypoint cat "$img" /usr/local/share/ca-certificates/onecli-gateway.crt 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+        [ "$img_ca" = "$gw_ca" ] && pass "${img} CA fingerprint matches gateway CA" \
+            || fail "${img} CA fingerprint differs from onecli-gateway CA (fresh vault? run: dotfiles stacks connectome build)"
+    done
+
+    attached=$($A network inspect onecli-agents -f '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null || echo "")
+    if [ -z "$attached" ]; then
+        fail "network onecli-agents missing (run: dotfiles stacks onecli up)"
+    else
+        for n in connectome connectome-shell; do
+            grep -qE "(^| )${n}( |$)" <<<"$attached" && pass "${n} attached to onecli-agents" \
+                || fail "${n} not attached to onecli-agents (run: dotfiles stacks connectome up)"
+        done
+    fi
+
+    # Shell must hold no LLM grant (needs the operator key in the host CLI).
+    # shellcheck source=../onecli/scripts/lib/api.sh
+    source "${SCRIPT_DIR}/../onecli/scripts/lib/api.sh"
+    if operator_key >/dev/null 2>&1; then
+        shell_id=$(agent_field connectome-shell id 2>/dev/null || true)
+        # The shell is granted nothing at all (design: connectome-shell ← nothing),
+        # so count every secret grant rather than relying on a type field.
+        llm=$(api GET "/v1/agents/${shell_id}/grants" 2>/dev/null | jq '[.secrets[]?] | length' 2>/dev/null || echo "?")
+        [ "$llm" = 0 ] && pass "connectome-shell has no LLM grant" \
+            || fail "connectome-shell LLM grants: ${llm} (run: dotfiles stacks onecli policy)"
+    else
+        warn "connectome-shell grant check skipped (host onecli CLI not authenticated)"
+    fi
+
+    if $A inspect connectome >/dev/null 2>&1; then
+        llm_kb=$($A exec connectome sh -c 'du -ck /agent/state/data/llm-calls.*.jsonl 2>/dev/null | tail -1 | cut -f1' 2>/dev/null || echo 0)
+        hlog_kb=$($A exec connectome sh -c 'du -k /agent/state/data/headless.log 2>/dev/null | cut -f1' 2>/dev/null || echo 0)
+        [ "${llm_kb:-0}" -gt $(( llm_warn_mb * 1024 )) ] && warn "connectome llm-calls total $(( llm_kb / 1024 )) MiB > ${llm_warn_mb} MiB (pruned >14d by backup)" \
+            || pass "connectome llm-calls total $(( ${llm_kb:-0} / 1024 )) MiB"
+        [ "${hlog_kb:-0}" -gt $(( hlog_warn_mb * 1024 )) ] && warn "connectome headless.log $(( hlog_kb / 1024 )) MiB > ${hlog_warn_mb} MiB (capped by backup)" \
+            || pass "connectome headless.log $(( ${hlog_kb:-0} / 1024 )) MiB"
+    fi
+fi
+
+# Static security-invariant lints (key names only; never .env values).
+while IFS= read -r line; do
+    case "$line" in
+        "[OK]"*)   pass "${line#\[OK\]   }" ;;
+        "[FAIL]"*) fail "${line#\[FAIL\] }" ;;
+        *)         [ -n "$line" ] && warn "lint: ${line}" ;;
+    esac
+done < <("${SCRIPT_DIR}/../connectome/scripts/lint.sh" 2>&1)
+
+echo
 echo "--- Stack identity & env ---"
 
 # Check A: homebridge BRIDGE_USERNAME matches config.json bridge.username
@@ -291,7 +375,7 @@ if [ -f "$hb_env" ] && [ -f "$hb_config" ]; then
 fi
 
 # Check B: env-key presence (no value reads, AC5.4-compliant)
-for stack in adguard freshrss homebridge onecli wallabag; do
+for stack in adguard connectome freshrss homebridge onecli wallabag; do
     example="${repo_root}/stacks/${stack}/.env.example"
     actual="${repo_root}/stacks/${stack}/.env"
     if [ ! -f "$example" ]; then
@@ -302,6 +386,12 @@ for stack in adguard freshrss homebridge onecli wallabag; do
     if [ ! -f "$actual" ]; then
         warn "${stack}/.env missing (run: cp .env.example .env && chmod 600 .env)"
         continue
+    fi
+    mode=$(stat -f %Lp "$actual")
+    if [ "$mode" = 600 ]; then
+        pass "${stack}/.env mode 0600"
+    else
+        fail "${stack}/.env mode ${mode} (run: chmod 600 stacks/${stack}/.env)"
     fi
     # Count keys per file (just the LHS of `=`, ignore comments)
     expected_keys=$(grep -E '^[A-Z][A-Z0-9_]*=' "$example" | sed 's/=.*//' | sort -u)
