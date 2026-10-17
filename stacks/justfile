@@ -8,14 +8,31 @@ mod wallabag
 default:
     @just --list
 
+# Bring every stack up. Continues past an individual stack's failure (e.g. an
+# expired Tailscale PAT failing `adguard up`) so onecli/connectome still start
+# at boot; prints a summary and exits non-zero if any stack failed.
+# onecli precedes connectome (connectome joins onecli's network).
 up-all:
-    just adguard up
-    just freshrss up
-    just homebridge up
-    just onecli up
-    just wallabag up
+    #!/usr/bin/env bash
+    set -uo pipefail
+    failed=()
+    for s in adguard freshrss homebridge onecli connectome wallabag; do
+        echo "=== ${s} up ==="
+        # Module recipes run with cwd stacks/, so plain `just <stack> up`
+        # resolves stacks/justfile (as the other aggregates do). Do NOT use
+        # {{justfile()}} here: inside a module it is the ROOT justfile.
+        just "$s" up || failed+=("$s")
+    done
+    if [ "${#failed[@]}" -gt 0 ]; then
+        echo "up-all: FAILED: ${failed[*]}" >&2
+        exit 1
+    fi
+    echo "up-all: all stacks up"
 
+# DNS-aware shutdown: apps before adguard; connectome before onecli (onecli
+# owns the onecli-agents network and refuses to go down under connectome).
 down-all:
+    just connectome down
     just onecli down
     just wallabag down
     just homebridge down
@@ -24,6 +41,7 @@ down-all:
 
 ps-all:
     just adguard ps
+    just connectome ps
     just freshrss ps
     just homebridge ps
     just onecli ps
@@ -31,15 +49,20 @@ ps-all:
 
 pull-all:
     just adguard pull
+    just connectome pull
     just freshrss pull
     just homebridge pull
     just onecli pull
     just wallabag pull
 
+# connectome before onecli: connectome's tarball is taken while the gateway
+# is up; connectome then briefly loses the gateway during onecli's stop/start
+# (harmless at 04:00).
 backup-all:
     just adguard backup
     just freshrss backup
     just homebridge backup
+    just connectome backup
     just onecli backup
     just wallabag backup
     @./scripts/backup-rotate.sh
