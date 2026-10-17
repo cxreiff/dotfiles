@@ -148,6 +148,14 @@ non-empty array of tool names.
 
 ## Known issues
 
+- **AC7.2 not verified live (accepted deferral, 2026-10-16).** Nobody has yet
+  checked that a DM from another user, or a message in a non-whitelisted
+  guild/channel, gets no reply. The bot is only in the operator's personal
+  servers for now. The allowlists (`DISCORD_DM_USERS`, `DISCORD_GUILD_ID`) are
+  enforced by discord-mcpl; before inviting the bot anywhere with other
+  members, have a second account DM it and post in a non-whitelisted channel,
+  and confirm `dotfiles stacks onecli requests 5` shows no new `responses` row.
+
 - **`>>#channel` prefix in replies.** agent-framework 0.21.0 always offers the
   "reply without joining: prefix with `>>#channel`" option in channel
   invitations, but the default `locus` prose routing never parses prefixes, so
