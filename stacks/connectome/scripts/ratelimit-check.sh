@@ -18,7 +18,7 @@ D() { docker --context colima-agents "$@"; }
 # Refuse to start within 60 s of the top of the hour (window rolls over).
 minute_in_hour=$(date +%M)
 second_in_minute=$(date +%S)
-seconds_until_top=$((3600 - (minute_in_hour * 60 + second_in_minute)))
+seconds_until_top=$((3600 - (10#$minute_in_hour * 60 + 10#$second_in_minute)))  # 10#: "08" is not octal
 if [ "$seconds_until_top" -lt 60 ] || [ "$seconds_until_top" -gt 3540 ]; then
     log "too close to the top of the hour (${seconds_until_top}s remaining); wait and retry"
     exit 2
@@ -37,7 +37,12 @@ log "original rule-1 limit: $original_limit/hour"
 restore_rule() {
     log "restoring rule 1 to $original_limit via policy.sh"
     if [ -n "$original_limit" ]; then
-        "${repo_root}/stacks/onecli/scripts/policy.sh" "$original_limit" >/dev/null 2>&1 || log "WARN: policy.sh restore failed"
+        if ! "${repo_root}/stacks/onecli/scripts/policy.sh" "$original_limit" >/dev/null; then
+            log "ERROR: could not restore rule 1 — the agent is still capped at 2/hour."
+            log "ERROR: fix now with: dotfiles stacks onecli policy $original_limit"
+            exit 3
+        fi
+        log "rule 1 restored to $original_limit/hour"
     fi
 }
 trap restore_rule EXIT
@@ -96,19 +101,16 @@ post_request() {
 # POST three times and capture results.
 result1=$(post_request 1)
 code1=$(echo "$result1" | head -1 | cut -d' ' -f3)
-body1=$(echo "$result1" | tail -1)
 
 result2=$(post_request 2)
 code2=$(echo "$result2" | head -1 | cut -d' ' -f3)
-body2=$(echo "$result2" | tail -1)
 
 result3=$(post_request 3)
 code3=$(echo "$result3" | head -1 | cut -d' ' -f3)
-body3=$(echo "$result3" | tail -1)
 
 # Assert the third response is HTTP 429 with rate-limit refusal.
 failed=0
-if [ "$code3" = 429 ] && echo "$body3" | grep -qE '(rate|limit)'; then
+if [ "$code3" = 429 ] && printf '%s' "$result3" | grep -qiE 'rate|limit'; then
     log "PASS: POST 3 is rate-limited (HTTP 429)"
 else
     log "FAIL: POST 3 is not rate-limited; got HTTP $code3"
