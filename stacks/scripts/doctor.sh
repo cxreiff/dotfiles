@@ -325,11 +325,22 @@ else
     source "${SCRIPT_DIR}/../onecli/scripts/lib/api.sh"
     if operator_key >/dev/null 2>&1; then
         shell_id=$(agent_field connectome-shell id 2>/dev/null || true)
-        # The shell is granted nothing at all (design: connectome-shell ← nothing),
-        # so count every secret grant rather than relying on a type field.
-        llm=$(api GET "/v1/agents/${shell_id}/grants" 2>/dev/null | jq '[.secrets[]?] | length' 2>/dev/null || echo "?")
-        [ "$llm" = 0 ] && pass "connectome-shell has no LLM grant" \
-            || fail "connectome-shell LLM grants: ${llm} (run: dotfiles stacks onecli policy)"
+        if [ -z "$shell_id" ]; then
+            fail "connectome-shell agent not found in onecli (run: dotfiles stacks onecli policy)"
+        else
+            # The shell is granted nothing at all (design: connectome-shell ← nothing),
+            # so count every secret grant. Fail closed: an API error or a response
+            # without a .secrets array is not evidence of "no grants".
+            llm=$(api GET "/v1/agents/${shell_id}/grants" 2>/dev/null \
+                | jq -e 'if (.secrets | type) == "array" then .secrets | length else error("shape") end' 2>/dev/null) || llm="?"
+            if [ "$llm" = 0 ]; then
+                pass "connectome-shell has no LLM grant"
+            elif [ "$llm" = "?" ]; then
+                fail "connectome-shell grants unreadable (API error or unexpected response shape)"
+            else
+                fail "connectome-shell holds ${llm} secret grant(s) (run: dotfiles stacks onecli policy)"
+            fi
+        fi
     else
         warn "connectome-shell grant check skipped (host onecli CLI not authenticated)"
     fi
