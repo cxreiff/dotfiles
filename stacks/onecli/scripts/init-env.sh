@@ -75,5 +75,5 @@ if [ "${#added[@]}" -gt 0 ]; then
 else
     echo "init-env: all onecli secrets already present; nothing changed"
 fi
-echo "init-env: REMINDER — escrow SECRET_ENCRYPTION_KEY from stacks/onecli/.env in your password manager." \
-     "Without it, onecli backups cannot be decrypted."
+echo "init-env: REMINDER — escrow the whole stacks/onecli/.env in your password manager." \
+     "A restored backup needs the same SECRET_ENCRYPTION_KEY and POSTGRES_PASSWORD."

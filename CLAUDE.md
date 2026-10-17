@@ -183,8 +183,8 @@ after a reboot":
 
 **Why keep FileVault (and not just disable it + auto-login, which is the
 more common headless recipe):** the `onecli` credential vault stores its
-`SECRET_ENCRYPTION_KEY` in `stacks/onecli/.env` (0600, gitignored, with an escrow copy
-in the password manager). The agents VM disk image contains decrypted runtime state
+`SECRET_ENCRYPTION_KEY` in `stacks/onecli/.env` (0600, gitignored; the whole file is
+escrowed in the password manager, since a restored vault also needs its `POSTGRES_PASSWORD`). The agents VM disk image contains decrypted runtime state
 (onecli gateway/postgres, connectome state with chronicle and `llm-calls` full prompts).
 FileVault is the only at-rest protection for these secrets and the plaintext backup
 tarballs. Key and ciphertext live together in the VM, so FileVault is essential (2026-06-02

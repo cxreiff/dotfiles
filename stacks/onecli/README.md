@@ -27,7 +27,7 @@ dotfiles stacks vm-agents-up
 
 cp .env.example .env
 chmod 600 .env
-dotfiles stacks onecli init-env               # generates three secrets; escrow in password manager
+dotfiles stacks onecli init-env               # generates the four secrets; escrow the whole .env
 
 dotfiles stacks onecli up                     # first boot — Docker creates onecli_pgdata + onecli_app-data
 dotfiles stacks onecli ps                     # api, web, gateway healthy; migrations exited 0
@@ -36,9 +36,9 @@ dotfiles stacks onecli import-openai          # required (fresh vault only): ded
 dotfiles stacks onecli policy                 # required: define connectome agent and allow rules
 ```
 
-`init-env` is idempotent and never prints secret values. After it runs, set
-an escrow copy of `SECRET_ENCRYPTION_KEY` in the password manager (used on
-fresh-device recovery). After `bootstrap`, the dashboard is at
+`init-env` is idempotent and never prints secret values. After it runs,
+escrow the whole `stacks/onecli/.env` in the password manager (see "Key
+location and FileVault"; used on fresh-device recovery). After `bootstrap`, the dashboard is at
 `http://127.0.0.1:10254` + the host `onecli` CLI works from any shell on the
 Mac. The gateway is unreachable except via proxy auth (`aoc_` tokens).
 
