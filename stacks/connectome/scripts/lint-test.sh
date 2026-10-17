@@ -281,6 +281,31 @@ expect_only inv9-recipes-rw 'invariant 4:|invariant 9:' --compose "$tmpdir/c-rec
 { cat "$tmpdir/Dockerfile"; echo 'ENV OBSERVERS_FILE=/agent/state/observers.json'; } > "$tmpdir/Df-obs"
 expect_only inv9-later-override 'invariant 9:' --dockerfile "$tmpdir/Df-obs"
 
+# expect_none LABEL [lint overrides...]: the lint must report no FAIL.
+expect_none() {
+    local label="$1" out; shift
+    out=$("$lint_sh" --recipe "$tmpdir/recipe.json" --compose "$tmpdir/compose.json" \
+        --dockerfile "$tmpdir/Dockerfile" --env "$tmpdir/env" \
+        --onecli-compose "$tmpdir/onecli-compose.json" --onecli-env "$tmpdir/onecli-env" "$@" 2>&1 || true)
+    if ! grep -q '^\[FAIL\]' <<<"$out"; then
+        echo "PASS lint-fixture ${label}" >&2
+    else
+        echo "FAIL lint-fixture ${label}: expected no FAIL" >&2
+        echo "$out" >&2
+        failures=$((failures + 1))
+    fi
+}
+mk oc-09 onecli-compose.json '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINATIONS = "10.0.0.0/8,172.16.0.0/09"'
+expect_only inv6-allow-leading-zero 'invariant 6:' --onecli-compose "$tmpdir/oc-09"
+mk oc-300 onecli-compose.json '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINATIONS = "172.300.0.0/16"'
+expect_only inv6-allow-octet-range 'invariant 6:' --onecli-compose "$tmpdir/oc-300"
+mk oc-ok onecli-compose.json '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINATIONS = "10.0.0.0/8, 192.168.0.0/16, 172.32.0.0/16"'
+expect_none inv6-allow-non-overlapping --onecli-compose "$tmpdir/oc-ok"
+{ grep -v 'OBSERVERS_FILE=' "$tmpdir/Dockerfile"; echo '# ENV OBSERVERS_FILE=/agent/recipes/observers.json'; } > "$tmpdir/Df-obs-comment"
+expect_only inv9-comment-only 'invariant 9:' --dockerfile "$tmpdir/Df-obs-comment"
+{ cat "$tmpdir/Dockerfile"; echo '# GATE_TELEMETRY stays unset (invariant 7)'; } > "$tmpdir/Df-tel-comment"
+expect_none inv7-comment-ignored --dockerfile "$tmpdir/Df-tel-comment"
+
 if [ "$failures" -gt 0 ]; then
     echo "FAIL: $failures fixture(s) failed" >&2
     exit 1

@@ -86,25 +86,29 @@ gw_private=$(jq -r '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINAT
 # A private-destination allowance must never reach the agents' Docker/VM
 # networks (172.16.0.0/12). Each entry must be an IPv4 CIDR (or bare IPv4)
 # that does not overlap that range; anything else is a violation (fail closed).
-ip2int() { local IFS=.; set -- $1; echo $(( ($1<<24) + ($2<<16) + ($3<<8) + $4 )); }
-allowance_bad() {
-    local entry ip len lo hi
+dec() { [[ "$1" =~ ^(0|[1-9][0-9]{0,2})$ ]] && [ "$1" -le 255 ]; }  # canonical decimal 0..255
+# Prints CLEAN when no entry is a problem, else the first bad entry. Callers
+# treat anything but CLEAN (bad entry, error, empty output) as a violation.
+allowance_check() {
+    local entry o1 o2 o3 o4 len o lo hi
     for entry in $(tr ', ' '\n\n' <<<"$1"); do
         [ -n "$entry" ] || continue
-        if [[ "$entry" =~ ^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})(/([0-9]{1,2}))?$ ]]; then
-            ip="${BASH_REMATCH[1]}"; len="${BASH_REMATCH[3]:-32}"
-            [ "$len" -le 32 ] || { echo "$entry"; return 0; }
-            lo=$(( $(ip2int "$ip") & ( (0xFFFFFFFF << (32 - len)) & 0xFFFFFFFF ) ))
-            hi=$(( lo + (1 << (32 - len)) - 1 ))
-            # overlap with [172.16.0.0, 172.31.255.255]
-            if [ "$lo" -le 2887778303 ] && [ "$hi" -ge 2886729728 ]; then echo "$entry"; return 0; fi
-        else
-            echo "$entry"; return 0
-        fi
+        # Strict IPv4[/len]: canonical decimal octets 0..255, prefix 0..32.
+        [[ "$entry" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})(/(0|[1-9][0-9]?))?$ ]] \
+            || { echo "$entry"; return; }
+        # Copy the groups first: dec's own [[ =~ ]] overwrites BASH_REMATCH.
+        o1=${BASH_REMATCH[1]} o2=${BASH_REMATCH[2]} o3=${BASH_REMATCH[3]} o4=${BASH_REMATCH[4]} len=${BASH_REMATCH[6]:-32}
+        for o in "$o1" "$o2" "$o3" "$o4"; do dec "$o" || { echo "$entry"; return; }; done
+        [ "$len" -le 32 ] || { echo "$entry"; return; }
+        lo=$(( ( (10#$o1 << 24) + (10#$o2 << 16) + (10#$o3 << 8) + 10#$o4 ) & ( (0xFFFFFFFF << (32 - len)) & 0xFFFFFFFF ) ))
+        hi=$(( lo + (1 << (32 - len)) - 1 ))
+        # overlap with [172.16.0.0, 172.31.255.255]
+        if [ "$lo" -le 2887778303 ] && [ "$hi" -ge 2886729728 ]; then echo "$entry"; return; fi
     done
-    return 1
+    echo CLEAN
 }
-gw_private_bad=$(allowance_bad "$gw_private" || true)
+allow_result=$(allowance_check "$gw_private" 2>/dev/null)
+[ "$allow_result" = CLEAN ] && gw_private_bad="" || gw_private_bad="${allow_result:-check error on [$gw_private]}"
 oc_env_has_private=$(keys "$oc_env" | grep -cx GATEWAY_ALLOW_PRIVATE_DESTINATIONS || true)
 host_gw=$(printf '%s\n%s\n' "$c" "$oc" | jq -s '[.[] | .services[]? | (.extra_hosts // empty) | tostring | select(test("host-gateway"))] | length' 2>/dev/null || echo 1)
 if [ -n "$oc" ] && [ -z "$bad_keys" ] && [ -z "$gw_private_bad" ] && [ "$oc_env_has_private" = 0 ] && [ "$host_gw" = 0 ]; then
