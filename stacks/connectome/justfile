@@ -6,13 +6,11 @@ internal_port := "18768"
 default:
     @just --list
 
-# Create/complete .env (prompts for Discord values; generates WebUI/daemon
-# secrets; re-syncs the two onecli agent tokens). Never prints values.
+# Create/complete .env (prompts for Discord values; generates secrets; re-syncs onecli tokens)
 init-env:
     @./scripts/init-env.sh
 
-# Build both images from ~/Developer/connectome clones (refuses dirty trees),
-# copy the gateway CA in, and write sources.lock.
+# Build both images from ~/Developer/connectome clones, copy gateway CA, write sources.lock
 build:
     @./scripts/build.sh
 
@@ -20,10 +18,9 @@ build:
 image-test:
     @./scripts/image-test.sh
 
-# Write the onecli Codex stub (+ real account id) and codex config.toml into
-# the state volume. Run once after build; re-run to recover. Never use the
-# WebUI "log in again" action.
+# Write the onecli Codex stub and config into the state volume (once after build)
 provision-codex:
+    # Note: never use the WebUI "log in again" action; it deletes the stub.
     @./scripts/provision-codex.sh
 
 # Fails clearly if onecli (which owns the onecli-agents network) is not up.
@@ -55,8 +52,7 @@ pull:
 shell:
     docker --context {{context}} exec -it connectome-shell bash
 
-# --headless sends stdout/stderr to $DATA_DIR/headless.log (docker logs is
-# empty past the entrypoint), so tail the files inside the container.
+# Tail headless.log and failures.log from inside the container (docker logs is empty)
 logs:
     docker --context {{context}} exec connectome sh -c 'touch /agent/state/logs/failures.log; tail -n 50 -F /agent/state/data/headless.log /agent/state/logs/failures.log'
 

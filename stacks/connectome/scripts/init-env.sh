@@ -22,6 +22,7 @@ chmod 600 "$env_file"
 has() { grep -qE "^$1=.+" "$env_file"; }
 set_key() {  # set_key KEY VALUE — replaces any existing line; value never echoed
     local tmp; tmp=$(mktemp "${env_file}.XXXXXX")
+    trap "rm -f '$tmp'" EXIT
     grep -vE "^$1=" "$env_file" > "$tmp" || true
     printf '%s=%s\n' "$1" "$2" >> "$tmp"
     chmod 600 "$tmp"; mv "$tmp" "$env_file"
@@ -37,15 +38,52 @@ prompt() {  # prompt KEY "question" [hidden] [default]
 
 prompt LLM_MODEL "Codex model id" "" "gpt-6-luna"
 prompt DISCORD_TOKEN "Discord bot token (hidden)" hidden
-prompt DISCORD_GUILD_ID "Discord guild:channel whitelist (numeric ids, e.g. 1234…:5678…)"
-prompt DISCORD_OPERATOR_ID "Operator Discord user id (numeric: Developer Mode → Copy User ID; not your username)"
-# A username here silently drops every DM; catch both shapes now. Ids are
-# not secrets, so the error may show them.
+
+# Validate and prompt for DISCORD_OPERATOR_ID with re-prompting on bad input
 id_val() { grep -E "^$1=" "$env_file" | head -1 | cut -d= -f2-; }
-[[ "$(id_val DISCORD_OPERATOR_ID)" =~ ^[0-9]{17,20}$ ]] \
-    || { echo "init-env: DISCORD_OPERATOR_ID must be a numeric Discord user id, got '$(id_val DISCORD_OPERATOR_ID)'; fix it in .env" >&2; exit 2; }
-[[ "$(id_val DISCORD_GUILD_ID)" =~ ^[0-9]{17,20}:[0-9]{17,20}(\+[0-9]{17,20})*$ ]] \
-    || { echo "init-env: DISCORD_GUILD_ID must be <guild id>:<channel id>[+<channel id>…], got '$(id_val DISCORD_GUILD_ID)'; fix it in .env" >&2; exit 2; }
+validate_operator_id() {
+    local pre_existing=! has DISCORD_OPERATOR_ID
+    while true; do
+        prompt DISCORD_OPERATOR_ID "Operator Discord user id (numeric: Developer Mode → Copy User ID; not your username)"
+        if [[ "$(id_val DISCORD_OPERATOR_ID)" =~ ^[0-9]{17,20}$ ]]; then
+            return 0
+        fi
+        if [ "$pre_existing" -eq 0 ]; then
+            # Pre-existing bad value in .env; don't re-prompt, just error
+            echo "init-env: DISCORD_OPERATOR_ID must be a numeric Discord user id, got '$(id_val DISCORD_OPERATOR_ID)'; fix it in .env" >&2
+            exit 2
+        fi
+        # Re-prompt if the value came from this run's prompt
+        echo "init-env: DISCORD_OPERATOR_ID must be a numeric Discord user id; please try again" >&2
+        # Remove the bad value so prompt() will ask again
+        grep -vE "^DISCORD_OPERATOR_ID=" "$env_file" > "$env_file.tmp"
+        mv "$env_file.tmp" "$env_file"
+    done
+}
+
+# Validate and prompt for DISCORD_GUILD_ID with re-prompting on bad input
+validate_guild_id() {
+    local pre_existing=! has DISCORD_GUILD_ID
+    while true; do
+        prompt DISCORD_GUILD_ID "Discord guild:channel whitelist (numeric ids, e.g. 1234…:5678…)"
+        if [[ "$(id_val DISCORD_GUILD_ID)" =~ ^[0-9]{17,20}:[0-9]{17,20}(\+[0-9]{17,20})*$ ]]; then
+            return 0
+        fi
+        if [ "$pre_existing" -eq 0 ]; then
+            # Pre-existing bad value in .env; don't re-prompt, just error
+            echo "init-env: DISCORD_GUILD_ID must be <guild id>:<channel id>[+<channel id>…], got '$(id_val DISCORD_GUILD_ID)'; fix it in .env" >&2
+            exit 2
+        fi
+        # Re-prompt if the value came from this run's prompt
+        echo "init-env: DISCORD_GUILD_ID must be <guild id>:<channel id>[+<channel id>…]; please try again" >&2
+        # Remove the bad value so prompt() will ask again
+        grep -vE "^DISCORD_GUILD_ID=" "$env_file" > "$env_file.tmp"
+        mv "$env_file.tmp" "$env_file"
+    done
+}
+
+validate_operator_id
+validate_guild_id
 has WEBUI_USER || { set_key WEBUI_USER operator; echo "init-env: set WEBUI_USER=operator"; }
 has WEBUI_PASS || { set_key WEBUI_PASS "$(openssl rand -hex 32)"; echo "init-env: generated WEBUI_PASS"; }
 has SESSION_SERVER_TOKEN || { set_key SESSION_SERVER_TOKEN "$(openssl rand -hex 32)"; echo "init-env: generated SESSION_SERVER_TOKEN"; }

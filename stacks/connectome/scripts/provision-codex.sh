@@ -21,7 +21,7 @@ account_id=$(api GET /v1/org/secrets \
 [ -n "$account_id" ] || { echo "provision-codex: openai secret has no accountId (run: dotfiles stacks onecli import-openai)" >&2; exit 3; }
 
 stub=$(api GET /v1/credential-stubs/codex | jq -r 'if type=="object" and has("content") then .content else tojson end')
-auth=$(jq -c --arg a "$account_id" '.tokens.account_id = $a' <<<"$stub") \
+auth=$(A="$account_id" jq -c '.tokens.account_id = env.A' <<<"$stub") \
     || { echo "provision-codex: stub is not JSON" >&2; exit 3; }
 jq -e '.tokens.access_token=="onecli-managed" and .tokens.refresh_token=="onecli-managed"' <<<"$auth" >/dev/null \
     || { echo "provision-codex: stub carries non-placeholder tokens; refusing" >&2; exit 3; }

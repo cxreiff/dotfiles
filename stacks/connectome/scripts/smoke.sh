@@ -23,15 +23,18 @@ check_ac5_1() {
         return
     fi
 
-    local c_caps c_sec
-    c_caps=$(D inspect -f '{{json .HostConfig.CapDrop}}' connectome)
-    c_sec=$(D inspect -f '{{json .HostConfig.SecurityOpt}}' connectome)
+    # Check CapDrop and SecurityOpt for both containers
+    local container caps sec
+    for container in connectome connectome-shell; do
+        caps=$(D inspect -f '{{json .HostConfig.CapDrop}}' "$container")
+        sec=$(D inspect -f '{{json .HostConfig.SecurityOpt}}' "$container")
+        if ! echo "$caps" | grep -q '"ALL"' || ! echo "$sec" | grep -q 'no-new-privileges:true'; then
+            fail "AC5.1 ($container caps/sec)"
+            return
+        fi
+    done
 
-    if echo "$c_caps" | grep -q '"ALL"' && echo "$c_sec" | grep -q 'no-new-privileges:true'; then
-        pass "AC5.1"
-    else
-        fail "AC5.1 (connectome caps/sec)"
-    fi
+    pass "AC5.1"
 }
 
 check_ac5_2() {
@@ -69,6 +72,15 @@ check_ac5_3() {
 }
 
 check_ac5_5() {
+    # Restore 4h config unconditionally (even if test fails)
+    restore_heartbeat_config() {
+        X connectome env HEARTBEAT_CONFIG_FILE=/agent/state/heartbeat/config.json \
+            HEARTBEAT_REMINDERS_FILE=/agent/state/heartbeat/reminders.json \
+            /opt/node/bin/node /opt/connectome-tests/mcp-call.mjs heartbeat_configure \
+            '{"intervalHours":4}' -- /opt/node/bin/node /opt/mcpl/heartbeat-mcpl/dist/src/index.js --stdio >/dev/null 2>&1 || true
+    }
+    trap restore_heartbeat_config EXIT
+
     local before_sha
     before_sha=$(X connectome sh -c 'sha256sum /agent/state/heartbeat/config.json | cut -d" " -f1' | tr -d ' ')
 
@@ -89,18 +101,6 @@ check_ac5_5() {
 
     if ! echo "$file_content" | grep -q '18000'; then
         fail "AC5.5 (5h config missing)"
-        return
-    fi
-
-    # Test with 4 hours (14400 seconds)
-    X connectome env HEARTBEAT_CONFIG_FILE=/agent/state/heartbeat/config.json \
-        HEARTBEAT_REMINDERS_FILE=/agent/state/heartbeat/reminders.json \
-        /opt/node/bin/node /opt/connectome-tests/mcp-call.mjs heartbeat_configure \
-        '{"intervalHours":4}' -- /opt/node/bin/node /opt/mcpl/heartbeat-mcpl/dist/src/index.js --stdio >/dev/null 2>&1 || true
-
-    file_content=$(X connectome cat /agent/state/heartbeat/config.json)
-    if ! echo "$file_content" | grep -q '14400'; then
-        fail "AC5.5 (4h config missing)"
         return
     fi
 
@@ -129,26 +129,29 @@ check_ac5_6_stale() {
 }
 
 check_ac5_6_wait() {
-    local before_time
-    before_time=$(date +%s)
+    # Set up trap to restore gateway and connectome
+    restore_ac5_6() {
+        D start onecli-gateway >/dev/null
+        for _ in $(seq 1 30); do
+            [ "$(D inspect -f '{{.State.Health.Status}}' onecli-gateway 2>/dev/null)" = healthy ] && break
+            sleep 2
+        done
+        D start connectome >/dev/null
+        sleep 3
+    }
+    trap restore_ac5_6 EXIT
+
     D stop connectome >/dev/null
     D stop onecli-gateway >/dev/null
 
-    # Run test container
+    # Time only the compose run
+    local before_time
+    before_time=$(date +%s)
     local output
     output=$(D compose -f "$stack_dir/compose.yaml" run --rm --no-deps -e GATEWAY_WAIT_SECONDS=6 connectome 2>&1 || true)
     local after_time
     after_time=$(date +%s)
     local elapsed=$((after_time - before_time))
-
-    # Restore gateway and connectome
-    D start onecli-gateway >/dev/null
-    for _ in $(seq 1 30); do
-        [ "$(D inspect -f '{{.State.Health.Status}}' onecli-gateway 2>/dev/null)" = healthy ] && break
-        sleep 2
-    done
-    D start connectome >/dev/null
-    sleep 3
 
     if echo "$output" | grep -q 'unreachable after 6s' && [ "$elapsed" -lt 20 ]; then
         pass "AC5.6-wait"
@@ -187,6 +190,7 @@ check_ac5_8() {
     local secrets_file
     secrets_file=$(mktemp)
     chmod 600 "$secrets_file"
+    trap "rm -f '$secrets_file'" EXIT
 
     local discord_token webui_pass host_token shell_token session_token
     discord_token=$(grep '^DISCORD_TOKEN=' "$stack_dir/.env" | cut -d= -f2-)
@@ -213,8 +217,6 @@ check_ac5_8() {
     c_matches=$(echo "$c_matches" | tr -d ' \n')
     s_matches=$(echo "$s_matches" | tr -d ' \n')
 
-    rm -f "$secrets_file"
-
     if [ "$c_matches" -eq 0 ] && [ "$s_matches" -eq 0 ]; then
         pass "AC5.8"
     else
@@ -240,8 +242,31 @@ check_ac7_3() {
 }
 
 check_ac7_6() {
+    local watermark_status dm_notices_status muted_channels_status
+
+    # Check watermark.json (must exist)
     if X connectome ls /agent/state/discord | grep -q watermark.json; then
-        pass "AC7.6"
+        watermark_status="[ON]"
+    else
+        watermark_status="[OFF]"
+    fi
+
+    # Check dm-notices.json (report status)
+    if X connectome ls /agent/state/discord 2>/dev/null | grep -q dm-notices.json; then
+        dm_notices_status="[ON]"
+    else
+        dm_notices_status="[OFF]"
+    fi
+
+    # Check muted-channels.json (report status)
+    if X connectome ls /agent/state/discord 2>/dev/null | grep -q muted-channels.json; then
+        muted_channels_status="[ON]"
+    else
+        muted_channels_status="[OFF]"
+    fi
+
+    if [ "$watermark_status" = "[ON]" ]; then
+        pass "AC7.6 (watermark $watermark_status dm-notices $dm_notices_status muted-channels $muted_channels_status)"
     else
         fail "AC7.6 (watermark.json missing)"
     fi
@@ -308,14 +333,24 @@ check_ac9_4() {
         return
     fi
 
-    local c_mounts s_mounts
-    c_mounts=$(D inspect -f '{{range .Mounts}}{{.Name}}:{{.RW}} {{end}}' connectome)
-    s_mounts=$(D inspect -f '{{range .Mounts}}{{.Name}}:{{.RW}} {{end}}' connectome-shell)
+    # Check that outbox is the ONLY named volume in both containers
+    local c_volumes s_volumes
+    c_volumes=$(D inspect -f '{{range .Mounts}}{{.Name}} {{end}}' connectome | tr -d ' ')
+    s_volumes=$(D inspect -f '{{range .Mounts}}{{.Name}} {{end}}' connectome-shell | tr -d ' ')
 
-    if echo "$c_mounts" | grep -q 'connectome_outbox:false' && echo "$s_mounts" | grep -q 'connectome_outbox:true'; then
-        pass "AC9.4"
+    # Both should have exactly one named volume: connectome_outbox
+    if [ "$c_volumes" = "connectome_outbox" ] && [ "$s_volumes" = "connectome_outbox" ]; then
+        # Verify RO/RW status: RO in connectome, RW in shell
+        local c_rw s_rw
+        c_rw=$(D inspect -f '{{range .Mounts}}{{if eq .Name "connectome_outbox"}}{{.RW}}{{end}}{{end}}' connectome)
+        s_rw=$(D inspect -f '{{range .Mounts}}{{if eq .Name "connectome_outbox"}}{{.RW}}{{end}}{{end}}' connectome-shell)
+        if [ "$c_rw" = "false" ] && [ "$s_rw" = "true" ]; then
+            pass "AC9.4"
+        else
+            fail "AC9.4 (RO/RW status: connectome=$c_rw shell=$s_rw)"
+        fi
     else
-        fail "AC9.4 (outbox RO status failed)"
+        fail "AC9.4 (named volumes: connectome='$c_volumes' shell='$s_volumes')"
     fi
 }
 

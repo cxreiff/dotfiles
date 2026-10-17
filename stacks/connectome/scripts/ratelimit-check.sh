@@ -15,11 +15,11 @@ source "${repo_root}/stacks/onecli/scripts/lib/api.sh"
 log() { echo "[ratelimit-check] $*" >&2; }
 D() { docker --context colima-agents "$@"; }
 
-# Refuse to start within 60 s of the top of the hour (window rolls over).
+# Refuse to start within ~180 s of the top of the hour (window rolls over).
 minute_in_hour=$(date +%M)
 second_in_minute=$(date +%S)
 seconds_until_top=$((3600 - (10#$minute_in_hour * 60 + 10#$second_in_minute)))  # 10#: "08" is not octal
-if [ "$seconds_until_top" -lt 60 ] || [ "$seconds_until_top" -gt 3540 ]; then
+if [ "$seconds_until_top" -lt 180 ] || [ "$seconds_until_top" -gt 3420 ]; then
     log "too close to the top of the hour (${seconds_until_top}s remaining); wait and retry"
     exit 2
 fi
@@ -86,13 +86,13 @@ D exec onecli-gateway cat /app/data/gateway/ca.pem > "$ca_dir/ca.pem"
 # Helper: POST {} to chatgpt.com/backend-api/codex/responses and capture status.
 post_request() {
     local n="$1"
-    local proxy="http://x:\${HOST_TOKEN}@gateway:10255"
     local out
     out=$(D run --rm --network onecli-agents \
         -e HOST_TOKEN -v "$ca_dir:/ca:ro" --entrypoint sh curlimages/curl -c \
-        "curl -sS --path-as-is --cacert /ca/ca.pem -x \"$proxy\" -w 'STATUS %{http_code} %{http_connect}' -X POST -H 'Content-Type: application/json' -d '{}' https://chatgpt.com/backend-api/codex/responses 2>&1; echo" 2>&1)
-    # Double quotes above: the container's sh must expand ${HOST_TOKEN}. A
-    # refusal at CONNECT time leaves http_code=000 and the status in http_connect.
+        "export https_proxy=\"http://x:\${HOST_TOKEN}@gateway:10255\"; curl -sS --path-as-is --cacert /ca/ca.pem -w 'STATUS %{http_code} %{http_connect}' -X POST -H 'Content-Type: application/json' -d '{}' https://chatgpt.com/backend-api/codex/responses 2>&1; echo" 2>&1)
+    # Double quotes above: the container's sh must expand ${HOST_TOKEN} into the
+    # environment variable. A refusal at CONNECT time leaves http_code=000 and
+    # the status in http_connect.
     local code connect body
     read -r code connect < <(grep -oE 'STATUS [0-9]{3} [0-9]{3}' <<<"$out" | awk '{print $2, $3}')
     [ "${code:-000}" = 000 ] && code="${connect:-error}"

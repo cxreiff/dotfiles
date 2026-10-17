@@ -103,7 +103,7 @@ wake `rate_limit` (drops bursts before inference) → onecli rule 1 (hard hourly
 ceiling; when saturated, chat replies fail too until the window rolls) →
 ChatGPT plan quota.
 
-| Measured 2026-10-17 | Value |
+| Measured 2026-10-16 (PDT; 2026-10-17 UTC) | Value |
 |---|---|
 | `responses` POSTs per tool-using turn | 2 |
 | per heartbeat tick (incl. the triggering DM turn) | 3 |
@@ -141,6 +141,10 @@ Recipe settings: `defaultModel: gpt-6-luna`, `maxDepth: 1` (subagents cannot
 spawn subagents; they are not even offered the tools), `maxExecutionMs:
 1800000`. Valid model ids on the ChatGPT plan: `gpt-6-luna`, `gpt-6-sol`,
 `gpt-6-astra`; others return 400.
+
+When calling a subagent: `tools: []` (an empty array) means the subagent has
+access to ALL tools (the default); to restrict to specific tools, pass a
+non-empty array of tool names.
 
 ## Known issues
 

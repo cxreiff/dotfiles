@@ -27,6 +27,7 @@ size() {
 }
 
 before=$(size)
+[[ "$before" =~ ^[0-9]+$ ]] || { echo "force-failure: connectome is down or unreachable" >&2; exit 1; }
 D stop onecli-gateway >/dev/null
 echo "force-failure: gateway stopped — send the bot ONE Discord DM now (waiting up to ${wait_s} s)"
 

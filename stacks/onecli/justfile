@@ -4,8 +4,7 @@ backups_dir := join(env("HOME"), ".volume-backups", "daily")
 default:
     @just --list
 
-# Start the v2 stack and wait for api/web/gateway healthy and the one-shot
-# migrations to exit 0 (compose 5.1.3 treats an exited-0 one-shot as success).
+# Start the v2 stack and wait for services healthy (migrations exit 0)
 up:
     docker --context {{context}} compose up -d --wait
 
@@ -27,36 +26,27 @@ pull:
 shell:
     docker --context {{context}} compose exec api sh
 
-# Generate SECRET_ENCRYPTION_KEY / BETTER_AUTH_SECRET / GATEWAY_INTERNAL_SECRET /
-# POSTGRES_PASSWORD into .env if absent (never prints values); chmod 600. Idempotent.
+# Generate vault secrets into .env if absent (never prints values); chmod 600
 init-env:
     @./scripts/init-env.sh
 
-# Fresh-vault account bootstrap: sign up (or sign in) the operator account,
-# fetch the user API key, point the host onecli CLI at 127.0.0.1:10256.
-# Idempotent; prompts for email/password on the terminal.
+# Fresh-vault account bootstrap (sign up/sign in, get API key, point CLI)
 bootstrap:
     @./scripts/bootstrap.sh
 
-# One-time: import a dedicated `codex login` as the `openai` OAuth secret,
-# then delete that login. Re-run only to replace the secret.
+# Import a `codex login` as the `openai` OAuth secret (one-time, or to replace)
 import-openai *args:
     @./scripts/import-openai.sh {{args}}
 
-# Create/update the connectome agents, org policy rules and secret grants.
-# Idempotent. Optional arg overrides rule 1's hourly request limit; omit to keep
-# the current limit (60 on first creation).
+# Create/update connectome agents, policy rules and secret grants (optional arg: rule 1 limit)
 policy rate_limit="":
     @./scripts/policy.sh {{rate_limit}}
 
-# Gateway probes (throwaway curl container on onecli-agents) for the
-# identity/policy acceptance checks. Read-only.
+# Gateway probes for identity/policy acceptance checks (read-only)
 probe:
     @./scripts/probe.sh
 
-# Gateway request log for the last N minutes (allowed requests are NOT in
-# `docker logs onecli-gateway`; they live in Postgres request_logs).
-# Columns: time, agent_id, method, host, path, status. Read-only.
+# Gateway request log for the last N minutes (from Postgres; not docker logs)
 requests $minutes="15":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -67,10 +57,7 @@ requests $minutes="15":
     printf '%s' "$sql" | docker --context {{context}} compose exec -T postgres \
         sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -F " " -f -'
 
-# Snapshot pgdata + app-data (ciphertext + gateway CA; the key lives in .env
-# and the password manager). Quiesces with stop/start — never down/up, which
-# would try to remove the shared onecli-agents network. No-op when the
-# agents VM is down.
+# Snapshot pgdata + app-data (quiesces with stop/start, not down/up)
 backup:
     #!/usr/bin/env bash
     set -euo pipefail

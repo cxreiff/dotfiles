@@ -1,0 +1,9 @@
+{
+  "name": "connectome-term-sessions",
+  "version": "1.0.0",
+  "description": "MCP server for terminal sessions in connectome agent",
+  "private": true,
+  "dependencies": {
+    "term-sessions-mcp": "1.6.0"
+  }
+}

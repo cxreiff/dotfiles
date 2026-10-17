@@ -112,6 +112,8 @@ if [ -f "$lock" ] \
    && [ "$(grep -cE '^source [a-z-]+ sha=[0-9a-f]{40} ' "$lock")" = 4 ] \
    && git -C "${HOME}/Developer/connectome/connectome-host" merge-base --is-ancestor 406dcc1 "$host_sha" 2>/dev/null \
    && grep -qx 'npm term-sessions-mcp 1.6.0' "$lock" \
+   && grep -q '^patch connectome-host local: recipe-configurable subagent' "$lock" \
+   && grep -q '^patch connectome-host local: empty optional subagent' "$lock" \
    && grep -qx 'patch heartbeat-mcpl local: refuse reminders below a 900 s floor' "$lock" \
    && grep -q '^patch discord-mcpl local: confine attachments' "$lock" \
    && ! grep -qE '^[-+][^-+]' "$lock"; then

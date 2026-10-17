@@ -1,6 +1,7 @@
 # Secrets — never track
 .env
 *.env
+.env.*
 *.env.local
 *.key
 *.pem

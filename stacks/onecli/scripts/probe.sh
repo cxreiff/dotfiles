@@ -23,12 +23,16 @@ docker --context "$ctx" exec onecli-gateway cat /app/data/gateway/ca.pem > "$ca_
 # probe <label> <token-var|none> <expected-status> <expected-body-substring|-> <curl args...>
 probe() {
     local label="$1" tokvar="$2" want="$3" wantbody="$4"; shift 4
-    local proxy='http://gateway:10255'
-    [ "$tokvar" != none ] && proxy="http://x:\${${tokvar}}@gateway:10255"
+    local proxy_setup=''
+    if [ "$tokvar" = none ]; then
+        proxy_setup='https_proxy=http://gateway:10255'
+    else
+        proxy_setup="https_proxy=\"http://x:\${${tokvar}}@gateway:10255\""
+    fi
     local out
     out=$(docker --context "$ctx" run --rm --network onecli-agents \
         -e HOST_TOKEN -e SHELL_TOKEN -v "$ca_dir:/ca:ro" --entrypoint sh curlimages/curl -c \
-        "curl -sS --path-as-is --cacert /ca/ca.pem -x \"$proxy\" -o /tmp/b -w 'STATUS %{http_code} %{http_connect}' $* ; echo; head -c 300 /tmp/b 2>/dev/null" 2>&1)
+        "export ${proxy_setup}; curl -sS --path-as-is --cacert /ca/ca.pem -o /tmp/b -w 'STATUS %{http_code} %{http_connect}' $* ; echo; head -c 300 /tmp/b 2>/dev/null" 2>&1)
     local code connect body
     # A refused CONNECT (407, or a 401 issued at CONNECT time) leaves
     # http_code=000 and puts the proxy's status in http_connect.
