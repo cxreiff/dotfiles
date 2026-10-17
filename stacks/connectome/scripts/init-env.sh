@@ -37,8 +37,15 @@ prompt() {  # prompt KEY "question" [hidden] [default]
 
 prompt LLM_MODEL "Codex model id" "" "gpt-6-luna"
 prompt DISCORD_TOKEN "Discord bot token (hidden)" hidden
-prompt DISCORD_GUILD_ID "Discord guild:channel whitelist"
-prompt DISCORD_OPERATOR_ID "Operator Discord user id"
+prompt DISCORD_GUILD_ID "Discord guild:channel whitelist (numeric ids, e.g. 1234…:5678…)"
+prompt DISCORD_OPERATOR_ID "Operator Discord user id (numeric: Developer Mode → Copy User ID; not your username)"
+# A username here silently drops every DM; catch both shapes now. Ids are
+# not secrets, so the error may show them.
+id_val() { grep -E "^$1=" "$env_file" | head -1 | cut -d= -f2-; }
+[[ "$(id_val DISCORD_OPERATOR_ID)" =~ ^[0-9]{17,20}$ ]] \
+    || { echo "init-env: DISCORD_OPERATOR_ID must be a numeric Discord user id, got '$(id_val DISCORD_OPERATOR_ID)'; fix it in .env" >&2; exit 2; }
+[[ "$(id_val DISCORD_GUILD_ID)" =~ ^[0-9]{17,20}:[0-9]{17,20}(\+[0-9]{17,20})*$ ]] \
+    || { echo "init-env: DISCORD_GUILD_ID must be <guild id>:<channel id>[+<channel id>…], got '$(id_val DISCORD_GUILD_ID)'; fix it in .env" >&2; exit 2; }
 has WEBUI_USER || { set_key WEBUI_USER operator; echo "init-env: set WEBUI_USER=operator"; }
 has WEBUI_PASS || { set_key WEBUI_PASS "$(openssl rand -hex 32)"; echo "init-env: generated WEBUI_PASS"; }
 has SESSION_SERVER_TOKEN || { set_key SESSION_SERVER_TOKEN "$(openssl rand -hex 32)"; echo "init-env: generated SESSION_SERVER_TOKEN"; }
