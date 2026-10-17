@@ -170,49 +170,62 @@ non-empty array of tool names.
 
 ## Architecture
 
-Two containers in one Compose project:
+Two containers in one Compose project, on two networks:
 
 - **`connectome` (connectome-host):** the agent host (Bun/TypeScript). Runs one
-  process via `bun src/index.ts <recipe> --headless`. Mounts the `.recipe.json`
-  from `/agent/recipes`, stores session state in `/agent/state`, collects logs
-  at `/agent/state/data/headless.log` and `logs/failures.log`. CWD is `/agent/cwd`
-  (holds `mcpl-servers.json`, heartbeat config, the shell socket). Reads-only mounts
-  `/agent/recipes` (the tracked sources); read-write mounts `/agent/state` (named
-  volumes) and `/agent/cwd` (bind mount of `stacks/connectome/recipes/clara/`).
-  Shares `/agent/state/data/outbox` with `shell` read-only.
+  process via `bun src/index.ts <recipe> --headless`. Stores session state in `/agent/state`
+  (named volume), collects logs at `/agent/state/data/headless.log` and logs/failures.log.
+  CWD is `/agent/cwd` (image-owned, immutable — holds symlinks to `/agent/recipes/mcpl-servers.json`
+  and `/agent/state/logs`). Mounts:
+  - `/agent/recipes` — named volume, read-only (agent recipe and observers.json)
+  - `/agent/state` — named volume, read-write (session data, codex config, heartbeat state)
+  - `/agent/outbox` — named volume, read-only (shared transient output with shell)
 - **`shell` (connectome-shell):** the agent's Linux workbench (node, Rust, Python, etc.).
-  Reaches connectome via term-sessions (over a Unix socket at `/agent/cwd/shell.sock`).
-  Mounts `/workspace` (named volume, writable), with `/workspace/outbox` read-only from
-  connectome's outbox. No network-wide mounts; egress is direct (not through connectome).
+  Reaches connectome via term-sessions over the `connectome` bridge network.
+  Mounts:
+  - `/workspace` — named volume, read-write (persistent workbench directory)
+  - `/workspace/outbox` — shared from connectome's `/agent/outbox`, read-write (shell writes output)
 
 **Filesystem layout inside containers:**
 
 ```
-/agent/
-  cwd/              → bind mount: stacks/connectome/recipes/clara/ (readwrite for shell)
-  recipes/          → bind mount: ~/Developer/connectome/*/recipes/ (readonly)
-  state/            → named volume connectome_state (readwrite)
+/agent/                       (connectome only)
+  cwd/                        → image-owned, read-only (symlinks only)
+    mcpl-servers.json         → symlink to /agent/recipes/mcpl-servers.json
+    logs/                     → symlink to /agent/state/logs
+  recipes/                    → named volume connectome_recipes (read-only)
+    agent.json                (resolved recipe, mode 0600)
+    observers.json            (hot-reloaded observer grants)
+    mcpl-servers.json         (tracked MCP server config)
+  state/                      → named volume connectome_state (read-write)
     data/
       headless.log            (40–50 MiB, capped at 10 MiB by backup pruning)
-      llm-calls.*.jsonl       (one new file per start, full prompts; ~130 MB/day heavy use)
+      llm-calls.*.jsonl       (one new file per start; full prompts; ~130 MB/day heavy use)
       .recipe.json            (unresolved ${VAR}s, mode 0600)
-      outbox/                 (connectome writes; shell reads; cleared between runs)
-      observers.json          (hot-reloaded observer grants)
-      gateway.crt             (onecli gateway CA; image-test verifies fingerprint match)
+      codex/
+        config.toml           (ChatGPT Codex provider stub, mode 0600)
+        auth.json             (account id, mode 0600)
+      outbox/                 (connectome writes, shell reads; cleared between runs)
+      children/               (future: persona subagent state)
     logs/
-      failures.log            (hard-coded CWD-relative; write errors swallowed)
-  outbox/           → read-only bind mount from connectome into shell
+      failures.log            (hard-coded frame-level error log)
+    heartbeat/
+      config.json             (wake interval, persist across restarts)
+      reminders.json          (pending reminders, in-memory only)
+  outbox/                     → named volume connectome_outbox (read-only here)
 
-/workspace/         → named volume connectome_workspace (shell mounted readwrite)
-  outbox/           → read-only from connectome's outbox
-  input/, output/   → workspace directories (agent creates on demand)
+/workspace/                   (shell only)
+  outbox/                     → connectome_outbox (read-write here)
+  input/, output/             → workspace directories (agent creates on demand)
 ```
 
 **Networks:**
 
-- `onecli-agents`: attached to connectome, shell, onecli gateway, and the provisioning shell.
-  No external access; used for inter-service discovery (`onecli-gateway:10255` is reachable
-  here). Shell also has direct egress through the VM's NAT (not via connectome).
+- `onecli-agents` (external): both containers attached; used for inter-service discovery
+  (connectome reaches `onecli-gateway:10255` here). Shell has direct egress through the
+  VM's NAT for external services (not proxied through connectome).
+- `connectome` (bridge, local): both containers attached; used for shell to reach connectome
+  over the network (term-sessions service listens on the `connectome` hostname via the bridge).
 
 ## Provisioning
 
@@ -221,47 +234,63 @@ Two containers in one Compose project:
 1. Fetches the Codex stub from onecli (`GET /v1/credential-stubs/codex`) with the operator's API key.
    The stub holds a parseable `access_token` and `account_id` (both marked `onecli-managed` and
    never refreshed by connectome — the gateway handles refresh).
-2. Writes the stub to `connectome_state:/agent/state/data/config.toml` (the Codex provider config).
+2. Writes the stub to `connectome_state:/agent/state/codex/{config.toml, auth.json}` (the Codex provider config and account id).
 
-This step creates the agent's gateway CA certificate during onecli setup; it must run **after** onecli
-is up and the vault is unlocked.
+This step must run **after** onecli is up and the vault is unlocked. It does not create the gateway
+CA certificate — that's baked into the image at build time (copied from the live onecli gateway).
 
 **Important:** never use the WebUI "log in again" action — it logs out the stub and blocks refresh.
 Recover with another `provision-codex` run.
 
 ## Security invariants
 
-Connectome's security invariants are checked at build time (`image-test`, 8 checks) and runtime (lints
-in `doctor`, 7 checks). The invariants enforce:
+Connectome has 9 security invariants, checked at build time (13 image tests + 4 integration tests in the build) and runtime (7 lint checks + 15 smoke tests). The invariants enforce:
 
 1. **Code-execution features disabled** (`codeExecution`, `extensions`, `mcplAdmin` off; `modules.workspace` false).
-   Protects against recipe injection. Checked at build.
-2. **Fleet never bare `true`** (explicit children with allowed recipes under `/agent/recipes`).
-   Prevents arbitrary recipe launch. Checked at build.
-3. (reserved)
-4. **Outbox-only shared workspace** (connectome mounts read-only; shell has no binds).
-   Limits connectome's file-write surface. Checked at build and runtime.
-5. (reserved)
-6. **No onecli user API key; no private-destination bypass; no host-gateway bind**.
-   Prevents credential exposure and network escape. Checked at runtime.
-7. **`GATE_TELEMETRY` unset everywhere.** Prevents accidental telemetry.
-   Checked at runtime.
-8. **Discord filters fixed in recipe; no agent filter rewrites; dangerous tools disabled**.
-   Prevents DM/guild bypass. Checked at runtime.
-9. **`OBSERVERS_FILE` on the read-only `/agent/recipes` mount, not overridden**.
-   Prevents observer privilege escalation via connectome. Checked at runtime.
+   Protects against recipe injection.
+   Checks: `lint.sh` invariant 1 (recipe config), `image-test.sh` checks 1-9 (full image suite).
 
-Run `dotfiles stacks connectome image-test` (build-time checks) and `dotfiles stacks connectome lint`
-(runtime checks); both are included in `doctor`. See `scripts/lint.sh` for implementation.
+2. **Fleet never bare `true`** (explicit children with allowed recipes under `/agent/recipes`).
+   Prevents arbitrary recipe launch.
+   Checks: `lint.sh` invariant 2 (recipe config).
+
+4. **Outbox-only shared workspace** (connectome mounts read-only; shell has no binds).
+   Limits connectome's file-write surface.
+   Checks: `lint.sh` invariant 4 (compose volumes), `smoke.sh` AC9.4 (runtime volume mounts).
+
+6. **No onecli user API key; no private-destination bypass; no host-gateway bind**.
+   Prevents credential exposure and network escape.
+   Checks: `lint.sh` invariant 6 (.env key names, compose config, onecli settings).
+
+7. **`GATE_TELEMETRY` unset everywhere.** Prevents accidental telemetry.
+   Checks: `lint.sh` invariant 7 (.env keys, compose env, Dockerfile).
+
+8. **Discord filters fixed in recipe; no agent filter rewrites; dangerous tools disabled**.
+   Prevents DM/guild bypass.
+   Checks: `lint.sh` invariant 8 (recipe config, .env keys), `smoke.sh` AC7.3 (runtime env).
+
+9. **`OBSERVERS_FILE` on the read-only `/agent/recipes` mount, not overridden**.
+   Prevents observer privilege escalation via connectome.
+   Checks: `lint.sh` invariant 9 (Dockerfile env, compose volume mount), `smoke.sh` AC8.3 (runtime read-only).
+
+Run `dotfiles stacks connectome image-test` (13 build-time checks) and `dotfiles stacks connectome smoke`
+(15 runtime checks). Both `lint` and `image-test` are included in `doctor`. See `scripts/{lint,image-test,smoke}.sh` for implementation.
 
 ## Known exposures (accepted)
 
-- **WebUI port is basic-auth only.** The shell can reach `localhost:7340` on the container network;
-  protected by a 32-char password from `.env`.
-- **LAN and Tailscale reachability.** The shell has direct egress through the VM's NAT. It can reach
-  router admin, AdGuard, homebridge UI, this Mac's Tailscale SSH/DNS, and other Tailscale peers.
-  Intended for agent tools (debugging, testing, e.g. `ssh` to a Tailscale node). Locking this down
-  is future work.
+- **WebUI port is basic-auth only.** The connectome WebUI listens on `127.0.0.1:18768` (internally :18768),
+  published to Mac localhost only; protected by a 32-char password from `.env`. The shell can reach it over
+  the container network but cannot reach the shell's own services (no cross-container port exposure).
+- **LAN and Tailscale reachability.** The shell has direct egress through the VM's NAT (not proxied through
+  connectome). It can reach the router admin, AdGuard, homebridge UI, this Mac's Tailscale SSH/DNS, and other
+  Tailscale peers. Intended for agent tools (debugging, testing, e.g. `ssh` to a Tailscale node). Locking this
+  down is future work.
+- **Fleet children on the same trust domain.** Persona subagents share connectome's state volume and the same
+  onecli identity (until separate `aoc_` tokens and `dataDir`s are implemented). A malicious persona can read
+  the host's chronicle and llm-calls logs.
+- **Fresh-device patches are manual.** Local branch patches on connectome sources are reapplied by hand on a
+  fresh device; `sources.lock` lists the subjects but not the diffs. An incorrect re-implementation could
+  introduce bugs or lose security hardening.
 - **onecli path-rule bypass.** A dot-segment bypass (`.../../..`) can escape any `Network` path rule.
   Defense-in-depth only — the gateway blocks private destinations for proxied requests, and the
   onecli policy is explicit allow-list. Report bypass upstream.
@@ -274,7 +303,8 @@ Run `dotfiles stacks connectome image-test` (build-time checks) and `dotfiles st
 Personas (future work) will be persistent fleet children with their own Discord identity, onecli
 proxy token, and `dataDir`. Each persona gets its own `children[]` entry in the recipe and its own
 `shell` container. The host and all personas share the connectome `state` and `recipes` volumes
-(shared context) and the onecli gateway (shared credential broker). Seams kept now:
+(shared context, but each persona has its own `state/data/children/<name>/` subdirectory) and the
+onecli gateway (shared credential broker). Seams kept now:
 
 - Recipe structure supports `children[]` with explicit recipes and runtime env.
 - Shell socket design allows one shell socket per persona (no namespace crossing).
@@ -311,13 +341,16 @@ proxy token, and `dataDir`. Each persona gets its own `children[]` entry in the 
   Runs after `up` or `provision-codex`.
 - `dotfiles stacks connectome set-heartbeat-rate <tokens> <ms>`: hot-reload heartbeat wake policy on
   the live session (e.g. `8 60000` = 8 tokens per 60 seconds). Changes are not persisted to the recipe.
-- `dotfiles stacks connectome ratelimit-check`: check current onecli policy quota usage and ChatGPT
-  plan remaining tokens.
-- `dotfiles stacks connectome probe`: test the onecli proxy (proves `aoc_` token validity).
+- `dotfiles stacks connectome ratelimit-check`: temporarily set rule 1 to 2/hour, restart the gateway,
+  expect the 3rd POST to get 429, then restore the limit. Proves the rate-limit enforcement.
 
-**Model swap:**
+**Model or provider swap:**
 
 Feeding one model's chronicle to another violates continuity (encrypted reasoning items are model-bound).
-A model swap requires a new session — use `connectome restore` with a clean `state` volume, or update
-`LLM_MODEL` in `.env`, re-run `init-env` to sync tokens, and `connectome restart`. The old session's
-state is preserved in the tarball backup.
+A model/provider swap requires a new session and a fresh `DATA_DIR` (not editing `LLM_MODEL` on a live session):
+
+- Update `LLM_PROVIDER` and `LLM_MODEL` in `.env`.
+- Delete the old session's state: `dotfiles stacks connectome down && docker --context colima-agents volume rm connectome_state`.
+- Re-run `dotfiles stacks connectome init-env`, `dotfiles stacks connectome build`, `dotfiles stacks connectome provision-codex`, `dotfiles stacks connectome up`.
+
+The old session's state is preserved in the tarball backup if you need to revert.

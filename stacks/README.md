@@ -98,9 +98,9 @@ Both are **LaunchDaemons**, not LaunchAgents, because this host is headless
 system`; run them as your normal user over SSH. See
 [Autostart at boot](#autostart-at-boot).
 
-`doctor` runs read-only diagnostics (~12 checks across infrastructure,
-per-stack state, Tailscale failover state, IP coupling, .env keys, and
-homebridge pairing identity). Run it after any non-trivial change.
+`doctor` runs read-only diagnostics across 8 sections: Infrastructure (colima/docker/socket_vmnet/just),
+Stack volumes, Backups, DNS forwarder (relay health), DNS failover (tailnet Global NS), IP coupling,
+Agents (onecli + connectome named volumes), and Stack identity & env. Run it after any non-trivial change.
 
 ## Recipes
 
@@ -123,7 +123,7 @@ homebridge pairing identity). Run it after any non-trivial change.
 | `down-all` | reverse order, DNS-aware: connectome, onecli, wallabag, homebridge, freshrss, adguard last. connectome must come down before onecli (onecli owns the `onecli-agents` network). |
 | `ps-all` | container status across all stacks |
 | `pull-all` | pull latest images for all stacks (connectome included) |
-| `backup-all` | backup all stacks in order (connectome before onecli, then others), then run GFS rotation. connectome is stop/start quiesce; onecli stays up. |
+| `backup-all` | backup all stacks in order (adguard, freshrss, homebridge, connectome, onecli, wallabag), then run GFS rotation. Each stack uses its quiesce method (see Backups below). |
 | `startup-install` | install the boot autostart daemon (all VMs + `up-all` at boot; sudo) |
 | `backup-install` | install the nightly 4 AM backup daemon (sudo) |
 
@@ -147,11 +147,14 @@ recipe runs all stacks (connectome before onecli, then others) then `backup-rota
 | `monthly/` | 3 per stack | The 1st of month's daily tarball |
 | `archive/` (outside GFS) | permanent | `onecli-v1-final.tgz` (reference, not rotated) |
 
-Backup quiesce:
+Backup quiesce and coverage:
 
-- **connectome** (named volumes `state`, `workspace`, `outbox`): stop/start quiesce. Prunes old llm-calls files and caps headless.log during backup.
-- **onecli** (named volumes `pgdata`, `app-data`): stays up (safe to snapshot live). Does not down during backup.
-- **adguard**, **freshrss**, **homebridge**, **wallabag** (bind mounts under `~/.volumes/`): down/up quiesce for consistent snapshots.
+- **adguard** (bind mount `~/.volumes/adguard/`): stays up (safe to tar live, no SQLite).
+- **freshrss** (bind mount `~/.volumes/freshrss/`): `down && up` quiesce (SQLite-backed RSS feed DB).
+- **homebridge** (bind mount `~/.volumes/homebridge/`): `down && up` quiesce (SQLite-backed HomeKit pairing).
+- **wallabag** (bind mount `~/.volumes/wallabag/`): stays up (PostgreSQL handled by quiesce on other side if needed).
+- **connectome** (named volumes `state` and `workspace` only — NOT `outbox`): `compose stop && backup && compose start`. Prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` to 10 MiB when >50 MiB.
+- **onecli** (named volumes `pgdata`, `app-data`): `compose stop && backup && compose start` (safe to snapshot live but wrapped for consistency).
 
 Schedule unattended nightly runs via launchd:
 

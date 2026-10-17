@@ -4,10 +4,9 @@
 agents access to services without exposing keys. Runs in the `agents`
 Colima VM as the credential broker for [connectome](../connectome/).
 
-Four services in one Compose project: migrations (setup, one-off), a
-Postgres 18 instance for the encrypted ciphertext store, a Next.js dashboard,
-and a Rust gateway (`localhost:10255` — the proxy identity broker). All
-images pinned to v2.12.0, all arm64.
+Five services in one Compose project: Postgres 18 (encrypted ciphertext store), migrations (setup, one-shot),
+a Next.js API (`localhost:10256`), a Next.js web dashboard (`localhost:10254`), and a Rust gateway
+(`localhost:10255` — the proxy identity broker). All images pinned to v2.12.0, all arm64.
 
 **Two pieces of asymmetry vs the other stacks:**
 
@@ -21,8 +20,7 @@ images pinned to v2.12.0, all arm64.
 
 Prerequisites: Stage 2 setup complete (`dotfiles stow setup-colima`
 already run), plus the host `onecli` CLI on PATH. If you don't have it:
-`curl -fsSL onecli.sh/cli/install | sh`. The `agents` VM is on-demand;
-bring it up first.
+`curl -fsSL onecli.sh/cli/install | sh`. The `agents` VM must be running.
 
 ```sh
 dotfiles stacks vm-agents-up
@@ -68,6 +66,11 @@ onecli v2 requires account login:
 
 1. **Dashboard:** `http://127.0.0.1:10254` on the Mac (over Colima's `network.mode: shared` port forward).
    Registration is open on first `up`; register immediately.
+   For remote SSH access, tunnel the dashboard and API:
+   ```sh
+   ssh -L 10254:127.0.0.1:10254 -L 10256:127.0.0.1:10256 cxmini
+   # Then visit http://127.0.0.1:10254 on your remote client
+   ```
 2. **Host CLI (`onecli` binary):** login with your account credentials. Run `onecli secrets list` and other operations.
    The `.onecli/config.json` points to `http://127.0.0.1:10254`; the CLI caches an API key (`~/.onecli/credentials/`).
 3. **Proxy identity (agents):** agents select their identity via the `HTTPS_PROXY` `aoc_` token. No default identity exists.
@@ -81,9 +84,9 @@ an escrow copy in the password manager). Tarballs hold ciphertext + gateway CA o
 never the key itself. FileVault protects the live `.env` on disk and the agents VM
 disk image at rest. On fresh-device recovery:
 
-1. Restore `onecli` tarball to empty volumes.
-2. Create `.env` with the escrowed `SECRET_ENCRYPTION_KEY` (and other secrets from the password manager).
-3. `dotfiles stacks onecli up` — the vault unlocks with the key.
+1. Create `.env` with the escrowed `SECRET_ENCRYPTION_KEY` (and other secrets from the password manager).
+2. `dotfiles stacks onecli up` — the `compose up` reads the `:?` guards and starts the vault.
+3. Restore `onecli` tarball to the running volumes (or skip if starting fresh).
 
 ## Identities and policy
 
@@ -97,10 +100,17 @@ onecli grants credentials to agents via explicit policy rules. Each agent holds 
 
 **Policy rules** (`dotfiles stacks onecli policy`):
 
-- `rule 1`: rate limit (1000 requests/hour per agent). Operators on the personal plan may consume their full quota; no per-app ChatGPT cap.
-  Run `dotfiles stacks connectome ratelimit-check` to see current usage and remaining tokens.
+| Rule | Target | Action | Details |
+|---|---|---|---|
+| `cx-1-codex-responses-limit` | `POST /backend-api/codex/responses*` on chatgpt.com | allow | Rate limit (1000/hour default, tunable with `dotfiles stacks onecli policy <N>`). Hard ceiling on LLM calls; 429 failures count toward the limit. |
+| `cx-2-codex-allow` | `POST /backend-api/codex/*` on chatgpt.com | allow | Allows Codex endpoints not matched by rule 1 (e.g. legacy models). |
+| `cx-3-wham-usage` | `GET /backend-api/wham/usage` on chatgpt.com | allow | Usage/quota queries. |
+| `cx-4-wham-accounts-check` | `GET /backend-api/wham/accounts/check` on chatgpt.com | allow | Account status check. |
+| `cx-5-wham-reset-credits` | `GET /backend-api/wham/rate-limit-reset-credits` on chatgpt.com | allow | Rate-limit reset time. |
+| `cx-6-block-openai-hosts` | `chatgpt.com` / `*.chatgpt.com` / `*.openai.com` / `api.openai.com` | block | Blocks direct access (forces proxy auth). |
+
 - Injection scope: agents select their identity via the `aoc_` token; injection applies to the host-IP (`chatgpt.com`, `api.openai.com`, etc.)
-  and method, not per-path.
+  and method, not per-path. Rule 1's rate limit is a hard ceiling; once saturated, subsequent POSTs fail 429 until the hourly window rolls.
 
 **Path rules** (onecli design):
 
@@ -108,7 +118,7 @@ onecli grants credentials to agents via explicit policy rules. Each agent holds 
   can escape the pattern. Report such bypass in the upstream issue. Intended usage: allow data-reads but block token refreshes.
 - Private-destination refusal covers proxied requests only (loopback, RFC1918, Tailscale). Unproxied direct connections are not filtered.
 
-Run `dotfiles stacks onecli policy` to review and edit rules; `dotfiles stacks connectome probe` to test the proxy.
+Run `dotfiles stacks onecli policy` to review and edit rules.
 
 ## Threat model
 
@@ -168,7 +178,7 @@ The recipe gates on `colima-agents` being running:
 `dotfiles stacks doctor` reports backup-age as `[OFF]` while `colima-agents` is stopped, and `[FAIL]` if the VM has been up
 more than 36 hours without a fresh backup.
 
-`dotfiles stacks onecli restore <tarball>` restores to empty volumes only (refuses to clobber). To reset:
+`dotfiles stacks onecli restore <tarball>` restores to empty volumes only (refuses to clobber). The `<tarball>` path
+must be absolute (e.g., `$HOME/.volume-backups/daily/onecli-2026-10-16.tgz`; relative paths resolve against `stacks/onecli/`).
+To reset:
 `dotfiles stacks onecli down`, `docker --context colima-agents volume rm onecli_pgdata onecli_app-data`, then `restore`.
-
-The v1 archive `~/.volume-backups/archive/onecli-v1-final.tgz` is outside GFS (permanent reference, kept separately).

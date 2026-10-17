@@ -8,8 +8,8 @@ Three independent areas, intentionally not unified:
 
 - `archive/` — legacy bare-repo dotfiles from before the move to Stow. **Frozen, unmanaged.** Do not edit unless the user explicitly asks; nothing in the active workflow reads from here.
 - `stow/` — GNU Stow packages, symlinked into `$HOME` for tools that read fixed paths.
-- `stacks/` — Docker Compose stacks. **Not stowed** — invoked in place via `just`.
-- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `startup.sh`, `startup-install.sh`, `dns-forward.sh`, `dns-forward-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist templates for the backup timer, the boot autostart daemon, and the dns-forward relay daemon). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
+- `stacks/` — Docker Compose stacks. **Not stowed** — invoked in place via `just`. Per-stack: `adguard/`, `connectome/`, `freshrss/`, `homebridge/`, `onecli/`, `wallabag/`.
+- `stacks/scripts/` — shared shell helpers used by stack justfiles (`backup.sh`, `restore.sh`, `backup-rotate.sh`, `backup-install.sh`, `startup.sh`, `startup-install.sh`, `dns-forward.sh`, `dns-forward-install.sh`, `bridged-ip-changed.sh`, `doctor.sh`, `lib/check.sh`, plus the launchd plist templates for the backup timer, the boot autostart daemon, and the dns-forward relay daemon). Per-stack `scripts/` dirs hold stack-specific scripts (e.g., `adguard/scripts/tailnet-dns.sh`, `connectome/scripts/{build,image-test,lint,smoke}.sh`, `homebridge/scripts/{bootstrap,gen-pin}.sh`).
 - `docs/` — operational references: `docs/migration-recovery.md` (clean-slate rebuild procedure), `docs/design-plans/` and `docs/implementation-plans/` (planning artifacts).
 
 The `dotfiles` shell alias (defined in `stow/base/.zshrc`) is the entry point for everything:
@@ -41,9 +41,10 @@ What's in the repo vs what's environment-specific:
 | `stacks/<stack>/conf/...` templates (e.g., `homebridge/config.json.template`) | Live files under `~/.volumes/<stack>/` |
 | `stow/<package>/...` | Stowed symlinks under `$HOME` |
 | `stow/colima/.colima/<profile>/colima.yaml` | Live VM disks under `~/.colima/_lima/`, qemu MAC, DHCP-leased IP |
-| `stacks/connectome/sources.lock` | `~/Developer/connectome/{connectome-host,discord-mcpl,heartbeat-mcpl,voice-kit}/` clones at pinned SHAs, with `local` branches holding patches |
-| `stacks/onecli/compose.yaml` | `onecli_pgdata` / `onecli_app-data` / `connectome_state` / `connectome_workspace` / `connectome_outbox` Docker named volumes inside the `agents` VM (ciphertext + gateway CA; encryption keys in stacks/<stack>/.env + password manager) |
-| `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data); `~/.volume-backups/archive/onecli-v1-final.tgz` (outside GFS, permanent) |
+| `stacks/connectome/sources.lock` | `~/Developer/connectome/{connectome-host,discord-mcpl,heartbeat-mcpl,voice-kit}/` clones at pinned SHAs (base commit in `base=` field), with `local` branches holding patches (subjects listed) |
+| `stacks/onecli/compose.yaml` | `onecli_pgdata` / `onecli_app-data` Docker named volumes inside the `agents` VM (encrypted ciphertext store + gateway CA; encryption key in `stacks/onecli/.env` + password manager escrow) |
+| `stacks/connectome/compose.yaml` | `connectome_state` / `connectome_workspace` / `connectome_outbox` Docker named volumes inside the `agents` VM (plaintext state, recipes, and transient output) |
+| `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` (sudo) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist` is per-machine | Installed by `dotfiles stacks startup-install` (sudo) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.dns-forward.plist` is per-machine (bakes in node Tailscale IP + bridged VM IP) | Installed by `dotfiles stacks dns-forward-install` (sudo) |
@@ -83,9 +84,9 @@ dotfiles stacks vm-shared-up      # start a VM (also: vm-shared-down, vm-bridged
 dotfiles stacks up-all            # bring up all stacks (continues past failures; onecli before connectome)
 dotfiles stacks down-all          # DNS-aware shutdown order (connectome/onecli before apps before adguard)
 dotfiles stacks ps-all            # status across stacks
-dotfiles stacks doctor            # ~22 read-only checks across 6 sections (run after non-trivial changes)
+dotfiles stacks doctor            # read-only checks across 8 sections: Infrastructure, Stack volumes, Backups, DNS forwarder, DNS failover, IP coupling, Agents (onecli + connectome), Stack identity & env
 
-dotfiles stacks backup-all        # per-stack backup + GFS rotation (connectome before onecli)
+dotfiles stacks backup-all        # per-stack backup + GFS rotation (adguard, freshrss, homebridge, connectome, onecli, wallabag)
 dotfiles stacks backup-install    # install nightly 4 AM backup LaunchDaemon (sudo)
 dotfiles stacks startup-install   # install boot autostart LaunchDaemon — all VMs + up-all (sudo)
 dotfiles stacks dns-forward-install # install tailnet DNS relay LaunchDaemon — node-IP:53 -> AGH VM (adguard; sudo)
@@ -130,7 +131,7 @@ Why `bridged` exists separately from `shared`: only `qemu + socket_vmnet bridged
 
 `adguard` and `homebridge` justfiles use `docker --context colima-bridged`; `freshrss` and `wallabag` use `docker --context colima-shared`. Don't homogenize them. Likewise, the bridged-VM `serve` recipes parse `colima list` for the live VM IP (because `network_mode: host` binds inside the VM, not on Mac localhost) — keep that pattern.
 
-`onecli` and `connectome` use `docker --context colima-agents`. **Unlike every other stack, their volumes live inside the VM as Docker named volumes, not under `~/.volumes/`** — see `stacks/onecli/README.md` for the threat-model rationale. The `connectome` stack also bind-mounts local sources (`~/Developer/connectome/*/recipes/` read-only into `/agent/recipes`).
+`onecli` and `connectome` use `docker --context colima-agents`. **Unlike every other stack, their volumes live inside the VM as Docker named volumes, not under `~/.volumes/`** — see `stacks/onecli/README.md` for the threat-model rationale. The `connectome` stack also bind-mounts local recipes (`./recipes` in the stack directory, read-only into `/agent/recipes`).
 
 All three profiles set `autoActivate: false` so `colima start -p X` does not steal the active Docker context. The active context is held at `default` (the built-in `unix:///var/run/docker.sock` pointer, which is unbound on this machine — there's no Docker Desktop). Any ad-hoc `docker run` from a fresh shell therefore fails fast rather than silently dropping a stray container into a purpose-dedicated VM. Recipes that need a VM target it explicitly with `--context colima-<profile>`; if you genuinely want ad-hoc work to land somewhere, `docker context use colima-<profile>` is a deliberate, scoped switch.
 
@@ -153,10 +154,14 @@ When adding a new package, edit `stow/justfile` to add the package to **every ag
 
 ## Backups
 
-- Per-stack `backup` recipes tar into `~/.volume-backups/daily/<stack>-YYYY-MM-DD.tgz`. Quiesce-needing stacks (`freshrss`, `wallabag`, `homebridge`, `connectome` — need clean snapshots) use `compose stop/start` (never `down/up`); `adguard` and `onecli` stay up (safe to read live). `connectome` prunes `llm-calls.*.jsonl` older than 14 days and caps `headless.log` at 10 MiB during backup.
-- `backup-rotate.sh` GFS-promotes daily → weekly (Sundays, kept 4) → monthly (1st of month, kept 3). `daily/` is capped at 7 per stack. The v1 archive `~/.volume-backups/archive/onecli-v1-final.tgz` is outside GFS (permanent).
+- Per-stack `backup` recipes tar into `~/.volume-backups/daily/<stack>-YYYY-MM-DD.tgz`. Quiesce behavior per stack:
+  - **freshrss**, **homebridge**, **wallabag**: `down && up` quiesce (clean snapshots).
+  - **connectome**: `compose stop && snapshot && compose start`. Also prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` to last 10 MiB when >50 MiB.
+  - **onecli**: `compose stop && snapshot && compose start` (safe to snapshot live but wrapped for consistency).
+  - **adguard**: stays up (safe to tar live, no SQLite).
+- `backup-rotate.sh` GFS-promotes daily → weekly (Sundays, kept 4) → monthly (1st of month, kept 3). `daily/` is capped at 7 per stack.
 - The launchd **LaunchDaemon** installed by `dotfiles stacks backup-install` runs `dotfiles stacks backup-all` nightly at 04:00. It's a daemon, not an agent (see "Boot autostart" — this host has no GUI session for an agent to load into). Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. The plist Label is `com.cxreiff.dotfiles.backup`.
-- `~/.volume-backups/` is gitignored runtime data; never commit a tarball (except the permanent v1 archive, which is committed separately if needed).
+- `~/.volume-backups/` is gitignored runtime data; never commit a tarball.
 
 ## Boot autostart — why LaunchDaemons, not LaunchAgents
 
@@ -177,17 +182,17 @@ after a reboot":
   started over SSH all the time), so a daemon-as-user works.
 
 **Why keep FileVault (and not just disable it + auto-login, which is the
-more common headless recipe):** the `onecli` credential vault's
-`SECRET_ENCRYPTION_KEY` lives in `stacks/onecli/.env` (0600, gitignored, with
-an escrow copy in the password manager), so volume tarballs hold ciphertext and
-the gateway CA only. FileVault protects the live `.env` file on disk, the agents
-VM disk image containing decrypted runtime state (onecli gateway/postgres, connectome
-state with chronicle and `llm-calls` full prompts), and the backup tarballs of
-connectome. Key and at-rest ciphertext separation via tarballs is accepted: the live
-VM is attack surface. This is a deliberate choice (2026-10-16). Consequence: a reboot
-halts at the FileVault unlock gate before any daemon runs. For planned remote reboots,
-unlock the next boot over SSH first: `sudo fdesetup authrestart`. Only unplanned power
-loss needs a physical/console unlock; after the unlock, the startup daemon fires normally.
+more common headless recipe):** the `onecli` credential vault stores its
+`SECRET_ENCRYPTION_KEY` in `stacks/onecli/.env` (0600, gitignored, with an escrow copy
+in the password manager). The agents VM disk image contains decrypted runtime state
+(onecli gateway/postgres, connectome state with chronicle and `llm-calls` full prompts).
+FileVault is the only at-rest protection for these secrets and the plaintext backup
+tarballs. Key and ciphertext live together in the VM, so FileVault is essential (2026-06-02
+design decision). On v2 (2026-10-16), the key-location changed to `.env` (was stored in
+onecli before), making FileVault even more critical. Consequence: a reboot halts at the
+FileVault unlock gate before any daemon runs. For planned remote reboots, unlock the next
+boot over SSH first: `sudo fdesetup authrestart`. Only unplanned power loss needs a
+physical/console unlock; after the unlock, the startup daemon fires normally.
 
 So both autostart and backups are **LaunchDaemons** in the `system` domain
 (`/Library/LaunchDaemons/`), loaded at system boot regardless of GUI login,
