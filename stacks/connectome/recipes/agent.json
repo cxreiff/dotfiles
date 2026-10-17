@@ -44,6 +44,7 @@
   },
   "modules": {
     "workspace": false,
+    "subagents": { "defaultModel": "gpt-6-luna", "maxDepth": 1, "maxExecutionMs": 1800000 },
     "wake": {
       "policies": [
         {
