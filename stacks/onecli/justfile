@@ -8,7 +8,15 @@ default:
 up:
     docker --context {{context}} compose up -d --wait
 
+# Refuses while connectome containers exist: compose down would try to remove
+# the onecli-agents network they are attached to. `down-all` orders this.
 down:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -n "$(docker --context {{context}} ps -aq --filter label=com.docker.compose.project=connectome)" ]; then
+        echo "onecli: connectome containers exist — run \`dotfiles stacks connectome down\` first" >&2
+        exit 1
+    fi
     docker --context {{context}} compose down
 
 restart:
