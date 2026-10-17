@@ -349,24 +349,23 @@ check_ac9_4() {
         return
     fi
 
-    # Check that outbox is the ONLY named volume in both containers
-    local c_volumes s_volumes
-    c_volumes=$(D inspect -f '{{range .Mounts}}{{.Name}} {{end}}' connectome | tr -d ' ')
-    s_volumes=$(D inspect -f '{{range .Mounts}}{{.Name}} {{end}}' connectome-shell | tr -d ' ')
-
-    # Both should have exactly one named volume: connectome_outbox
-    if [ "$c_volumes" = "connectome_outbox" ] && [ "$s_volumes" = "connectome_outbox" ]; then
-        # Verify RO/RW status: RO in connectome, RW in shell
-        local c_rw s_rw
-        c_rw=$(D inspect -f '{{range .Mounts}}{{if eq .Name "connectome_outbox"}}{{.RW}}{{end}}{{end}}' connectome)
-        s_rw=$(D inspect -f '{{range .Mounts}}{{if eq .Name "connectome_outbox"}}{{.RW}}{{end}}{{end}}' connectome-shell)
-        if [ "$c_rw" = "false" ] && [ "$s_rw" = "true" ]; then
-            pass "AC9.4"
-        else
-            fail "AC9.4 (RO/RW status: connectome=$c_rw shell=$s_rw)"
-        fi
+    # Invariant 4: outbox is the only named volume mounted in BOTH containers
+    # (each may have others: state in connectome, workspace in shell).
+    local c_volumes s_volumes shared
+    c_volumes=$(D inspect -f '{{range .Mounts}}{{if .Name}}{{.Name}}{{"\n"}}{{end}}{{end}}' connectome | sort -u)
+    s_volumes=$(D inspect -f '{{range .Mounts}}{{if .Name}}{{.Name}}{{"\n"}}{{end}}{{end}}' connectome-shell | sort -u)
+    shared=$(comm -12 <(printf '%s\n' "$c_volumes" | sed '/^$/d') <(printf '%s\n' "$s_volumes" | sed '/^$/d') | tr '\n' ' ' | sed 's/ $//')
+    if [ "$shared" != "connectome_outbox" ]; then
+        fail "AC9.4 (volumes shared by both containers: '${shared}', want only connectome_outbox)"
+        return
+    fi
+    local c_rw s_rw
+    c_rw=$(D inspect -f '{{range .Mounts}}{{if eq .Name "connectome_outbox"}}{{.RW}}{{end}}{{end}}' connectome)
+    s_rw=$(D inspect -f '{{range .Mounts}}{{if eq .Name "connectome_outbox"}}{{.RW}}{{end}}{{end}}' connectome-shell)
+    if [ "$c_rw" = "false" ] && [ "$s_rw" = "true" ]; then
+        pass "AC9.4"
     else
-        fail "AC9.4 (named volumes: connectome='$c_volumes' shell='$s_volumes')"
+        fail "AC9.4 (outbox RO/RW: connectome=$c_rw shell=$s_rw)"
     fi
 }
 
