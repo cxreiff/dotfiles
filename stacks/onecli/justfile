@@ -99,7 +99,7 @@ backup:
         -v "{{backups_dir}}":/dst \
         alpine \
         sh -c "umask 077 && cd /src && tar czf /dst/$(basename "$dst") pgdata app-data"
-    # Plaintext agent state / the gateway CA key: owner-only. The umask in the
+    # Vault ciphertext + gateway CA key: owner-only. The umask in the
     # container sets it at creation (a host-side chmod can be undone when the
     # VM flushes the file's attributes back over virtiofs); chmod as a backstop.
     chmod 600 "$dst"
