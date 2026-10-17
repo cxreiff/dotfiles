@@ -22,13 +22,13 @@ RUN cd voice-kit && npm ci && npm run build
 
 COPY src/discord-mcpl ./discord-mcpl
 RUN cd discord-mcpl && npm ci && npm run build \
- && node --import tsx --test test/attachment-root.test.ts \
+ && node --import tsx --test --test-timeout=30000 test/attachment-root.test.ts \
  && npm prune --omit=dev
 RUN cd voice-kit && npm prune --omit=dev
 
 COPY src/heartbeat-mcpl ./heartbeat-mcpl
 RUN cd heartbeat-mcpl && npm ci && npm run build \
- && node --import tsx --test test/reminder-floor.test.ts \
+ && node --import tsx --test --test-timeout=30000 test/reminder-floor.test.ts \
  && npm prune --omit=dev
 
 ARG TERM_SESSIONS_VERSION=1.6.0

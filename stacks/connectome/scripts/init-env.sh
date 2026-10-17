@@ -7,7 +7,7 @@
 #     API (agents connectome-host / connectome-shell), so a regenerated token
 #     is picked up by re-running this.
 # Env: CONNECTOME_ENV_FILE overrides the target (tests).
-# Exit codes: 0 ok; 2 missing prereq; 3 onecli API failure.
+# Exit codes: 0 ok; 2 missing or invalid value, or missing prereq; 3 onecli API failure.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,7 +51,8 @@ prompt_id() {  # prompt_id KEY "question" REGEX "format description"
         return 0
     fi
     while :; do
-        read -r -p "$question: " v || { echo; echo "init-env: $key is required" >&2; exit 2; }
+        # read returns 1 at EOF even when it read a final unterminated line.
+        read -r -p "$question: " v || [ -n "$v" ] || { echo; echo "init-env: $key is required" >&2; exit 2; }
         [[ "$v" =~ $re ]] && break
         echo "init-env: $key must be $fmt; try again" >&2
     done
