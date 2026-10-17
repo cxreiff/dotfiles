@@ -10,7 +10,7 @@ Three Colima VMs, each tuned for the workloads it carries:
 |---|---|---|---|
 | `shared`   | `vz`   | vzNAT — Mac localhost forwards (Colima's `network.mode: shared`) | freshrss, wallabag, future Mac-localhost-only services |
 | `bridged`  | `qemu` | socket_vmnet bridged — real LAN IP (Colima's `network.mode: bridged`) | adguard, homebridge — services that need real LAN visibility (DNS source IPs, mDNS/Bonjour) |
-| `agents`   | `vz`   | vzNAT (`network.mode: shared`) | container host for agent workloads |
+| `agents`   | `vz`   | vzNAT (`network.mode: shared`) | onecli (credential vault v2), connectome (agent host + shell) |
 
 Each VM is started and stopped individually via `vm-<name>-up` /
 `vm-<name>-down`. All three are brought up automatically at boot once you
@@ -77,6 +77,8 @@ For each stack you want to run, follow that stack's README:
 - `freshrss/README.md` — RSS reader (shared VM, fully declarative via .env)
 - `homebridge/README.md` — HomeKit bridge (bridged VM, pair via the iOS
   Home app after `dotfiles stacks homebridge bootstrap`)
+- `onecli/README.md` — credential vault v2 (agents VM, required for connectome)
+- `connectome/README.md` — AI agent **clara** over Discord (agents VM; requires onecli)
 - `wallabag/README.md` — read-it-later (shared VM, run `dotfiles stacks
   wallabag bootstrap` after first up)
 
@@ -117,30 +119,39 @@ homebridge pairing identity). Run it after any non-trivial change.
 
 | Recipe | Effect |
 |---|---|
-| `up-all` | bring up adguard, freshrss, homebridge, onecli, wallabag |
-| `down-all` | reverse order: onecli, wallabag, homebridge, freshrss, adguard last (DNS-aware) |
+| `up-all` | bring up adguard, freshrss, homebridge, onecli, connectome, wallabag. Continues past failures (e.g., Tailscale PAT expired) so agent stacks still start at boot; prints a summary naming any failures; exits non-zero if any failed. onecli precedes connectome (connectome joins the `onecli-agents` network). |
+| `down-all` | reverse order, DNS-aware: connectome, onecli, wallabag, homebridge, freshrss, adguard last. connectome must come down before onecli (onecli owns the `onecli-agents` network). |
 | `ps-all` | container status across all stacks |
-| `pull-all` | pull latest images for all stacks |
+| `pull-all` | pull latest images for all stacks (connectome included) |
+| `backup-all` | backup all stacks in order (connectome before onecli, then others), then run GFS rotation. connectome is stop/start quiesce; onecli stays up. |
 | `startup-install` | install the boot autostart daemon (all VMs + `up-all` at boot; sudo) |
 | `backup-install` | install the nightly 4 AM backup daemon (sudo) |
 
 ### Per-stack
 
-Modules: `dotfiles stacks adguard …`, `dotfiles stacks freshrss …`,
-`dotfiles stacks homebridge …`, `dotfiles stacks wallabag …`. See
+Modules: `dotfiles stacks adguard …`, `dotfiles stacks connectome …`,
+`dotfiles stacks freshrss …`, `dotfiles stacks homebridge …`,
+`dotfiles stacks onecli …`, `dotfiles stacks wallabag …`. See
 respective READMEs for the full per-stack recipe set.
 
 ## Backups
 
-Per-stack `backup` and `restore` recipes tar `~/.volumes/<stack>/` into
+Per-stack `backup` and `restore` recipes tar named volumes into
 `~/.volume-backups/{daily,weekly,monthly}/`. The aggregate `backup-all`
-recipe runs all four stacks then `backup-rotate.sh`:
+recipe runs all stacks (connectome before onecli, then others) then `backup-rotate.sh`:
 
 | Tier | Retention | Promoted from |
 |---|---|---|
 | `daily/` | 7 per stack | `backup-all` itself |
 | `weekly/` | 4 per stack | Sunday's daily tarball |
 | `monthly/` | 3 per stack | The 1st of month's daily tarball |
+| `archive/` (outside GFS) | permanent | `onecli-v1-final.tgz` (reference, not rotated) |
+
+Backup quiesce:
+
+- **connectome** (named volumes `state`, `workspace`, `outbox`): stop/start quiesce. Prunes old llm-calls files and caps headless.log during backup.
+- **onecli** (named volumes `pgdata`, `app-data`): stays up (safe to snapshot live). Does not down during backup.
+- **adguard**, **freshrss**, **homebridge**, **wallabag** (bind mounts under `~/.volumes/`): down/up quiesce for consistent snapshots.
 
 Schedule unattended nightly runs via launchd:
 
