@@ -70,3 +70,11 @@ smoke:
 # AC5.4: briefly stop the gateway; the operator DMs; expect a failures.log record.
 force-failure:
     @./scripts/force-failure.sh
+
+# Set the heartbeat wake rate_limit in the live session gate(s).
+set-heartbeat-rate tokens refill_ms:
+    @./scripts/set-heartbeat-rate.sh {{tokens}} {{refill_ms}}
+
+# AC10.3: exhaust a temporary 2/hour rule 1 and expect the gateway refusal.
+ratelimit-check:
+    @./scripts/ratelimit-check.sh
