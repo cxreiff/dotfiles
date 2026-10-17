@@ -30,7 +30,9 @@ set_key() {  # set_key KEY VALUE — replaces any existing line; value never ech
 prompt() {  # prompt KEY "question" [hidden] [default]
     has "$1" && return 0
     local v
-    if [ "${3:-}" = hidden ]; then read -r -s -p "$2: " v; echo; else read -r -p "$2${4:+ [$4]}: " v; fi
+    # `|| true`: read returns 1 at EOF (even after a final unterminated line);
+    # the default and the "is required" check below handle every case.
+    if [ "${3:-}" = hidden ]; then read -r -s -p "$2: " v || true; echo; else read -r -p "$2${4:+ [$4]}: " v || true; fi
     v="${v:-${4:-}}"
     [ -n "$v" ] || { echo "init-env: $1 is required" >&2; exit 2; }
     set_key "$1" "$v"; echo "init-env: set $1"
