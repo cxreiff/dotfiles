@@ -138,7 +138,8 @@ respective READMEs for the full per-stack recipe set.
 
 Per-stack `backup` and `restore` recipes tar named volumes into
 `~/.volume-backups/{daily,weekly,monthly}/`. The aggregate `backup-all`
-recipe runs all stacks (connectome before onecli, then others) then `backup-rotate.sh`:
+recipe backs up adguard, freshrss, homebridge, connectome, onecli, wallabag (connectome before
+onecli), then runs `backup-rotate.sh`:
 
 | Tier | Retention | Promoted from |
 |---|---|---|
@@ -152,9 +153,9 @@ Backup quiesce and coverage:
 - **adguard** (bind mount `~/.volumes/adguard/`): stays up (safe to tar live, no SQLite).
 - **freshrss** (bind mount `~/.volumes/freshrss/`): `down && up` quiesce (SQLite-backed RSS feed DB).
 - **homebridge** (bind mount `~/.volumes/homebridge/`): `down && up` quiesce (SQLite-backed HomeKit pairing).
-- **wallabag** (bind mount `~/.volumes/wallabag/`): stays up (PostgreSQL handled by quiesce on other side if needed).
+- **wallabag** (bind mount `~/.volumes/wallabag/`): `down && up` quiesce.
 - **connectome** (named volumes `state` and `workspace` only — NOT `outbox`): `compose stop && backup && compose start`. Prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` to 10 MiB when >50 MiB.
-- **onecli** (named volumes `pgdata`, `app-data`): `compose stop && backup && compose start` (safe to snapshot live but wrapped for consistency).
+- **onecli** (named volumes `pgdata`, `app-data`): `compose stop && backup && compose start` (Postgres data is only consistent stopped).
 
 Schedule unattended nightly runs via launchd:
 

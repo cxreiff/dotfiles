@@ -24,8 +24,9 @@ local clones under `~/Developer/connectome/` exist with their `local` branches
 
 1. `dotfiles stacks onecli up` — onecli v2 must be running first (it owns the
    `onecli-agents` network).
-2. `dotfiles stacks onecli policy` — creates the `connectome-host` /
-   `connectome-shell` agents and the org rules.
+2. `dotfiles stacks onecli policy 1000` — creates the `connectome-host` /
+   `connectome-shell` agents and the org rules, with rule 1 at the calibrated
+   1000/hour (with no argument a fresh vault gets 60/hour).
 3. `dotfiles stacks onecli import-openai` — dedicated ChatGPT device login,
    stored as the `openai` OAuth secret (only on a fresh vault).
 4. `dotfiles stacks connectome init-env` — prompts for the model, Discord
@@ -170,77 +171,86 @@ non-empty array of tool names.
 
 ## Architecture
 
-Two containers in one Compose project, on two networks:
+Two containers in one Compose project (`stacks/connectome/compose.yaml`):
 
-- **`connectome` (connectome-host):** the agent host (Bun/TypeScript). Runs one
-  process via `bun src/index.ts <recipe> --headless`. Stores session state in `/agent/state`
-  (named volume), collects logs at `/agent/state/data/headless.log` and logs/failures.log.
-  CWD is `/agent/cwd` (image-owned, immutable — holds symlinks to `/agent/recipes/mcpl-servers.json`
-  and `/agent/state/logs`). Mounts:
-  - `/agent/recipes` — named volume, read-only (agent recipe and observers.json)
-  - `/agent/state` — named volume, read-write (session data, codex config, heartbeat state)
-  - `/agent/outbox` — named volume, read-only (shared transient output with shell)
-- **`shell` (connectome-shell):** the agent's Linux workbench (node, Rust, Python, etc.).
-  Reaches connectome via term-sessions over the `connectome` bridge network.
-  Mounts:
-  - `/workspace` — named volume, read-write (persistent workbench directory)
-  - `/workspace/outbox` — shared from connectome's `/agent/outbox`, read-write (shell writes output)
+- **`connectome`** (image `connectome-host:local`): the agent host. The
+  entrypoint seeds state, waits (bounded) for `gateway:10255`, then runs
+  `bun /opt/connectome/src/index.ts /agent/recipes/agent.json --headless`. It
+  runs the MCP servers as children (discord-mcpl, heartbeat-mcpl, and the
+  term-sessions **client**) and serves the WebUI on port 18768, published on
+  `127.0.0.1:18768` only (`dotfiles stacks connectome serve` puts it on the
+  tailnet at port 8768).
+- **`shell`** (image `connectome-shell:local`, hostname `shell`): the agent's
+  workbench. It runs the term-sessions **daemon** (`session-server --headless`,
+  port 3100, `SESSION_SERVER_TOKEN`); connectome's term-sessions client
+  connects to `shell:3100`. It holds no host secrets: its environment is only
+  its own onecli proxy (`HTTPS_PROXY` with `SHELL_ONECLI_TOKEN`), `NO_PROXY`
+  and `SESSION_SERVER_TOKEN`.
 
-**Filesystem layout inside containers:**
+Mounts:
+
+| Container | Mount | Source | Mode |
+|---|---|---|---|
+| connectome | `/agent/state` | volume `connectome_state` | rw |
+| connectome | `/agent/outbox` | volume `connectome_outbox` | **ro** |
+| connectome | `/agent/recipes` | bind of the tracked `stacks/connectome/recipes/` | **ro** |
+| shell | `/workspace` | volume `connectome_workspace` | rw |
+| shell | `/workspace/outbox` | volume `connectome_outbox` | rw |
+
+The shell writes files into `/workspace/outbox`; connectome attaches them by
+their `/agent/outbox/...` path (read-only view of the same volume, and the
+discord attachment guard's root).
+
+Layout inside `connectome`:
 
 ```
-/agent/                       (connectome only)
-  cwd/                        → image-owned, read-only (symlinks only)
-    mcpl-servers.json         → symlink to /agent/recipes/mcpl-servers.json
-    logs/                     → symlink to /agent/state/logs
-  recipes/                    → named volume connectome_recipes (read-only)
-    agent.json                (resolved recipe, mode 0600)
-    observers.json            (hot-reloaded observer grants)
-    mcpl-servers.json         (tracked MCP server config)
-  state/                      → named volume connectome_state (read-write)
-    data/
-      headless.log            (40–50 MiB, capped at 10 MiB by backup pruning)
-      llm-calls.*.jsonl       (one new file per start; full prompts; ~130 MB/day heavy use)
-      .recipe.json            (unresolved ${VAR}s, mode 0600)
-      codex/
-        config.toml           (ChatGPT Codex provider stub, mode 0600)
-        auth.json             (account id, mode 0600)
-      outbox/                 (connectome writes, shell reads; cleared between runs)
-      children/               (future: persona subagent state)
-    logs/
-      failures.log            (hard-coded frame-level error log)
-    heartbeat/
-      config.json             (wake interval, persist across restarts)
-      reminders.json          (pending reminders, in-memory only)
-  outbox/                     → named volume connectome_outbox (read-only here)
-
-/workspace/                   (shell only)
-  outbox/                     → connectome_outbox (read-write here)
-  input/, output/             → workspace directories (agent creates on demand)
+/agent/cwd/                 image-owned, not writable (invariant 3)
+  mcpl-servers.json   -> /agent/recipes/mcpl-servers.json
+  logs                -> /agent/state/logs
+/agent/recipes/             tracked files, read-only bind
+  agent.json  observers.json  mcpl-servers.json  codex-config.toml
+/agent/state/               volume connectome_state
+  data/                     DATA_DIR: headless.log, llm-calls.*.jsonl,
+                            .recipe.json, sessions/, children/
+  codex/                    CODEX_HOME: auth.json (onecli stub), config.toml
+  logs/                     failures.log
+  heartbeat/                config.json (interval), reminders.json
+  discord/                  watermark, DM-notice and muted-channel state
+/agent/outbox/              volume connectome_outbox, read-only
 ```
 
-**Networks:**
+`backup` prunes `llm-calls.*.jsonl` older than 14 days and, once
+`headless.log` passes 50 MiB, truncates it to its last 10 MiB.
 
-- `onecli-agents` (external): both containers attached; used for inter-service discovery
-  (connectome reaches `onecli-gateway:10255` here). Shell has direct egress through the
-  VM's NAT for external services (not proxied through connectome).
-- `connectome` (bridge, local): both containers attached; used for shell to reach connectome
-  over the network (term-sessions service listens on the `connectome` hostname via the bridge).
+Networks:
+
+- `onecli-agents` (external, owned by the onecli stack, not internal): both
+  containers reach the gateway at `gateway:10255` with their own `aoc_`
+  token, and it also gives them direct egress.
+- `connectome` (this project's bridge): connectome to `shell:3100` for
+  term-sessions. The api, web and postgres of onecli are not on either
+  network.
 
 ## Provisioning
 
-`dotfiles stacks connectome provision-codex` (run after `onecli import-openai`):
+`dotfiles stacks connectome provision-codex` (after `onecli import-openai`,
+with onecli up):
 
-1. Fetches the Codex stub from onecli (`GET /v1/credential-stubs/codex`) with the operator's API key.
-   The stub holds a parseable `access_token` and `account_id` (both marked `onecli-managed` and
-   never refreshed by connectome — the gateway handles refresh).
-2. Writes the stub to `connectome_state:/agent/state/codex/{config.toml, auth.json}` (the Codex provider config and account id).
+1. Reads the `openai` secret's `metadata.accountId` and the Codex credential
+   stub (`GET /v1/credential-stubs/codex`) with the operator API key, on the
+   Mac only.
+2. Sets `tokens.account_id` to the **real** ChatGPT account id (an identifier,
+   not a credential) and refuses unless both tokens are the placeholder
+   `onecli-managed`. The gateway injects the real token on `chatgpt.com`.
+3. Writes `/agent/state/codex/auth.json` (0600, container uid) and copies the
+   tracked `recipes/codex-config.toml` to `/agent/state/codex/config.toml`.
 
-This step must run **after** onecli is up and the vault is unlocked. It does not create the gateway
-CA certificate — that's baked into the image at build time (copied from the live onecli gateway).
+The gateway CA is not part of this: `build` copies it from the running
+gateway into both images.
 
-**Important:** never use the WebUI "log in again" action — it logs out the stub and blocks refresh.
-Recover with another `provision-codex` run.
+Never use the WebUI "log in again" action: it runs `account/logout`, deletes
+the stub and starts a real login (blocked by onecli rule 6). Recover with
+another `provision-codex`.
 
 ## Security invariants
 
@@ -262,43 +272,53 @@ are checked by the image build, `image-test` or `smoke`.
 | 10 | The discord-mcpl attachment patch is applied: attachments outside `DISCORD_ATTACHMENT_ROOT`, `/proc/*`, symlinks out of the root and FIFOs are refused | In-build `attachment-root` tests (Dockerfile, `--test-timeout`), `image-test` AC7.5 row |
 
 `dotfiles stacks connectome lint-test` proves each lint fails on a fixture
-that violates exactly its invariant (29 fixtures, including the
+that violates exactly its invariant (34 fixtures, including the
 sub-conditions above).
 
 ## Known exposures (accepted)
 
-- **WebUI port is basic-auth only.** The connectome WebUI listens on `127.0.0.1:18768` (internally :18768),
-  published to Mac localhost only; protected by a 32-char password from `.env`. The shell can reach it over
-  the container network but cannot reach the shell's own services (no cross-container port exposure).
-- **LAN and Tailscale reachability.** The shell has direct egress through the VM's NAT (not proxied through
-  connectome). It can reach the router admin, AdGuard, homebridge UI, this Mac's Tailscale SSH/DNS, and other
-  Tailscale peers. Intended for agent tools (debugging, testing, e.g. `ssh` to a Tailscale node). Locking this
-  down is future work.
-- **Fleet children on the same trust domain.** Persona subagents share connectome's state volume and the same
-  onecli identity (until separate `aoc_` tokens and `dataDir`s are implemented). A malicious persona can read
-  the host's chronicle and llm-calls logs.
-- **Fresh-device patches are manual.** Local branch patches on connectome sources are reapplied by hand on a
-  fresh device; `sources.lock` lists the subjects but not the diffs. An incorrect re-implementation could
-  introduce bugs or lose security hardening.
-- **onecli path-rule bypass.** A dot-segment bypass (`.../../..`) can escape any `Network` path rule.
-  Defense-in-depth only — the gateway blocks private destinations for proxied requests, and the
-  onecli policy is explicit allow-list. Report bypass upstream.
-- **Same-UID on the Mac.** An attacker with your UID can curl the onecli dashboard (unauth in VM)
-  and steal credentials, or compromise connectome's container. Same-UID = vault compromise (see
-  onecli/README.md).
+- **WebUI is basic-auth only.** It listens on 18768 inside `connectome`,
+  published on `127.0.0.1:18768` and served on the tailnet by Tailscale serve
+  (port 8768). Credentials are `WEBUI_USER` / `WEBUI_PASS` (64 hex chars) from
+  `.env`. The `shell` container can reach it over the `connectome` network
+  and also gets 401 without credentials (`smoke` AC8.2).
+- **LAN and tailnet reachability.** `onecli-agents` is not internal, so both
+  containers have direct egress through the VM's NAT, outside the gateway. The
+  spike reached the router admin, AdGuard, the homebridge UI, this Mac's
+  tailnet IP and other tailnet peers. The gateway's private-destination
+  refusal only covers proxied traffic. Intended for now; lockdown is future
+  work.
+- **onecli path-rule bypass with the host token.** The gateway matches rules
+  on the raw path: `GET /backend-api/codex/../me` (or `%2e%2e`) passes rule 2,
+  chatgpt.com normalises it and answers with credentials injected. Policy
+  globs can't close this; the real boundary is that only `connectome` holds
+  the host `aoc_` token and it has no generic HTTP tool. The shell token is
+  refused on `chatgpt.com` regardless (`probe` AC3.4). To report upstream.
+- **Same trust domain for fleet children.** Future persona children are
+  spawned with the host's entire environment (including the host `aoc_`
+  token) until they get their own tokens via `children[].env`.
+- **Fresh-device patches are manual.** `sources.lock` records patch subjects,
+  not diffs; keep a copy of the `~/Developer/connectome` clones.
+- **Same UID on the Mac.** Anything running as your user can read
+  `stacks/*/.env` and the host onecli CLI's operator API key, which together
+  open the vault. Same-UID compromise is vault compromise (see
+  `stacks/onecli/README.md`, Threat model).
 
 ## Future: persona fleet children
 
-Personas (future work) will be persistent fleet children with their own Discord identity, onecli
-proxy token, and `dataDir`. Each persona gets its own `children[]` entry in the recipe and its own
-`shell` container. The host and all personas share the connectome `state` and `recipes` volumes
-(shared context, but each persona has its own `state/data/children/<name>/` subdirectory) and the
-onecli gateway (shared credential broker). Seams kept now:
+Not built yet; the seams kept for it:
 
-- Recipe structure supports `children[]` with explicit recipes and runtime env.
-- Shell socket design allows one shell socket per persona (no namespace crossing).
-- onecli proxy supports multiple identities (`aoc_` tokens) on one gateway.
-- Discord-mcpl can host multiple bot tokens in one process (future: one per persona).
+- Each persona is an explicit `modules.fleet.children[]` entry (lint
+  invariant 2 rejects `fleet: true`) with its own tracked recipe under
+  `/agent/recipes`, its own `dataDir` under `/agent/state/data/children/<name>`
+  (the entrypoint already clears stale `ipc.sock`/`headless.pid` there), and
+  its own Discord bot token and onecli `aoc_` token passed via
+  `children[].env` (runtime-only at the pinned connectome-host commit).
+- One `shell` daemon means personas would share one shell identity and see
+  each other's term-sessions; add a `shell-<name>` container per persona once
+  personas get distinct trust or credentials.
+- Fleet children are distinct from `modules.subagents` (ephemeral, in-process,
+  same identity; see Subagents).
 
 ## Operations
 
@@ -335,11 +355,20 @@ onecli gateway (shared credential broker). Seams kept now:
 
 **Model or provider swap:**
 
-Feeding one model's chronicle to another violates continuity (encrypted reasoning items are model-bound).
-A model/provider swap requires a new session and a fresh `DATA_DIR` (not editing `LLM_MODEL` on a live session):
+A model or provider swap means a new session (a fresh `DATA_DIR`), not editing
+`LLM_MODEL` under a live one: the chronicle's encrypted reasoning items are
+model-bound. There is no recipe for it; the one manual step below moves the
+old session aside inside the `state` volume (reversible), keeping the Codex
+stub, heartbeat and Discord state. No rebuild is needed.
 
-- Update `LLM_PROVIDER` and `LLM_MODEL` in `.env`.
-- Delete the old session's state: `dotfiles stacks connectome down && docker --context colima-agents volume rm connectome_state`.
-- Re-run `dotfiles stacks connectome init-env`, `dotfiles stacks connectome build`, `dotfiles stacks connectome provision-codex`, `dotfiles stacks connectome up`.
+```sh
+dotfiles stacks connectome backup        # restore point
+$EDITOR stacks/connectome/.env           # change LLM_MODEL (and LLM_PROVIDER)
+dotfiles stacks connectome down
+docker --context colima-agents run --rm -v connectome_state:/s alpine \
+    sh -c 'mv /s/data "/s/data.before-$(date +%Y%m%d)"'
+dotfiles stacks connectome up            # entrypoint recreates data/
+```
 
-The old session's state is preserved in the tarball backup if you need to revert.
+To go back: `down`, move the saved directory back to `data`, restore the old
+`LLM_MODEL`, `up` (or `restore` the backup onto empty volumes).

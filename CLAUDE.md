@@ -101,7 +101,7 @@ dotfiles stacks adguard tailnet-dns-on|tailnet-dns-off|tailnet-dns-status
 
 Per-stack details: `stacks/<name>/README.md`. The `adguard` README documents a non-obvious wizard gotcha (must bind DNS to `col0`, not `eth0` or "All interfaces") — preserve that if editing.
 
-`doctor` is the first thing to run when investigating any operational issue — it covers Infrastructure, Stack volumes, Backups (fails if any tarball is >36h old), DNS failover, IP coupling, and Stack identity & env. It's read-only and AC5.4-compliant (does not read .env *values*; the one BRIDGE_USERNAME read is a public pairing identifier, not a secret — don't extend that pattern to other keys without thought).
+`doctor` is the first thing to run when investigating any operational issue — it covers Infrastructure, Stack volumes, Backups (fails if any tarball is >36h old), DNS forwarder, DNS failover, IP coupling, Agents (onecli + connectome health, CA fingerprints, shell grant, invariant lints) and Stack identity & env (incl. `.env` mode 0600). It's read-only and AC5.4-compliant (does not read .env *values*; the one BRIDGE_USERNAME read is a public pairing identifier, not a secret — don't extend that pattern to other keys without thought).
 
 ## DNS failover state machine
 
@@ -157,11 +157,12 @@ When adding a new package, edit `stow/justfile` to add the package to **every ag
 - Per-stack `backup` recipes tar into `~/.volume-backups/daily/<stack>-YYYY-MM-DD.tgz`. Quiesce behavior per stack:
   - **freshrss**, **homebridge**, **wallabag**: `down && up` quiesce (clean snapshots).
   - **connectome**: `compose stop && snapshot && compose start`. Also prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` to last 10 MiB when >50 MiB.
-  - **onecli**: `compose stop && snapshot && compose start` (safe to snapshot live but wrapped for consistency).
+  - **onecli**: `compose stop && snapshot && compose start` (Postgres data is only consistent stopped).
+  - connectome and onecli skip when their volumes are missing, restart only what was running, and never fail on the restart, so `backup-all` always reaches the later stacks and the rotation.
   - **adguard**: stays up (safe to tar live, no SQLite).
 - `backup-rotate.sh` GFS-promotes daily → weekly (Sundays, kept 4) → monthly (1st of month, kept 3). `daily/` is capped at 7 per stack.
 - The launchd **LaunchDaemon** installed by `dotfiles stacks backup-install` runs `dotfiles stacks backup-all` nightly at 04:00. It's a daemon, not an agent (see "Boot autostart" — this host has no GUI session for an agent to load into). Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. The plist Label is `com.cxreiff.dotfiles.backup`.
-- `~/.volume-backups/` is gitignored runtime data; never commit a tarball.
+- `~/.volume-backups/` is gitignored runtime data; never commit a tarball. `~/.volume-backups/archive/` (outside GFS rotation, never pruned) holds one-off reference tarballs, e.g. `onecli-v1-final.tgz`.
 
 ## Boot autostart — why LaunchDaemons, not LaunchAgents
 
@@ -183,13 +184,14 @@ after a reboot":
 
 **Why keep FileVault (and not just disable it + auto-login, which is the
 more common headless recipe):** the `onecli` credential vault stores its
-`SECRET_ENCRYPTION_KEY` in `stacks/onecli/.env` (0600, gitignored; the whole file is
-escrowed in the password manager, since a restored vault also needs its `POSTGRES_PASSWORD`). The agents VM disk image contains decrypted runtime state
-(onecli gateway/postgres, connectome state with chronicle and `llm-calls` full prompts).
-FileVault is the only at-rest protection for these secrets and the plaintext backup
-tarballs. Key and ciphertext live together in the VM, so FileVault is essential (2026-06-02
-design decision). On v2 (2026-10-16), the key-location changed to `.env` (was stored in
-onecli before), making FileVault even more critical. Consequence: a reboot halts at the
+`SECRET_ENCRYPTION_KEY` in `stacks/onecli/.env` on the Mac (0600, gitignored; the whole file
+is escrowed in the password manager, since a restored vault also needs its `POSTGRES_PASSWORD`),
+while the vault's ciphertext lives in the `onecli_pgdata` volume inside the `agents` VM disk
+image. Both sit on this Mac's disk, as do the plaintext connectome state (chronicle, full-prompt
+`llm-calls` logs) and its backup tarballs, so FileVault is the only at-rest protection against
+a stolen or imaged disk. This is a deliberate choice (2026-06-02; with onecli v2, 2026-10-16,
+the key moved from the vault's app-data volume to `.env`, which changes where it lives on the
+disk, not the reliance on FileVault). Consequence: a reboot halts at the
 FileVault unlock gate before any daemon runs. For planned remote reboots, unlock the next
 boot over SSH first: `sudo fdesetup authrestart`. Only unplanned power loss needs a
 physical/console unlock; after the unlock, the startup daemon fires normally.
