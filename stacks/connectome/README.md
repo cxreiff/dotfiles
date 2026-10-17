@@ -340,7 +340,7 @@ Not built yet; the seams kept for it:
 **Backup:**
 
 - `dotfiles stacks connectome backup`: stop-based quiesce. Prunes `llm-calls.*.jsonl` older than
-  14 days and caps `headless.log` to 10 MiB. Writes `~/.volume-backups/daily/connectome-YYYY-MM-DD.tgz`
+  14 days and, once `headless.log` passes 50 MiB, truncates it to its last 10 MiB. Writes `~/.volume-backups/daily/connectome-YYYY-MM-DD.tgz`
   containing `connectome_state` and `connectome_workspace`. The `connectome_outbox` volume is not
   backed up (transient).
 - `dotfiles stacks connectome restore <tarball>`: restores `state` and `workspace` on empty volumes

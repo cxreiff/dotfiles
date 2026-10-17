@@ -153,7 +153,9 @@ README, Known exposures). The gateway's private-destination refusal covers proxi
   the api, web and postgres are only on the stack's own `onecli` network, which agent containers
   are not attached to (api and web are also published on `127.0.0.1`).
 - At rest, the store holds ciphertext; the key is in `stacks/onecli/.env` on the Mac (and the
-  password-manager escrow), not in the VM's volumes or the tarballs.
+  password-manager escrow), not in the volumes or the tarballs. Compose passes it as environment to
+  the api, web and gateway, so it is also in their container config on the agents VM disk
+  (`docker inspect`): FileVault covers that copy too.
 
 **What we accept:**
 
@@ -176,7 +178,7 @@ README, Known exposures). The gateway's private-destination refusal covers proxi
 Every other stack in this repo uses bind mounts under `~/.volumes/<stack>/`. onecli does not.
 
 What's at stake: `pgdata` holds the AES-256-GCM ciphertext of all credentials. Inside the VM, the vault key is loaded from
-`.env` into the gateway's memory at startup. Keeping the ciphertext inside the VM rather than on the Mac filesystem removes a
+`.env` into the api, web and gateway containers at startup. Keeping the ciphertext inside the VM rather than on the Mac filesystem removes a
 class of accidental disclosure paths:
 
 - backups of `~` that don't know to exclude `~/.volumes/`
@@ -196,7 +198,8 @@ The recipe gates on `colima-agents` being running:
 
 - VM down → recipe skips (so nightly `backup-all` doesn't fail).
 - Volumes missing → recipe skips (no empty tarball).
-- Otherwise → stops the containers, snapshots, and restarts only the containers that were running; a failed restart is a
+- Otherwise → stops the stack, snapshots, and starts it again only if it was running (an intentionally stopped stack stays
+  stopped); a failed restart is a
   warning, so `backup-all` (which backs up connectome, then onecli) carries on to the remaining stacks and the rotation.
 
 `dotfiles stacks doctor` reports backup age as `[OFF]` while `colima-agents` is stopped, and `[FAIL]` when the newest

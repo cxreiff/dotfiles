@@ -158,7 +158,7 @@ When adding a new package, edit `stow/justfile` to add the package to **every ag
   - **freshrss**, **homebridge**, **wallabag**: `down && up` quiesce (clean snapshots).
   - **connectome**: `compose stop && snapshot && compose start`. Also prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` to last 10 MiB when >50 MiB.
   - **onecli**: `compose stop && snapshot && compose start` (Postgres data is only consistent stopped).
-  - connectome and onecli skip when their volumes are missing, restart only what was running, and never fail on the restart, so `backup-all` always reaches the later stacks and the rotation.
+  - connectome and onecli skip when their volumes are missing, start the stack again only if it was running (an intentionally stopped stack stays stopped), and never fail on the restart, so `backup-all` always reaches the later stacks and the rotation.
   - **adguard**: stays up (safe to tar live, no SQLite).
 - `backup-rotate.sh` GFS-promotes daily → weekly (Sundays, kept 4) → monthly (1st of month, kept 3). `daily/` is capped at 7 per stack.
 - The launchd **LaunchDaemon** installed by `dotfiles stacks backup-install` runs `dotfiles stacks backup-all` nightly at 04:00. It's a daemon, not an agent (see "Boot autostart" — this host has no GUI session for an agent to load into). Logs land in `~/.volume-backups/.log/{stdout,stderr}.log`. The plist Label is `com.cxreiff.dotfiles.backup`.

@@ -78,11 +78,13 @@ dotfiles stacks connectome image-test
 dotfiles stacks connectome restore "$HOME/.volume-backups/daily/connectome-$(date +%Y-%m-%d).tgz"
 dotfiles stacks connectome smoke
 
-# 8. Restore the other stacks from backup
+# 8. The other stacks' data lives in ~/.volumes/<stack> bind mounts on the Mac,
+#    which step 3 does not touch: on the same device there is nothing to
+#    restore. On a new device (empty ~/.volumes), restore them; each restore
+#    refuses a non-empty destination.
 for stack in adguard freshrss homebridge wallabag; do
-    if [ -f ~/.volume-backups/daily/${stack}-$(date +%Y-%m-%d).tgz ]; then
-        dotfiles stacks $stack restore ~/.volume-backups/daily/${stack}-$(date +%Y-%m-%d).tgz --force
-    fi
+    t="$HOME/.volume-backups/daily/${stack}-$(date +%Y-%m-%d).tgz"
+    [ -f "$t" ] && dotfiles stacks "$stack" restore "$t"
 done
 
 # 9. Bring everything up
