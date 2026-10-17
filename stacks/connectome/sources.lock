@@ -4,11 +4,12 @@ source connectome-host sha=2ee8219e4784a715119f719a37d4c72ef2df7041 branch=local
 patch connectome-host local: recipe-configurable subagent maxDepth and maxExecutionMs
 patch connectome-host local: empty optional subagent inputs mean not given
 patch connectome-host local: document tools:[] behavior in normalizeSubagentInput
-source discord-mcpl sha=27068731ef79bbc5214d85a500b0eeb70d6c0856 branch=local upstream=https://github.com/anima-research/discord-mcpl base=f7e6b1fa8c5872e36a35c36c589edca979f21194
+source discord-mcpl sha=2a652b06b465fbfd09d0e4bc583a5fed8a7adf01 branch=local upstream=https://github.com/anima-research/discord-mcpl base=f7e6b1fa8c5872e36a35c36c589edca979f21194
 patch discord-mcpl local: confine attachments to DISCORD_ATTACHMENT_ROOT (fd-verified)
 patch discord-mcpl local: defend attachment guard against growing files; fix test cases
 patch discord-mcpl local: attachment guard: type-correct bounded read loop (handles short reads)
 patch discord-mcpl local: skip the unreadable-file test as root (mode 000 does not block root)
+patch discord-mcpl local: attachment-root tests: real .. traversal path; FIFO guarded by test timeout
 source voice-kit sha=46fcb66bdf57506b696cabe80b7416fc800da082 branch=main upstream=https://github.com/anima-research/voice-kit base=46fcb66bdf57506b696cabe80b7416fc800da082
 source heartbeat-mcpl sha=09a6718ac7533ddcb82e3272c16f6f52a1810996 branch=local upstream=https://github.com/anima-research/heartbeat-mcpl base=fef2d992231b15e79f0ca5b02f0eed354fb2277a
 patch heartbeat-mcpl local: refuse reminders below a 900 s floor
