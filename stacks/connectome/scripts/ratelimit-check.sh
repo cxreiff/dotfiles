@@ -90,9 +90,12 @@ post_request() {
     local out
     out=$(D run --rm --network onecli-agents \
         -e HOST_TOKEN -v "$ca_dir:/ca:ro" --entrypoint sh curlimages/curl -c \
-        "curl -sS --path-as-is --cacert /ca/ca.pem -x '$proxy' -w 'STATUS %{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://chatgpt.com/backend-api/codex/responses 2>&1; echo" 2>&1)
-    local code body
-    code=$(grep -oE 'STATUS [0-9]{3}' <<<"$out" | awk '{print $2}' || echo 'error')
+        "curl -sS --path-as-is --cacert /ca/ca.pem -x \"$proxy\" -w 'STATUS %{http_code} %{http_connect}' -X POST -H 'Content-Type: application/json' -d '{}' https://chatgpt.com/backend-api/codex/responses 2>&1; echo" 2>&1)
+    # Double quotes above: the container's sh must expand ${HOST_TOKEN}. A
+    # refusal at CONNECT time leaves http_code=000 and the status in http_connect.
+    local code connect body
+    read -r code connect < <(grep -oE 'STATUS [0-9]{3} [0-9]{3}' <<<"$out" | awk '{print $2, $3}')
+    [ "${code:-000}" = 000 ] && code="${connect:-error}"
     body="$out"
     echo "POST $n: $code"
     echo "$code" "$body"
