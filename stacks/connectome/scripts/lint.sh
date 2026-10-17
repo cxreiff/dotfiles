@@ -38,7 +38,11 @@ rj() { jq -e "$1" "$recipe" >/dev/null 2>&1; }
 
 c=$(cjson "$compose") || c=""
 oc=$(cjson "$oc_compose") || oc=""
+# Fail closed: an unreadable input must never let a check pass.
 [ -n "$c" ] || fail "lint: cannot parse ${compose}"
+[ -n "$oc" ] || fail "lint: cannot parse ${oc_compose}"
+[ -f "$recipe" ] && jq -e . "$recipe" >/dev/null 2>&1 || fail "lint: cannot parse ${recipe}"
+[ -f "$dockerfile" ] || fail "lint: cannot read ${dockerfile}"
 cj() { jq -e "$1" >/dev/null 2>&1 <<<"$c"; }
 env_keys=$(keys "$envf")
 svc_env_keys=$(jq -r '.services[]?.environment // {} | keys[]' <<<"$c" 2>/dev/null)
@@ -58,7 +62,7 @@ fi
 if rj '(.modules.fleet == null)
        or ((.modules.fleet | type) == "object"
            and ((.modules.fleet.children // null) | type) == "array"
-           and ((.modules.fleet.allowedRecipes // []) | length > 0 and all(startswith("/agent/recipes/"))))'; then
+           and ((.modules.fleet.allowedRecipes // []) | length > 0 and all(startswith("/agent/recipes/") and (contains("/../") | not) and (endswith("/..") | not))))'; then
     pass "invariant 2: modules.fleet absent or explicit object form"
 else
     fail "invariant 2: modules.fleet is true or lacks explicit children/allowedRecipes under /agent/recipes"
@@ -79,16 +83,39 @@ fi
 # 6 — no onecli user API key; private-destination allowance never covers 172.16/12; no host-gateway
 bad_keys=$(printf '%s\n%s\n' "$env_keys" "$svc_env_keys" | grep -iE 'API_KEY|USER_KEY|ONECLI_KEY|^OC_' || true)
 gw_private=$(jq -r '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINATIONS // ""' <<<"$oc" 2>/dev/null)
+# A private-destination allowance must never reach the agents' Docker/VM
+# networks (172.16.0.0/12). Each entry must be an IPv4 CIDR (or bare IPv4)
+# that does not overlap that range; anything else is a violation (fail closed).
+ip2int() { local IFS=.; set -- $1; echo $(( ($1<<24) + ($2<<16) + ($3<<8) + $4 )); }
+allowance_bad() {
+    local entry ip len lo hi
+    for entry in $(tr ', ' '\n\n' <<<"$1"); do
+        [ -n "$entry" ] || continue
+        if [[ "$entry" =~ ^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})(/([0-9]{1,2}))?$ ]]; then
+            ip="${BASH_REMATCH[1]}"; len="${BASH_REMATCH[3]:-32}"
+            [ "$len" -le 32 ] || { echo "$entry"; return 0; }
+            lo=$(( $(ip2int "$ip") & ( (0xFFFFFFFF << (32 - len)) & 0xFFFFFFFF ) ))
+            hi=$(( lo + (1 << (32 - len)) - 1 ))
+            # overlap with [172.16.0.0, 172.31.255.255]
+            if [ "$lo" -le 2887778303 ] && [ "$hi" -ge 2886729728 ]; then echo "$entry"; return 0; fi
+        else
+            echo "$entry"; return 0
+        fi
+    done
+    return 1
+}
+gw_private_bad=$(allowance_bad "$gw_private" || true)
 oc_env_has_private=$(keys "$oc_env" | grep -cx GATEWAY_ALLOW_PRIVATE_DESTINATIONS || true)
 host_gw=$(printf '%s\n%s\n' "$c" "$oc" | jq -s '[.[] | .services[]? | (.extra_hosts // empty) | tostring | select(test("host-gateway"))] | length' 2>/dev/null || echo 1)
-if [ -z "$bad_keys" ] && ! grep -qE '(^|,)172\.' <<<"$gw_private" && [ "$oc_env_has_private" = 0 ] && [ "$host_gw" = 0 ]; then
+if [ -n "$oc" ] && [ -z "$bad_keys" ] && [ -z "$gw_private_bad" ] && [ "$oc_env_has_private" = 0 ] && [ "$host_gw" = 0 ]; then
     pass "invariant 6: no onecli user API key; no 172.16/12 private allowance; no host-gateway"
 else
-    fail "invariant 6: ${bad_keys:+api-key-like keys [$(tr '\n' ' ' <<<"$bad_keys")] }${gw_private:+private allowance [$gw_private] }$([ "$oc_env_has_private" != 0 ] && echo 'GATEWAY_ALLOW_PRIVATE_DESTINATIONS set in onecli .env (value not inspected) ')$([ "$host_gw" != 0 ] && echo 'extra_hosts host-gateway')"
+    fail "invariant 6: ${bad_keys:+api-key-like keys [$(tr '\n' ' ' <<<"$bad_keys")] }${gw_private_bad:+private allowance covers 172.16/12 or is malformed [$gw_private_bad] }$([ "$oc_env_has_private" != 0 ] && echo 'GATEWAY_ALLOW_PRIVATE_DESTINATIONS set in onecli .env (value not inspected) ')$([ "$host_gw" != 0 ] && echo 'extra_hosts host-gateway')"
 fi
 
 # 7 — GATE_TELEMETRY unset everywhere
-if ! printf '%s\n%s\n' "$env_keys" "$svc_env_keys" | grep -qx GATE_TELEMETRY && ! grep -q 'GATE_TELEMETRY' "$dockerfile"; then
+if [ -f "$dockerfile" ] && ! printf '%s\n%s\n' "$env_keys" "$svc_env_keys" | grep -qx GATE_TELEMETRY \
+   && ! grep -vE '^[[:space:]]*#' "$dockerfile" | grep -q 'GATE_TELEMETRY'; then
     pass "invariant 7: GATE_TELEMETRY unset"
 else
     fail "invariant 7: GATE_TELEMETRY is set (.env key, compose env, or Dockerfile)"
@@ -107,7 +134,9 @@ else
 fi
 
 # 9 — OBSERVERS_FILE on the read-only recipes mount, not overridden
-if grep -q 'OBSERVERS_FILE=/agent/recipes/observers.json' "$dockerfile" \
+# The last OBSERVERS_FILE assignment in non-comment Dockerfile lines wins.
+obs_file=$( [ -f "$dockerfile" ] && grep -vE '^[[:space:]]*#' "$dockerfile" | grep -oE 'OBSERVERS_FILE=[^[:space:]\\]+' | tail -1 | cut -d= -f2- )
+if [ "$obs_file" = /agent/recipes/observers.json ] \
    && cj '(.services.connectome.environment // {} | has("OBSERVERS_FILE") | not)
           and ([.services.connectome.volumes[]? | select(.target=="/agent/recipes") | .read_only] == [true])'; then
     pass "invariant 9: OBSERVERS_FILE points at the read-only /agent/recipes mount"

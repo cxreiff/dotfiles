@@ -20,25 +20,21 @@ echo "Building baseline fixtures..." >&2
 # Recipe: copy the tracked file
 cp "${stack_dir}/recipes/agent.json" "$tmpdir/recipe.json"
 
-# Compose: convert YAML to JSON via docker compose config
-docker compose -f "${stack_dir}/compose.yaml" config --no-interpolate --format json > "$tmpdir/compose.json" 2>/dev/null
+# Compose: convert YAML to JSON via docker compose config (must parse).
+docker compose -f "${stack_dir}/compose.yaml" config --no-interpolate --format json > "$tmpdir/compose.json" \
+    || { echo "lint-test: cannot render ${stack_dir}/compose.yaml" >&2; exit 1; }
 
-# Env: extract key lines from .env.example (if .env exists, use it, else .env.example)
-if [ -f "${stack_dir}/.env" ]; then
-    grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${stack_dir}/.env" > "$tmpdir/env" || true
-else
-    grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${stack_dir}/.env.example" > "$tmpdir/env" || true
-fi
+# Env fixtures: KEY NAMES ONLY (empty values) from the tracked .env.example.
+# Never read the real .env here: fixtures are temp files, and the lint only
+# ever needs key names (AC12.5).
+grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' "${stack_dir}/.env.example" > "$tmpdir/env"
 
-# onecli compose: convert YAML to JSON
-docker compose -f "${repo_root}/stacks/onecli/compose.yaml" config --no-interpolate --format json > "$tmpdir/onecli-compose.json" 2>/dev/null
+# onecli compose: convert YAML to JSON (must parse).
+docker compose -f "${repo_root}/stacks/onecli/compose.yaml" config --no-interpolate --format json > "$tmpdir/onecli-compose.json" \
+    || { echo "lint-test: cannot render ${repo_root}/stacks/onecli/compose.yaml" >&2; exit 1; }
 
-# onecli env: extract key lines
-if [ -f "${repo_root}/stacks/onecli/.env" ]; then
-    grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${repo_root}/stacks/onecli/.env" > "$tmpdir/onecli-env" || true
-else
-    grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "${repo_root}/stacks/onecli/.env.example" > "$tmpdir/onecli-env" || true
-fi
+# onecli env fixture: key names only, from the tracked .env.example.
+grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' "${repo_root}/stacks/onecli/.env.example" > "$tmpdir/onecli-env"
 
 # Dockerfile: copy the tracked file
 cp "${stack_dir}/build/connectome.Dockerfile" "$tmpdir/Dockerfile"
@@ -231,6 +227,59 @@ else
     echo "$invsubagents_output" >&2
     failures=$((failures + 1))
 fi
+
+# --- Sub-condition fixtures -------------------------------------------------
+# expect_only LABEL FAIL-REGEX [lint overrides...]: the lint must FAIL, and
+# every FAIL line must match FAIL-REGEX (no collateral failures). Overrides
+# come after the baseline flags; lint.sh keeps the last value per flag.
+expect_only() {
+    local label="$1" pat="$2" out; shift 2
+    out=$("$lint_sh" --recipe "$tmpdir/recipe.json" --compose "$tmpdir/compose.json" \
+        --dockerfile "$tmpdir/Dockerfile" --env "$tmpdir/env" \
+        --onecli-compose "$tmpdir/onecli-compose.json" --onecli-env "$tmpdir/onecli-env" "$@" 2>&1 || true)
+    if grep -q '^\[FAIL\]' <<<"$out" && ! grep '^\[FAIL\]' <<<"$out" | grep -qvE "$pat"; then
+        echo "PASS lint-fixture ${label}" >&2
+    else
+        echo "FAIL lint-fixture ${label}: expected only FAILs matching /${pat}/" >&2
+        echo "$out" >&2
+        failures=$((failures + 1))
+    fi
+}
+# mk NAME SOURCE JQ: write a jq-modified copy of a baseline fixture.
+mk() { jq "$3" "$tmpdir/$2" > "$tmpdir/$1"; }
+
+mk r-mcpl recipe.json '.modules.mcplAdmin = true';                 expect_only inv1-mcplAdmin 'invariant 1:' --recipe "$tmpdir/r-mcpl"
+mk r-ext recipe.json '.extensions = [{"name":"x"}]';                expect_only inv1-extensions 'invariant 1:' --recipe "$tmpdir/r-ext"
+mk r-ws recipe.json '.modules.workspace = true';                    expect_only inv1-workspace 'invariant 1:' --recipe "$tmpdir/r-ws"
+mk r-satrue recipe.json '.modules.subagents = true';                expect_only inv1-subagents-true 'invariant 1:' --recipe "$tmpdir/r-satrue"
+mk r-sanod recipe.json 'del(.modules.subagents.maxDepth)';          expect_only inv1-subagents-no-maxDepth 'invariant 1:' --recipe "$tmpdir/r-sanod"
+mk r-fleetdot recipe.json '.modules.fleet = {"children":[],"allowedRecipes":["/agent/recipes/../state/x.json"]}'
+expect_only inv2-dotdot 'invariant 2:' --recipe "$tmpdir/r-fleetdot"
+mk c-outrw compose.json '(.services.connectome.volumes[] | select(.source=="outbox") | .read_only) = false'
+expect_only inv4-outbox-rw 'invariant 4:' --compose "$tmpdir/c-outrw"
+mk c-shared compose.json '.services.shell.volumes += [{"type":"volume","source":"state","target":"/x"}]'
+expect_only inv4-extra-shared 'invariant 4:' --compose "$tmpdir/c-shared"
+mk c-shbind compose.json '.services.shell.volumes += [{"type":"bind","source":"/tmp","target":"/x"}]'
+expect_only inv4-shell-bind 'invariant 4:' --compose "$tmpdir/c-shbind"
+mk oc-172 onecli-compose.json '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINATIONS = "10.0.0.0/8, 172.16.0.0/12"'
+expect_only inv6-allow-172-spaced 'invariant 6:' --onecli-compose "$tmpdir/oc-172"
+mk oc-all onecli-compose.json '.services.gateway.environment.GATEWAY_ALLOW_PRIVATE_DESTINATIONS = "0.0.0.0/0"'
+expect_only inv6-allow-superset 'invariant 6:' --onecli-compose "$tmpdir/oc-all"
+mk c-hostgw compose.json '.services.connectome.extra_hosts = ["host.docker.internal:host-gateway"]'
+expect_only inv6-host-gateway 'invariant 6:' --compose "$tmpdir/c-hostgw"
+{ cat "$tmpdir/onecli-env"; echo 'GATEWAY_ALLOW_PRIVATE_DESTINATIONS='; } > "$tmpdir/oe-priv"
+expect_only inv6-onecli-env-key 'invariant 6:' --onecli-env "$tmpdir/oe-priv"
+echo 'not: [valid' > "$tmpdir/oc-bad.yaml"
+expect_only inv6-onecli-unparseable 'cannot parse|invariant 6:' --onecli-compose "$tmpdir/oc-bad.yaml"
+{ cat "$tmpdir/Dockerfile"; echo 'ENV GATE_TELEMETRY=1'; } > "$tmpdir/Df-tel"
+expect_only inv7-dockerfile 'invariant 7:' --dockerfile "$tmpdir/Df-tel"
+expect_only inv7-9-dockerfile-missing 'cannot read|invariant 7:|invariant 9:' --dockerfile "$tmpdir/does-not-exist"
+mk r-tools recipe.json '.mcpServers.discord.disabledTools -= ["delete_channel"]'
+expect_only inv8-tool-enabled 'invariant 8:' --recipe "$tmpdir/r-tools"
+mk c-recrw compose.json '(.services.connectome.volumes[] | select(.target=="/agent/recipes") | .read_only) = false'
+expect_only inv9-recipes-rw 'invariant 4:|invariant 9:' --compose "$tmpdir/c-recrw"
+{ cat "$tmpdir/Dockerfile"; echo 'ENV OBSERVERS_FILE=/agent/state/observers.json'; } > "$tmpdir/Df-obs"
+expect_only inv9-later-override 'invariant 9:' --dockerfile "$tmpdir/Df-obs"
 
 if [ "$failures" -gt 0 ]; then
     echo "FAIL: $failures fixture(s) failed" >&2
