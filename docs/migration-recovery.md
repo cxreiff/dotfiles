@@ -24,12 +24,16 @@ non-volumes container state, which we don't care about.
   freshrss, homebridge, onecli, wallabag (run `dotfiles stacks backup-all` before
   destroying anything). The launchd timer should already be giving you nightly snapshots.
 - The user's `stacks/<stack>/.env` files captured separately. They're gitignored
-  so they're not in the repo; copy them off before wiping a device. **For onecli v2:**
-  the `SECRET_ENCRYPTION_KEY` value from `.env` must also be escrowed in the password manager
-  (set by `init-env`; needed to unlock the vault on fresh-device restore).
-- Local clones of connectome sources at pinned SHAs (see `stacks/connectome/sources.lock`)
-  with `local` branches holding patches. On a fresh device, clones must be re-created and
-  patches re-applied by hand before `connectome build`.
+  so they're not in the repo; copy them off before wiping a device. **For onecli v2,
+  escrow the whole `stacks/onecli/.env` in the password manager:** a restored vault
+  needs the same `SECRET_ENCRYPTION_KEY` (to decrypt its secrets) and the same
+  `POSTGRES_PASSWORD` (Postgres keeps the password it was initialised with).
+- A copy of the `~/Developer/connectome/` clones if possible: their `local` branches
+  hold the patch commits, which are not pushed anywhere. Without it, the patches are
+  re-applied by hand from the subjects in `stacks/connectome/sources.lock` before
+  `connectome build`.
+- The clean-slate procedure deletes the agents VM, and with it the locally built
+  connectome images, so `connectome build` always runs again after onecli is back.
 
 ## Clean-slate procedure
 
@@ -54,33 +58,44 @@ dotfiles stacks vm-shared-up
 dotfiles stacks vm-bridged-up
 dotfiles stacks vm-agents-up
 
-# 6. For onecli: set up .env with the escrowed SECRET_ENCRYPTION_KEY and restore from backup
-#    (otherwise skip this step if you have no backup; you'll do fresh setup below).
-cp stacks/onecli/.env.example stacks/onecli/.env
-chmod 600 stacks/onecli/.env
-$EDITOR stacks/onecli/.env  # paste the escrowed SECRET_ENCRYPTION_KEY and other secrets
-dotfiles stacks onecli restore ~/.volume-backups/daily/onecli-$(date +%Y-%m-%d).tgz
+# 6. onecli: recreate stacks/onecli/.env (0600) from the ESCROWED copy (the
+#    whole file: SECRET_ENCRYPTION_KEY decrypts the secrets, and pgdata only
+#    accepts the POSTGRES_PASSWORD it was initialised with). Never use init-env
+#    here: it would generate new values that cannot open the backup. Then
+#    restore. Do NOT run `onecli up` first: restore refuses non-empty volumes
+#    and brings the stack up itself.
+install -m 600 /dev/null stacks/onecli/.env
+$EDITOR stacks/onecli/.env  # paste the escrowed onecli .env
+dotfiles stacks onecli restore "$HOME/.volume-backups/daily/onecli-$(date +%Y-%m-%d).tgz"
 
-# 7. For connectome: clone sources, apply patches, and build. Then restore from backup if you have one.
-#    (Even if restoring from backup, the clones + build are required; sources.lock gives the exact SHAs.)
-mkdir -p ~/Developer/connectome
-cd ~/Developer/connectome
+# 7. connectome: sources, patches, .env, build, then restore.
+#    sources.lock (tracked) records, per clone: sha= (the built commit, i.e. the
+#    tip of the `local` branch, which exists only in the old clone) and base=
+#    (the upstream commit it branched from), plus one `patch` line per local
+#    commit. Check out base=, then re-apply the patches on a `local` branch:
+#    cherry-pick from a copy of the old clones if you have one, else
+#    re-implement each from its subject (see stacks/connectome/README.md).
+mkdir -p ~/Developer/connectome && cd ~/Developer/connectome
 for repo in connectome-host discord-mcpl heartbeat-mcpl voice-kit; do
-    git clone https://github.com/anima-research/${repo}.git
-    cd ${repo}
-    # Get the SHA for this repo from sources.lock
-    sha=$(grep "^source ${repo} " ~/Developer/dotfiles/stacks/connectome/sources.lock | cut -d' ' -f3 | cut -d= -f2)
-    git checkout $sha
-    git checkout -b local
-    cd ..
+    git clone "https://github.com/anima-research/${repo}.git"
+    base=$(awk -v r="$repo" '$1=="source" && $2==r {for (i=3;i<=NF;i++) if ($i ~ /^base=/) {sub("base=","",$i); print $i}}' \
+        ~/Developer/dotfiles/stacks/connectome/sources.lock)
+    git -C "$repo" checkout -b local "$base"
 done
-# Apply patches by hand. sources.lock lists the patch subjects; cherry-pick or re-implement.
-# Then build and optionally restore from backup:
+grep '^patch ' ~/Developer/dotfiles/stacks/connectome/sources.lock   # re-apply these, commit each on `local`
 cd ~/Developer/dotfiles
+# connectome .env: restore it from your copy, or re-create with init-env (it
+# prompts for the model, Discord token, guild:channel and operator id, and syncs
+# the onecli agent tokens from the restored vault).
+dotfiles stacks connectome init-env
+# Build after onecli is up: the images bake in the restored vault's gateway CA.
 dotfiles stacks connectome build
-if [ -f ~/.volume-backups/daily/connectome-$(date +%Y-%m-%d).tgz ]; then
-    dotfiles stacks connectome restore ~/.volume-backups/daily/connectome-$(date +%Y-%m-%d).tgz
-fi
+dotfiles stacks connectome image-test
+# Restore onto the (still empty) volumes; restore brings the stack up. Do not
+# run `connectome up` or `provision-codex` before it (the codex stub is in the
+# backup).
+dotfiles stacks connectome restore "$HOME/.volume-backups/daily/connectome-$(date +%Y-%m-%d).tgz"
+dotfiles stacks connectome smoke
 
 # 8. Restore other stacks from backup (optional; skip if you have no backups)
 for stack in adguard freshrss homebridge wallabag; do
@@ -116,66 +131,61 @@ subsection below for **onecli v2 and connectome on a fresh device**.
 
 ### onecli v2 and connectome on a fresh device
 
-All of the below is required whether restoring from backup or starting from scratch. The only difference:
-if you have backups, skip the `init-env` and `bootstrap` steps for onecli and connectome, and restore
-after the builds instead.
+Both paths need the clones, the hand-applied patches and `connectome build`
+(the images bake in the vault's gateway CA, so build after onecli is up).
+They differ in where the vault and the agent state come from.
 
-1. **Set up onecli v2:**
+1. **Clone and patch the connectome sources** at the commits in the tracked
+   `stacks/connectome/sources.lock`: check out each `base=` (the upstream
+   commit), create a `local` branch, and re-apply the commits listed in the
+   `patch` lines (cherry-pick from a copy of the old clones, or re-implement
+   from the subjects). `voice-kit` has no patches. The loop in the clean-slate
+   procedure above does the clone and checkout. `build` refuses dirty clones
+   and rewrites `sources.lock` with the new SHAs.
+
+2. **onecli v2**
+
+   With a backup: recreate `stacks/onecli/.env` from the escrowed copy, then
+   `dotfiles stacks onecli restore "$HOME/.volume-backups/daily/onecli-<date>.tgz"`
+   (no `up` first), then `dotfiles stacks onecli bootstrap` to sign the host
+   CLI in to the restored account.
+
+   From scratch:
 
    ```sh
-   dotfiles stacks onecli init-env               # generates three secrets
-   # Escrow SECRET_ENCRYPTION_KEY in password manager for future recovery
-   dotfiles stacks onecli up                     # creates volumes, migrations run
-   dotfiles stacks onecli bootstrap              # register account + operator identity
-   dotfiles stacks onecli import-openai          # dedicated ChatGPT device login
-   dotfiles stacks onecli policy                 # create agent identities + allow rules
+   dotfiles stacks onecli init-env      # generates the four secrets; escrow the whole .env
+   dotfiles stacks onecli up
+   dotfiles stacks onecli bootstrap     # register the operator account, point the host CLI at it
+   dotfiles stacks onecli import-openai # dedicated ChatGPT device login (also reconciles grants)
+   dotfiles stacks onecli policy        # agents, org rules (rule 1 limit: see connectome README)
    ```
 
-2. **Clone and patch connectome sources** (needed before `connectome build`):
+3. **connectome**
 
    ```sh
-   mkdir -p ~/Developer/connectome
-   cd ~/Developer/connectome
-
-   # Clone the four sources at the exact SHAs in stacks/connectome/sources.lock
-   for repo in connectome-host discord-mcpl heartbeat-mcpl voice-kit; do
-       git clone https://github.com/anima-research/${repo}.git
-       cd ${repo}
-       # Find the SHA from sources.lock
-       sha=$(grep "^source ${repo} " ~/Developer/dotfiles/stacks/connectome/sources.lock | cut -d' ' -f3 | cut -d= -f2)
-       git checkout $sha
-       git checkout -b local
-       # Apply patches by hand. sources.lock lists subjects (not diffs):
-       # Subjects are like "heartbeat-mcpl local: refuse reminders below a 900 s floor"
-       # Cherry-pick from a backup clone or re-implement.
-       cd ..
-   done
+   dotfiles stacks connectome init-env  # prompts; syncs the aoc_ tokens from onecli
+   dotfiles stacks connectome build
+   dotfiles stacks connectome image-test
    ```
 
-3. **Build connectome images** (requires onecli to be running for CA copy):
+   With a backup: `dotfiles stacks connectome restore "$HOME/.volume-backups/daily/connectome-<date>.tgz"`
+   onto the empty volumes (restore brings the stack up; skip `provision-codex`
+   and `up`).
+
+   From scratch:
 
    ```sh
-   dotfiles stacks connectome build              # records sources.lock SHAs and patch subjects
-   dotfiles stacks connectome image-test         # 13 build-time checks
-   ```
-
-4. **Provision and bring up connectome:**
-
-   ```sh
-   dotfiles stacks connectome init-env           # prompts for model, Discord token, guild/channel, operator ID
-   dotfiles stacks connectome provision-codex    # write Codex stub from onecli
+   dotfiles stacks connectome provision-codex   # onecli Codex stub + config into the state volume
    dotfiles stacks connectome up
-   dotfiles stacks connectome smoke              # 15 runtime checks
+   dotfiles stacks connectome serve
    ```
 
-5. **Or restore connectome from a backup** (if you have a tarball):
+   Either way, finish with `dotfiles stacks connectome smoke`.
 
-   ```sh
-   # Skip init-env + provision-codex if restoring; just restore then up
-   dotfiles stacks connectome restore ~/.volume-backups/daily/connectome-<date>.tgz
-   ```
+Tarball paths passed to `restore` must be absolute (relative paths resolve
+against `stacks/<stack>/`).
 
-After these four steps, proceed with the other stacks:
+Then proceed with the other stacks:
 - `adguard/README.md` (DNS wizard, must bind to `col0`)
 - `homebridge/README.md` (Pair via Home app)
 - `wallabag/README.md` (`dotfiles stacks wallabag bootstrap`)

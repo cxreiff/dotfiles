@@ -244,37 +244,26 @@ Recover with another `provision-codex` run.
 
 ## Security invariants
 
-Connectome has 9 security invariants, checked at build time (13 image tests + 4 integration tests in the build) and runtime (7 lint checks + 15 smoke tests). The invariants enforce:
+Ten invariants from the design. `dotfiles stacks doctor` runs the static ones
+(`lint.sh`, which reads tracked files and `.env` key names only); the others
+are checked by the image build, `image-test` or `smoke`.
 
-1. **Code-execution features disabled** (`codeExecution`, `extensions`, `mcplAdmin` off; `modules.workspace` false).
-   Protects against recipe injection.
-   Checks: `lint.sh` invariant 1 (recipe config), `image-test.sh` checks 1-9 (full image suite).
+| # | Invariant | Checked by |
+|---|---|---|
+| 1 | `codeExecution`, `extensions`, `modules.mcplAdmin` off; `modules.workspace` false; `modules.subagents.maxDepth` is 1 (subagents cannot spawn subagents) | `lint.sh` invariant 1 |
+| 2 | `modules.fleet` absent or an explicit object (children + `allowedRecipes` under `/agent/recipes/`, no `..`); never `true` | `lint.sh` invariant 2 |
+| 3 | `/agent/cwd` is not writable by the connectome uid; it holds only the `logs` and `mcpl-servers.json` symlinks | `image-test` (AC5.2 row), `smoke` AC5.2 |
+| 4 | The only volume mounted in both containers is `outbox`, read-only in `connectome`; connectome binds are read-only; the shell has no binds | `lint.sh` invariant 4, `smoke` AC9.4 |
+| 5 | No secret in any process's argv (`/proc/*/cmdline` is world-readable) | `smoke` AC5.8 (scans both containers once the MCP children run) |
+| 6 | No onecli user API key in either container; `GATEWAY_ALLOW_PRIVATE_DESTINATIONS` never overlaps 172.16.0.0/12 (malformed entries fail); no `extra_hosts: host-gateway` | `lint.sh` invariant 6, `smoke` AC5.7 |
+| 7 | `GATE_TELEMETRY` unset (`.env` keys, compose env, Dockerfile) | `lint.sh` invariant 7 |
+| 8 | Discord DM/guild allowlists fixed in the recipe; no `DISCORD_FILTERS_FILE`; `filters_update`, `create_text_channel`, `delete_channel` disabled | `lint.sh` invariant 8, `smoke` AC7.3 |
+| 9 | `OBSERVERS_FILE` (last assignment in the Dockerfile) is `/agent/recipes/observers.json` on the read-only recipes mount, not overridden | `lint.sh` invariant 9, `smoke` AC8.3 |
+| 10 | The discord-mcpl attachment patch is applied: attachments outside `DISCORD_ATTACHMENT_ROOT`, `/proc/*`, symlinks out of the root and FIFOs are refused | In-build `attachment-root` tests (Dockerfile, `--test-timeout`), `image-test` AC7.5 row |
 
-2. **Fleet never bare `true`** (explicit children with allowed recipes under `/agent/recipes`).
-   Prevents arbitrary recipe launch.
-   Checks: `lint.sh` invariant 2 (recipe config).
-
-4. **Outbox-only shared workspace** (connectome mounts read-only; shell has no binds).
-   Limits connectome's file-write surface.
-   Checks: `lint.sh` invariant 4 (compose volumes), `smoke.sh` AC9.4 (runtime volume mounts).
-
-6. **No onecli user API key; no private-destination bypass; no host-gateway bind**.
-   Prevents credential exposure and network escape.
-   Checks: `lint.sh` invariant 6 (.env key names, compose config, onecli settings).
-
-7. **`GATE_TELEMETRY` unset everywhere.** Prevents accidental telemetry.
-   Checks: `lint.sh` invariant 7 (.env keys, compose env, Dockerfile).
-
-8. **Discord filters fixed in recipe; no agent filter rewrites; dangerous tools disabled**.
-   Prevents DM/guild bypass.
-   Checks: `lint.sh` invariant 8 (recipe config, .env keys), `smoke.sh` AC7.3 (runtime env).
-
-9. **`OBSERVERS_FILE` on the read-only `/agent/recipes` mount, not overridden**.
-   Prevents observer privilege escalation via connectome.
-   Checks: `lint.sh` invariant 9 (Dockerfile env, compose volume mount), `smoke.sh` AC8.3 (runtime read-only).
-
-Run `dotfiles stacks connectome image-test` (13 build-time checks) and `dotfiles stacks connectome smoke`
-(15 runtime checks). Both `lint` and `image-test` are included in `doctor`. See `scripts/{lint,image-test,smoke}.sh` for implementation.
+`dotfiles stacks connectome lint-test` proves each lint fails on a fixture
+that violates exactly its invariant (29 fixtures, including the
+sub-conditions above).
 
 ## Known exposures (accepted)
 

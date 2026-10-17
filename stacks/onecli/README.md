@@ -79,14 +79,26 @@ onecli v2 requires account login:
 
 ## Key location and FileVault
 
-The `SECRET_ENCRYPTION_KEY` lives in `stacks/onecli/.env` (0600, gitignored, with
-an escrow copy in the password manager). Tarballs hold ciphertext + gateway CA only,
-never the key itself. FileVault protects the live `.env` on disk and the agents VM
-disk image at rest. On fresh-device recovery:
+`SECRET_ENCRYPTION_KEY` lives in `stacks/onecli/.env` (0600, gitignored).
+Tarballs hold ciphertext and the gateway CA only, never the key. FileVault
+protects the live `.env` and the agents VM disk image at rest.
 
-1. Create `.env` with the escrowed `SECRET_ENCRYPTION_KEY` (and other secrets from the password manager).
-2. `dotfiles stacks onecli up` — the `compose up` reads the `:?` guards and starts the vault.
-3. Restore `onecli` tarball to the running volumes (or skip if starting fresh).
+**Escrow the whole `stacks/onecli/.env` in the password manager**, not only
+the key: Postgres keeps the password it was initialised with inside `pgdata`,
+so restoring a tarball needs the same `POSTGRES_PASSWORD`, and
+`SECRET_ENCRYPTION_KEY` must match to decrypt the secrets. (`BETTER_AUTH_SECRET`
+and `GATEWAY_INTERNAL_SECRET` can be regenerated; doing so only ends web
+sessions.) Never run `init-env` to "recreate" a `.env` for a backup: it
+generates new values that cannot open the restored vault.
+
+Recovery from a tarball (fresh device or empty volumes):
+
+1. Recreate `stacks/onecli/.env` (mode 0600) from the escrowed copy.
+2. `dotfiles stacks onecli restore /absolute/path/onecli-<date>.tgz`. It
+   refuses non-empty volumes, so do **not** run `onecli up` first; restore
+   creates the volumes, extracts, then runs `compose up -d --wait` itself.
+3. `dotfiles stacks onecli bootstrap` only if the host CLI has no working key
+   (it signs in to the existing account; it does not create a new vault).
 
 ## Identities and policy
 
