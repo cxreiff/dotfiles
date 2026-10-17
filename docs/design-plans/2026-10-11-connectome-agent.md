@@ -4,7 +4,13 @@
 review rounds 1–3 and the spike). Revision 6 (2026-10-12) adds acceptance
 criteria, "Done when" lines, phase markers and the usage-cap calibration step,
 and moves [onecli identities](#onecli-identities) into Phase 1; no design
-decision changed. [Decisions](#decisions-made-by-the-user)
+decision changed. Revision 7 (2026-10-16, during implementation) records an
+operator-requested addition: `modules.subagents` for clara (ephemeral
+in-process subagents; default model `gpt-6-luna`, `maxDepth: 1` so subagents
+cannot spawn subagents, 30 min sync limit), backed by two local
+connectome-host patches; invariant 1 gains the `maxDepth` clause. Subagents
+share clara's onecli identity and quota, async ones have no time limit, and
+`tools: []` means all tools (see `stacks/connectome/README.md`). [Decisions](#decisions-made-by-the-user)
 are the user's; [Proposed design](#proposed-design) is the approved plan.
 
 ## Summary
@@ -533,7 +539,8 @@ patches:
 **Security invariants** (lint = static check of tracked recipes/compose and
 `.env` **key names**, never values; run by `doctor`):
 1. `codeExecution`, `modules.mcplAdmin`, `extensions` are off;
-   `modules.workspace` is `false`. *(lint)*
+   `modules.workspace` is `false`; `modules.subagents`, if present, has
+   `maxDepth: 1` (revision 7). *(lint)*
 2. `modules.fleet` is never `true`; only the object form with explicit
    `children` and `allowedRecipes` under `/agent/recipes`. *(lint)*
 3. CWD (`/agent/cwd`) is not writable by the connectome uid; its only

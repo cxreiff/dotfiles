@@ -138,6 +138,9 @@ Notes:
 
 ## Subagents
 
+*Operator-requested addition beyond the approved design (2026-10-16; design
+revision 7).*
+
 `modules.subagents` gives clara `subagent--spawn` (fresh context, e.g. an
 independent reviewer) and `subagent--fork` (continues from her context).
 Recipe settings: `defaultModel: gpt-6-luna`, `maxDepth: 1` (subagents cannot
@@ -150,6 +153,14 @@ access to ALL tools (the default); to restrict to specific tools, pass a
 non-empty array of tool names.
 
 ## Known issues
+
+- **AC7.5 not exercised live (2026-10-16).** Asked to attach
+  `/proc/self/environ`, a symlink out of the outbox or `/etc/hostname`, the
+  model refused to make the call at all, so the attachment guard never ran
+  live. It is verified by the in-build `attachment-root` tests and the
+  `image-test` AC7.5 row against the shipped build. To check it live, call the
+  discord `send_message` tool directly with a `files` path outside
+  `/agent/outbox` and expect "must be inside".
 
 - **AC7.2 not verified live (accepted deferral, 2026-10-16).** Nobody has yet
   checked that a DM from another user, or a message in a non-whitelisted

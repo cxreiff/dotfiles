@@ -99,6 +99,8 @@ backup:
         -v "{{backups_dir}}":/dst \
         alpine \
         sh -c "cd /src && tar czf /dst/$(basename "$dst") pgdata app-data"
+    # Plaintext agent state / the gateway CA key: owner-only.
+    chmod 600 "$dst"
     echo "$dst"
 
 # Restore vault from tarball; refuses to overwrite a populated volume.

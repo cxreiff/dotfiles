@@ -8,10 +8,10 @@ mod wallabag
 default:
     @just --list
 
-# Bring every stack up. Continues past an individual stack's failure (e.g. an
-# expired Tailscale PAT failing `adguard up`) so onecli/connectome still start
-# at boot; prints a summary and exits non-zero if any stack failed.
-# onecli precedes connectome (connectome joins onecli's network).
+# Continues past an individual stack's failure (e.g. an expired Tailscale PAT
+# failing `adguard up`) so onecli/connectome still start at boot. onecli
+# precedes connectome (connectome joins onecli's network).
+# Bring every stack up; prints a summary and exits non-zero if any failed.
 up-all:
     #!/usr/bin/env bash
     set -uo pipefail
@@ -29,8 +29,9 @@ up-all:
     fi
     echo "up-all: all stacks up"
 
-# DNS-aware shutdown: apps before adguard; connectome before onecli (onecli
-# owns the onecli-agents network and refuses to go down under connectome).
+# Apps before adguard; connectome before onecli (onecli owns the
+# onecli-agents network and refuses to go down under connectome).
+# DNS-aware shutdown of every stack.
 down-all:
     just connectome down
     just onecli down
@@ -58,6 +59,7 @@ pull-all:
 # connectome before onecli: connectome's tarball is taken while the gateway
 # is up; connectome then briefly loses the gateway during onecli's stop/start
 # (harmless at 04:00).
+# Back up every stack, then GFS-rotate.
 backup-all:
     just adguard backup
     just freshrss backup

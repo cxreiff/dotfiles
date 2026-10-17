@@ -60,9 +60,10 @@ logs:
 serve:
     {{tailscale}} serve --bg --https={{serve_port}} http://localhost:{{internal_port}}
 
-# Quiesce with stop/start (never down/up), prune llm-calls.*.jsonl older than
-# 14 days, cap headless.log (keep the last 10 MiB once it passes 50 MiB),
-# then tar the state + workspace volumes. No-op when the agents VM is down.
+# Quiesces with stop/start (never down/up), prunes llm-calls.*.jsonl older
+# than 14 days, keeps the last 10 MiB of headless.log once it passes 50 MiB.
+# No-op when the agents VM is down or the volumes are missing.
+# Tar the state + workspace volumes to ~/.volume-backups/daily (0600).
 backup:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -102,6 +103,8 @@ backup:
         -v connectome_workspace:/src/workspace:ro \
         -v "{{backups_dir}}":/dst \
         alpine sh -c "cd /src && tar czf /dst/$(basename "$dst") state workspace"
+    # Plaintext agent state / the gateway CA key: owner-only.
+    chmod 600 "$dst"
     echo "$dst"
 
 # Restore state + workspace from a tarball; refuses non-empty volumes.

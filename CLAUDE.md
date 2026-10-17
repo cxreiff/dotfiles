@@ -43,7 +43,7 @@ What's in the repo vs what's environment-specific:
 | `stow/colima/.colima/<profile>/colima.yaml` | Live VM disks under `~/.colima/_lima/`, qemu MAC, DHCP-leased IP |
 | `stacks/connectome/sources.lock` | `~/Developer/connectome/{connectome-host,discord-mcpl,heartbeat-mcpl,voice-kit}/` clones at pinned SHAs (base commit in `base=` field), with `local` branches holding patches (subjects listed) |
 | `stacks/onecli/compose.yaml` | `onecli_pgdata` / `onecli_app-data` Docker named volumes inside the `agents` VM (encrypted ciphertext store + gateway CA; encryption key in `stacks/onecli/.env` + password manager escrow) |
-| `stacks/connectome/compose.yaml` | `connectome_state` / `connectome_workspace` / `connectome_outbox` Docker named volumes inside the `agents` VM (plaintext state, recipes, and transient output) |
+| `stacks/connectome/compose.yaml` | `connectome_state` / `connectome_workspace` / `connectome_outbox` Docker named volumes inside the `agents` VM (plaintext agent state, the shell workspace, and the transient outbox; recipes are a read-only bind of `stacks/connectome/recipes`) |
 | `stacks/scripts/{backup,restore,backup-rotate}.sh` | `~/.volume-backups/{daily,weekly,monthly}/` backup tarballs (gitignored runtime data) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.backup.plist` is per-machine | Installed by `dotfiles stacks backup-install` (sudo) |
 | `/Library/LaunchDaemons/com.cxreiff.dotfiles.startup.plist` is per-machine | Installed by `dotfiles stacks startup-install` (sudo) |

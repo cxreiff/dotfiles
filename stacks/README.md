@@ -100,7 +100,7 @@ system`; run them as your normal user over SSH. See
 
 `doctor` runs read-only diagnostics across 8 sections: Infrastructure (colima/docker/socket_vmnet/just),
 Stack volumes, Backups, DNS forwarder (relay health), DNS failover (tailnet Global NS), IP coupling,
-Agents (onecli + connectome named volumes), and Stack identity & env. Run it after any non-trivial change.
+Agents (onecli health, CA fingerprints, network attachment, shell grant, log sizes, invariant lints), and Stack identity & env (incl. `.env` mode 0600). Run it after any non-trivial change.
 
 ## Recipes
 
@@ -136,8 +136,10 @@ respective READMEs for the full per-stack recipe set.
 
 ## Backups
 
-Per-stack `backup` and `restore` recipes tar named volumes into
-`~/.volume-backups/{daily,weekly,monthly}/`. The aggregate `backup-all`
+Per-stack `backup` and `restore` recipes tar each stack's data (the
+`~/.volumes/<stack>` bind mount, or the named volumes for onecli and
+connectome) into `~/.volume-backups/{daily,weekly,monthly}/` (tarballs 0600
+for onecli and connectome). The aggregate `backup-all`
 recipe backs up adguard, freshrss, homebridge, connectome, onecli, wallabag (connectome before
 onecli), then runs `backup-rotate.sh`:
 
