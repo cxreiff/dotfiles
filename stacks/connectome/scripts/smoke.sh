@@ -13,6 +13,42 @@ source "$repo_root/stacks/scripts/lib/check.sh"
 D() { docker --context colima-agents "$@"; }
 X() { D exec "$@"; }
 
+# One EXIT handler for the whole run (bash keeps a single EXIT trap): checks
+# register restore steps here; they run in reverse order on any exit,
+# including set -e aborts and Ctrl-C. Restore steps must be idempotent.
+cleanups=()
+add_cleanup() { cleanups+=("$1"); }
+run_cleanups() {
+    local i
+    for (( i=${#cleanups[@]}-1; i>=0; i-- )); do "${cleanups[$i]}" || true; done
+}
+trap run_cleanups EXIT
+
+# Exec-based checks must not pass vacuously against a stopped container.
+running() {
+    local c
+    for c in "$@"; do
+        [ "$(D inspect -f '{{.State.Running}}' "$c" 2>/dev/null)" = true ] || return 1
+    done
+}
+heartbeat_cfg() {  # heartbeat_cfg HOURS: set the persisted interval via the heartbeat server
+    X connectome env HEARTBEAT_CONFIG_FILE=/agent/state/heartbeat/config.json \
+        HEARTBEAT_REMINDERS_FILE=/agent/state/heartbeat/reminders.json \
+        /opt/node/bin/node /opt/connectome-tests/mcp-call.mjs heartbeat_configure \
+        "{\"intervalHours\":$1}" -- /opt/node/bin/node /opt/mcpl/heartbeat-mcpl/dist/src/index.js --stdio >/dev/null 2>&1
+}
+restore_heartbeat_config() { running connectome && heartbeat_cfg 4; }
+restore_stack() {  # gateway first (connectome's entrypoint waits for it), then connectome
+    D start onecli-gateway >/dev/null 2>&1 || true
+    local _
+    for _ in $(seq 1 30); do
+        [ "$(D inspect -f '{{.State.Health.Status}}' onecli-gateway 2>/dev/null)" = healthy ] && break
+        sleep 2
+    done
+    D start connectome >/dev/null 2>&1 || true
+    for _ in $(seq 1 30); do running connectome && break; sleep 1; done
+}
+
 check_ac5_1() {
     local c_uid s_uid
     c_uid=$(X connectome sh -c 'id -u' | tr -d ' ')
@@ -72,46 +108,30 @@ check_ac5_3() {
 }
 
 check_ac5_5() {
-    # Restore 4h config unconditionally (even if test fails)
-    restore_heartbeat_config() {
-        X connectome env HEARTBEAT_CONFIG_FILE=/agent/state/heartbeat/config.json \
-            HEARTBEAT_REMINDERS_FILE=/agent/state/heartbeat/reminders.json \
-            /opt/node/bin/node /opt/connectome-tests/mcp-call.mjs heartbeat_configure \
-            '{"intervalHours":4}' -- /opt/node/bin/node /opt/mcpl/heartbeat-mcpl/dist/src/index.js --stdio >/dev/null 2>&1 || true
-    }
-    trap restore_heartbeat_config EXIT
-
-    local before_sha
-    before_sha=$(X connectome sh -c 'sha256sum /agent/state/heartbeat/config.json | cut -d" " -f1' | tr -d ' ')
-
-    # Call heartbeat_configure with intervalHours=5
-    X connectome env HEARTBEAT_CONFIG_FILE=/agent/state/heartbeat/config.json \
-        HEARTBEAT_REMINDERS_FILE=/agent/state/heartbeat/reminders.json \
-        /opt/node/bin/node /opt/connectome-tests/mcp-call.mjs heartbeat_configure \
-        '{"intervalHours":5}' -- /opt/node/bin/node /opt/mcpl/heartbeat-mcpl/dist/src/index.js --stdio >/dev/null 2>&1 || true
-
-    local after_sha file_content
-    after_sha=$(X connectome sh -c 'sha256sum /agent/state/heartbeat/config.json | cut -d" " -f1' | tr -d ' ')
-    file_content=$(X connectome cat /agent/state/heartbeat/config.json)
-
-    if [ "$before_sha" = "$after_sha" ]; then
-        fail "AC5.5 (hash unchanged)"
+    add_cleanup restore_heartbeat_config
+    if ! running connectome; then fail "AC5.5 (connectome not running)"; return; fi
+    local before_sha after_sha _
+    before_sha=$(X connectome sha256sum /agent/state/heartbeat/config.json | cut -d" " -f1)
+    heartbeat_cfg 5 || true
+    after_sha=$(X connectome sha256sum /agent/state/heartbeat/config.json | cut -d" " -f1)
+    if [ "$before_sha" = "$after_sha" ] || ! X connectome grep -q '"intervalSeconds": 18000' /agent/state/heartbeat/config.json; then
+        fail "AC5.5 (heartbeat_configure did not change the file to 18000)"
+        restore_heartbeat_config || true
         return
     fi
-
-    if ! echo "$file_content" | grep -q '18000'; then
-        fail "AC5.5 (5h config missing)"
-        return
-    fi
-
-    # Restart connectome to verify persistence
+    # Persistence across a container restart.
     D restart connectome >/dev/null
-    sleep 3
-    file_content=$(X connectome cat /agent/state/heartbeat/config.json)
-    if echo "$file_content" | grep -q '14400'; then
+    for _ in $(seq 1 30); do running connectome && break; sleep 1; done
+    if ! X connectome grep -q '"intervalSeconds": 18000' /agent/state/heartbeat/config.json; then
+        fail "AC5.5 (18000 not kept across restart)"
+        restore_heartbeat_config || true
+        return
+    fi
+    heartbeat_cfg 4 || true
+    if X connectome grep -q '"intervalSeconds": 14400' /agent/state/heartbeat/config.json; then
         pass "AC5.5"
     else
-        fail "AC5.5 (after restart)"
+        fail "AC5.5 (could not set back to 14400)"
     fi
 }
 
@@ -129,30 +149,22 @@ check_ac5_6_stale() {
 }
 
 check_ac5_6_wait() {
-    # Set up trap to restore gateway and connectome
-    restore_ac5_6() {
-        D start onecli-gateway >/dev/null
-        for _ in $(seq 1 30); do
-            [ "$(D inspect -f '{{.State.Health.Status}}' onecli-gateway 2>/dev/null)" = healthy ] && break
-            sleep 2
-        done
-        D start connectome >/dev/null
-        sleep 3
-    }
-    trap restore_ac5_6 EXIT
-
+    add_cleanup restore_stack
     D stop connectome >/dev/null
     D stop onecli-gateway >/dev/null
 
-    # Time only the compose run
-    local before_time
+    # Time only the compose run.
+    local before_time after_time elapsed output
     before_time=$(date +%s)
-    local output
     output=$(D compose -f "$stack_dir/compose.yaml" run --rm --no-deps -e GATEWAY_WAIT_SECONDS=6 connectome 2>&1 || true)
-    local after_time
     after_time=$(date +%s)
-    local elapsed=$((after_time - before_time))
+    elapsed=$((after_time - before_time))
 
+    restore_stack
+    if ! running onecli-gateway connectome; then
+        fail "AC5.6-wait (could not restore gateway/connectome)"
+        return
+    fi
     if echo "$output" | grep -q 'unreachable after 6s' && [ "$elapsed" -lt 20 ]; then
         pass "AC5.6-wait"
     else
@@ -161,6 +173,7 @@ check_ac5_6_wait() {
 }
 
 check_ac5_7() {
+    if ! running connectome connectome-shell; then fail "AC5.7 (containers not running)"; return; fi
     local c_output s_output
     c_output=$(X connectome sh -c 'env; grep -rIhoE "(^|[^a])oc_[0-9a-f]{32,}" /agent /home /workspace /etc /tmp 2>/dev/null' 2>&1 || true)
     s_output=$(X connectome-shell sh -c 'env; grep -rIhoE "(^|[^a])oc_[0-9a-f]{32,}" /agent /home /workspace /etc /tmp 2>/dev/null' 2>&1 || true)
@@ -186,11 +199,14 @@ check_ac5_7() {
     fi
 }
 
+smoke_secrets_file=""
+rm_secrets_file() { [ -z "$smoke_secrets_file" ] || rm -f "$smoke_secrets_file"; }
 check_ac5_8() {
+    if ! running connectome connectome-shell; then fail "AC5.8 (containers not running)"; return; fi
     local secrets_file
-    secrets_file=$(mktemp)
-    chmod 600 "$secrets_file"
-    trap "rm -f '$secrets_file'" EXIT
+    secrets_file=$(umask 077; mktemp)
+    smoke_secrets_file="$secrets_file"
+    add_cleanup rm_secrets_file
 
     local discord_token webui_pass host_token shell_token session_token
     discord_token=$(grep '^DISCORD_TOKEN=' "$stack_dir/.env" | cut -d= -f2-)
