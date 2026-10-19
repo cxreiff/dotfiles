@@ -240,9 +240,17 @@ func TestTLSImmediateHandshakeAndHTTP11Only(t *testing.T) {
 	}
 }
 
+// The pre-first-byte cap is 10 s: a stalled first connection must be closed
+// quickly so the client retries, but a late ClientHello (AC6.9) must survive.
+func TestDefaultIdleFirstIsTenSeconds(t *testing.T) {
+	if defaultIdleFirst != 10*time.Second {
+		t.Fatalf("defaultIdleFirst = %v, want 10s", defaultIdleFirst)
+	}
+}
+
 func TestTLSClientHelloArrivingAfterTwoSecondsStillTLS(t *testing.T) {
 	cfg, pool := testTLS(t)
-	h, logs := newHandler(cfg, time.Minute, nil) // default-style pre-first-byte cap
+	h, logs := newHandler(cfg, defaultIdleFirst, nil) // the real default cap
 	addr := target(t, pingPong)
 	srv, cli := tcpPair(t)
 	var released atomic.Int32

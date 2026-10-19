@@ -39,6 +39,7 @@ const (
 	noNodeHint        = "no node in state — run `dotfiles stacks cxagents login`"
 	rejectLogBuffer   = 1024
 	rejectReportEvery = 10 * time.Second
+	maxIdleFirst      = 10 * time.Minute
 )
 
 // localNet reports the container's cxagents address and subnet. It is a
@@ -54,6 +55,7 @@ type config struct {
 	StatusPort      uint16
 	MaxFlowsPerPort int
 	MaxFlows        int
+	IdleFirst       time.Duration
 	Verbose         bool
 }
 
@@ -89,7 +91,19 @@ func configFrom(getenv func(string) string) (config, error) {
 	if cfg.MaxFlows, err = positiveEnv(or("FORWARDER_MAX_FLOWS", "256"), "FORWARDER_MAX_FLOWS"); err != nil {
 		return config{}, err
 	}
+	if cfg.IdleFirst, err = idleFirstEnv(or("FORWARDER_IDLE_FIRST", "10s")); err != nil {
+		return config{}, err
+	}
 	return cfg, nil
+}
+
+// idleFirstEnv parses FORWARDER_IDLE_FIRST: a Go duration in (0, 10m].
+func idleFirstEnv(s string) (time.Duration, error) {
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 || d > maxIdleFirst {
+		return 0, fmt.Errorf("FORWARDER_IDLE_FIRST: want a duration in (0, 10m], e.g. 10s")
+	}
+	return d, nil
 }
 
 func positiveEnv(s, key string) (int, error) {
@@ -198,6 +212,7 @@ func serveCmd(ctx context.Context, cfg config, stdout, stderr io.Writer) int {
 			NextProtos:     []string{"http/1.1"}, // no h2: HTTP/1.1 dev servers only (AC6.10)
 			MinVersion:     tls.VersionTLS12,
 		},
+		IdleFirst:  cfg.IdleFirst,
 		OnDialFail: cache.Refresh,
 		WhoIs:      whoIsName(lc),
 		Log:        logFlow,

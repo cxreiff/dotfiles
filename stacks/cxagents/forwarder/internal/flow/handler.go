@@ -17,7 +17,7 @@ import (
 type Handler struct {
 	Dial        func(ctx context.Context, addr netip.AddrPort) (net.Conn, error) // default: net.Dialer
 	DialTimeout time.Duration                                                    // default 2 s
-	IdleFirst   time.Duration                                                    // default 60 s: pre-first-byte cap, both sides silent
+	IdleFirst   time.Duration                                                    // default 10 s: pre-first-byte cap, both sides silent
 	Handshake   time.Duration                                                    // default 10 s: TLS handshake deadline
 	TLS         *tls.Config                                                      // GetCertificate from tsnet; ALPN http/1.1 only
 	OnDialFail  func(target string)                                              // e.g. resolver.Refresh
@@ -31,7 +31,7 @@ type Handler struct {
 
 const (
 	defaultDialTimeout = 2 * time.Second
-	defaultIdleFirst   = 60 * time.Second
+	defaultIdleFirst   = 10 * time.Second
 	defaultHandshake   = 10 * time.Second
 	whoIsTimeout       = time.Second
 	readChunk          = 4096

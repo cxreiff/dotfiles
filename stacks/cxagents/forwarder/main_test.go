@@ -199,7 +199,7 @@ func TestConfigFromDefaultsAndOverrides(t *testing.T) {
 	want := config{
 		StateDir: "/state", Hostname: "cxagents", Tag: "tag:cxagents",
 		RoutesPath: "/etc/forwarder/routes", StatusPort: 8080,
-		MaxFlowsPerPort: 32, MaxFlows: 256,
+		MaxFlowsPerPort: 32, MaxFlows: 256, IdleFirst: 10 * time.Second,
 	}
 	if cfg != want {
 		t.Errorf("defaults = %+v, want %+v", cfg, want)
@@ -207,15 +207,15 @@ func TestConfigFromDefaultsAndOverrides(t *testing.T) {
 
 	env := map[string]string{
 		"FORWARDER_STATUS_PORT": "9090", "FORWARDER_MAX_FLOWS": "10", "FORWARDER_TS_VERBOSE": "1",
+		"FORWARDER_IDLE_FIRST": "3s",
 	}
 	cfg, err = configFrom(func(k string) string { return env[k] })
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.StatusPort != 9090 || cfg.MaxFlows != 10 || !cfg.Verbose {
+	if cfg.StatusPort != 9090 || cfg.MaxFlows != 10 || !cfg.Verbose || cfg.IdleFirst != 3*time.Second {
 		t.Errorf("overrides not applied: %+v", cfg)
 	}
-
 	for _, bad := range []string{"0", "70000", "http"} {
 		_, err := configFrom(func(k string) string {
 			if k == "FORWARDER_STATUS_PORT" {
@@ -225,6 +225,20 @@ func TestConfigFromDefaultsAndOverrides(t *testing.T) {
 		})
 		if err == nil {
 			t.Errorf("FORWARDER_STATUS_PORT=%q: want error", bad)
+		}
+	}
+}
+
+func TestConfigFromRejectsBadIdleFirst(t *testing.T) {
+	for _, bad := range []string{"0", "0s", "-1s", "11m", "soon", "10"} {
+		_, err := configFrom(func(k string) string {
+			if k == "FORWARDER_IDLE_FIRST" {
+				return bad
+			}
+			return ""
+		})
+		if err == nil {
+			t.Errorf("FORWARDER_IDLE_FIRST=%q: want error", bad)
 		}
 	}
 }
