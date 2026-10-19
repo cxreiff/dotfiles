@@ -10,7 +10,7 @@ Three Colima VMs, each tuned for the workloads it carries:
 |---|---|---|---|
 | `shared`   | `vz`   | vzNAT — Mac localhost forwards (Colima's `network.mode: shared`) | freshrss, wallabag, future Mac-localhost-only services |
 | `bridged`  | `qemu` | socket_vmnet bridged — real LAN IP (Colima's `network.mode: bridged`) | adguard, homebridge — services that need real LAN visibility (DNS source IPs, mDNS/Bonjour) |
-| `agents`   | `vz`   | vzNAT (`network.mode: shared`) | onecli (credential vault v2), connectome (agent host + shell) |
+| `agents`   | `vz`   | vzNAT (`network.mode: shared`) | onecli (credential vault v2), connectome (agent host + shell), cxagents (tailnet node) |
 
 Each VM is started and stopped individually via `vm-<name>-up` /
 `vm-<name>-down`. All three are brought up automatically at boot once you
@@ -61,6 +61,8 @@ sudo brew services start tailscale
 sudo tailscale up --hostname=cxmini
 ```
 
+On a replacement Mac, first delete the stale `cxmini` device in the admin console, or this join takes the name `cxmini-1` — see `docs/migration-recovery.md`.
+
 Every justfile and script invokes the CLI by absolute path at
 `/opt/homebrew/bin/tailscale` (LaunchDaemons run with a minimal `PATH`).
 
@@ -78,6 +80,8 @@ For each stack you want to run, follow that stack's README:
 - `homebridge/README.md` — HomeKit bridge (bridged VM, pair via the iOS
   Home app after `dotfiles stacks homebridge bootstrap`)
 - `onecli/README.md` — credential vault v2 (agents VM, required for connectome)
+- `../tailscale/README.md` — not a stack (repo-root `tailscale/`): the tailnet policy and the OAuth clients in `tailscale/.env`. `adguard`'s tailnet DNS needs the admin client; `cxagents` needs both, with the policy declaring `tag:cxagents` pushed first.
+- `cxagents/README.md` — tailnet node `cxagents` (agents VM; set up `tailscale/` first, see above; connectome's shell joins it as an optional overlay)
 - `connectome/README.md` — AI agent **clara** over Discord (agents VM; requires onecli)
 - `wallabag/README.md` — read-it-later (shared VM, run `dotfiles stacks
   wallabag bootstrap` after first up)
@@ -98,9 +102,9 @@ Both are **LaunchDaemons**, not LaunchAgents, because this host is headless
 system`; run them as your normal user over SSH. See
 [Autostart at boot](#autostart-at-boot).
 
-`doctor` runs read-only diagnostics across 8 sections: Infrastructure (colima/docker/socket_vmnet/just),
-Stack volumes, Backups, DNS forwarder (relay health), DNS failover (tailnet Global NS), IP coupling,
-Agents (onecli health, CA fingerprints, network attachment, shell grant, log sizes, invariant lints), and Stack identity & env (incl. `.env` mode 0600). Run it after any non-trivial change.
+`doctor` runs read-only diagnostics across 10 sections: Infrastructure (colima/docker/socket_vmnet/just),
+Stack volumes, Backups, DNS forwarder (relay health), Tailnet (OAuth client scopes and tags, policy drift, MagicDNS, Tailnet Lock), DNS failover (tailnet Global NS), IP coupling,
+Agents (onecli health, CA fingerprints, network attachment, shell grant, log sizes, invariant lints), cxagents (node identity and certificate, routes targets, lockdown lints), and Stack identity & env (incl. `.env` mode 0600). Run it after any non-trivial change.
 
 ## Recipes
 
@@ -119,8 +123,8 @@ Agents (onecli health, CA fingerprints, network attachment, shell grant, log siz
 
 | Recipe | Effect |
 |---|---|
-| `up-all` | bring up adguard, freshrss, homebridge, onecli, connectome, wallabag. Continues past failures (e.g., Tailscale PAT expired) so agent stacks still start at boot; prints a summary naming any failures; exits non-zero if any failed. onecli precedes connectome (connectome joins the `onecli-agents` network). |
-| `down-all` | reverse order, DNS-aware: connectome, onecli, wallabag, homebridge, freshrss, adguard last. connectome must come down before onecli (onecli owns the `onecli-agents` network). |
+| `up-all` | bring up adguard, freshrss, homebridge, onecli, cxagents, connectome, wallabag. Continues past failures (e.g., `tailscale/.env` missing or the Tailscale API unreachable) so agent stacks still start at boot; prints a summary naming any failures; exits non-zero if any failed. onecli precedes connectome (connectome joins the `onecli-agents` network); cxagents precedes connectome so the shell can join the `cxagents` network. |
+| `down-all` | reverse order, DNS-aware: connectome, cxagents, onecli, wallabag, homebridge, freshrss, adguard last. connectome must come down before cxagents (its `down` refuses while the shell holds the `cxagents` network) and before onecli (onecli owns the `onecli-agents` network). |
 | `ps-all` | container status across all stacks |
 | `pull-all` | pull latest images for all stacks (connectome included) |
 | `backup-all` | backup all stacks in order (adguard, freshrss, homebridge, connectome, onecli, wallabag), then run GFS rotation. Each stack uses its quiesce method (see Backups below). |
@@ -131,7 +135,7 @@ Agents (onecli health, CA fingerprints, network attachment, shell grant, log siz
 
 Modules: `dotfiles stacks adguard …`, `dotfiles stacks connectome …`,
 `dotfiles stacks freshrss …`, `dotfiles stacks homebridge …`,
-`dotfiles stacks onecli …`, `dotfiles stacks wallabag …`. See
+`dotfiles stacks onecli …`, `dotfiles stacks cxagents …`, `dotfiles stacks wallabag …`. See
 respective READMEs for the full per-stack recipe set.
 
 ## Backups
@@ -158,6 +162,7 @@ Backup quiesce and coverage:
 - **wallabag** (bind mount `~/.volumes/wallabag/`): `down && up` quiesce.
 - **connectome** (named volumes `state` and `workspace` only — NOT `outbox`): `compose stop && backup && compose start`. Prunes `llm-calls.*.jsonl` older than 14 days and truncates `headless.log` to 10 MiB when >50 MiB.
 - **onecli** (named volumes `pgdata`, `app-data`): `compose stop && backup && compose start` (Postgres data is only consistent stopped).
+- **cxagents**: not in `backup-all`. Its state volume (node keys, certificate cache) is disposable; see [`cxagents/README.md`](cxagents/README.md).
 
 Schedule unattended nightly runs via launchd:
 

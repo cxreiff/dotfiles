@@ -23,6 +23,7 @@ non-volumes container state, which we don't care about.
 - Recent `~/.volume-backups/daily/` tarballs for all stacks — adguard, connectome,
   freshrss, homebridge, onecli, wallabag (run `dotfiles stacks backup-all` before
   destroying anything). The launchd timer should already be giving you nightly snapshots.
+- The escrowed `tailscale/.env` (both tailnet OAuth clients, mode 0600). The tailnet policy, the cxagents node and the tailnet DNS all read it. Escrow the whole file in the password manager, as with `stacks/onecli/.env`.
 - The user's `stacks/<stack>/.env` files captured separately. They're gitignored
   so they're not in the repo; copy them off before wiping a device. **For onecli v2,
   escrow the whole `stacks/onecli/.env` in the password manager:** a restored vault
@@ -67,7 +68,15 @@ dotfiles stacks vm-agents-up
 #    and brings the stack up itself.
 dotfiles stacks onecli restore "$HOME/.volume-backups/daily/onecli-$(date +%Y-%m-%d).tgz"
 
-# 7. connectome. On the same device the ~/Developer/connectome clones (with
+# 7. cxagents. The node's state (cxagents_state) went with the agents VM, so
+#    login registers a fresh node. If it prints the admin-console URL of a stale
+#    `cxagents` device, delete that device there and run login again. The shell
+#    of connectome (step 8) joins the cxagents network when the stack comes up.
+dotfiles stacks cxagents build
+dotfiles stacks cxagents login
+dotfiles stacks cxagents up
+
+# 8. connectome. On the same device the ~/Developer/connectome clones (with
 #    their `local` patch branches) and stacks/connectome/.env are still in
 #    place (on a new device see "onecli v2 and connectome on a fresh device").
 #    Rebuild: the VM deletion removed the images, and the build bakes in the
@@ -78,7 +87,7 @@ dotfiles stacks connectome image-test
 dotfiles stacks connectome restore "$HOME/.volume-backups/daily/connectome-$(date +%Y-%m-%d).tgz"
 dotfiles stacks connectome smoke
 
-# 8. The other stacks' data lives in ~/.volumes/<stack> bind mounts on the Mac,
+# 9. The other stacks' data lives in ~/.volumes/<stack> bind mounts on the Mac,
 #    which step 3 does not touch: on the same device there is nothing to
 #    restore. On a new device (empty ~/.volumes), restore them; each restore
 #    refuses a non-empty destination.
@@ -87,31 +96,56 @@ for stack in adguard freshrss homebridge wallabag; do
     [ -f "$t" ] && dotfiles stacks "$stack" restore "$t"
 done
 
-# 9. Bring everything up
+# 10. Bring everything up
 dotfiles stacks up-all
 
-# 10. If the bridged VM IP changed (rare — qemu-deterministic MAC keeps
+# 11. If the bridged VM IP changed (rare — qemu-deterministic MAC keeps
 #     the DHCP lease), re-coordinate:
 dotfiles stacks bridged-ip-changed   # follow the printed checklist
 
-# 11. Re-install the boot autostart + nightly backup LaunchDaemons (sudo).
+# 12. Re-install the boot autostart + nightly backup LaunchDaemons (sudo).
 #     Required on a fresh device: this host is headless + FileVault, so
 #     nothing comes back after a reboot without these. See stacks/README.md
 #     "Autostart at boot".
 dotfiles stacks startup-install
 dotfiles stacks backup-install
 
-# 12. Confirm
+# 13. Confirm
 dotfiles stacks doctor
 ```
+
+The clean-slate procedure on the same Mac needs none of the node-IP follow-ups in the fresh-device section below. It deletes only the Colima VMs, and the Mac's Tailscale node (and so its IP and `hosts.cxmini`) is untouched, so the IP does not change.
 
 ## On a fresh device (new Mac, no prior state)
 
 Follow the procedure above from step 4. Without backups, skip the restores in
-steps 6–8: set up onecli and connectome as in the subsection below instead,
+steps 6, 8 and 9: set up onecli and connectome as in the subsections below instead,
 and step through each other stack's first-run wizard / `bootstrap` per its
-README. With backups, steps 6–7 still need the escrowed onecli `.env`, a
-connectome `.env` and the patched clones first (subsection below).
+README. With backups, steps 6 and 8 still need the escrowed onecli `.env`, a
+connectome `.env` and the patched clones first (subsections below).
+
+### Tailnet and cxagents on a fresh device
+
+Run this after `dotfiles stacks vm-agents-up` (clean-slate step 5). On a fresh device it **replaces clean-slate step 7** (the cxagents build, login and up): run these steps instead, not step 7 as well. The `tailscale/.env` restore comes first, because the tailnet scripts and the cxagents login read it.
+
+1. Restore `tailscale/.env` from the escrow copy and set its mode: `chmod 600 tailscale/.env`. Then `dotfiles tailscale policy-status` should print `in-sync`. If it prints `drift`, run `dotfiles tailscale policy-diff` and decide what to do. Never push blind.
+2. If this Mac has not joined Tailscale yet, name the node `cxmini` before it joins. If it already joined in Stage 2 (`stacks/README.md`), go straight to the name check. **Preferred:** delete the stale `cxmini` device in the admin console (https://login.tailscale.com/admin/machines) first, so no collision happens. Then run `sudo tailscale up --hostname=cxmini` (if not yet joined) and confirm the node's name:
+
+   ```sh
+   /opt/homebrew/bin/tailscale status --json | jq -r .Self.DNSName
+   ```
+
+   It must print `cxmini.faun-fir.ts.net.` (your `TAILNET_DNS_SUFFIX`). Tailscale does not refuse a taken name: it joins under a renamed device such as `cxmini-1.faun-fir.ts.net.`, which breaks the connectome WebUI origin, the serve URLs and saved logins. `dotfiles stacks doctor` (`--- Tailnet ---`) FAILs on that name. **Fallback** if it still prints `cxmini-1…`: delete the stale `cxmini` device in the admin console (if not already done), then either rename this machine to `cxmini` there (Machines → … → Edit machine name), or force a fresh name computation with a temporary hostname: `sudo tailscale set --hostname=cxmini-tmp && sudo tailscale set --hostname=cxmini`. Confirm the DNS name again after either.
+
+3. **Node-IP follow-ups: always run these on a fresh device, once the name is confirmed in step 2.** A fresh-device join always gets a new Tailscale node IP, even when the name came out as `cxmini` on the first try, so this step is not part of the name fallback. Then:
+   - Set `hosts.cxmini` in `tailscale/policy.hujson` to `tailscale ip -4`, run `dotfiles tailscale policy-push`, and commit `tailscale/policy.hujson`. Doctor's Tailnet section FAILs until the entry matches this node's IP.
+   - `dotfiles stacks dns-forward-install` (the relay plist bakes in the node IP).
+   - `dotfiles stacks adguard tailnet-dns-on` once adguard is up (the tailnet Global nameservers point at the node IP; `adguard up` does this too, once the relay answers).
+4. `dotfiles stacks cxagents build`, then `dotfiles stacks cxagents image-test`.
+5. `dotfiles stacks cxagents login`. If it prints the admin-console URL of a stale `cxagents` device, delete that device there, then run `login` again.
+6. `dotfiles stacks cxagents up`.
+7. Then onecli and connectome, in the next subsection. connectome's shell joins the `cxagents` network on its own, because `stacks/connectome/scripts/compose.sh` adds the overlay whenever the network exists.
+8. After the onecli and connectome steps: `dotfiles stacks doctor`. No FAILs.
 
 ### onecli v2 and connectome on a fresh device
 
@@ -189,6 +223,20 @@ Then proceed with the other stacks:
 - `homebridge/README.md` (Pair via Home app)
 - `wallabag/README.md` (`dotfiles stacks wallabag bootstrap`)
 - `freshrss/README.md` (auto-installs from `.env`)
+
+### New tailnet
+
+Use this only when the tailnet itself is new (a new Tailscale account or tailnet name). Restoring the existing tailnet is the subsection above.
+
+1. Create the `dotfiles-admin` OAuth client as `tailscale/README.md` (Clients) describes. Then `cp tailscale/.env.example tailscale/.env && chmod 600 tailscale/.env`, and fill in its ID and secret.
+2. Update `tailscale/tailnet.conf` (`TAILNET` and `TAILNET_DNS_SUFFIX`; `NODE_HOSTNAME` stays `cxmini`, the fixed node name). Set the `hosts.cxmini` entry in `tailscale/policy.hujson` to the new node's IP (`tailscale ip -4`; cxmini must already have joined the new tailnet, Stage 2, and its DNS name must be `cxmini.<suffix>`, as the fresh-device step 2 checks). Update the test user in the policy's `tests` to a login from `tailscale status --json`. See `tailscale/README.md`, Bootstrap paths (b).
+3. `dotfiles tailscale policy-push --init`. It shows the diff against the default policy and asks for confirmation. Commit `tailscale/policy.hujson` afterwards.
+4. Work through the settings checklist in `tailscale/README.md`: MagicDNS on, HTTPS certificates on, Tailnet Lock off, device approval off (the last one by hand).
+5. Create the `dotfiles-authkeys` OAuth client as `tailscale/README.md` (Clients) describes, add its ID and secret to `tailscale/.env`, and escrow the whole file again.
+6. Continue with "Tailnet and cxagents on a fresh device" at step 4 (this section already covers step 3: its step 2 sets `hosts.cxmini` and 6b below runs the relay and Global NS steps). Between its step 6 (`cxagents up`) and its step 7 (onecli and connectome), also do:
+
+   - **a. connectome recipe.** `stacks/connectome/recipes/agent.json` hardcodes the tailnet suffix in two places. Set `modules.webui.allowedOrigins` to `["https://cxmini.<new suffix>:8768"]` and the `cxagents.<suffix>` host in `agent.systemPrompt` to the new suffix. Then run `dotfiles stacks connectome lint`: invariant 11 checks both and FAILs until they match. Commit the file.
+   - **b. Node IP.** `dotfiles stacks dns-forward-install` (the relay plist bakes in the node's new Tailscale IP). Then `dotfiles stacks adguard up` sets the new tailnet's Global nameservers to that IP, because its `tailnet-dns.sh on` runs after the relay answers. If adguard is already up, run `dotfiles stacks adguard tailnet-dns-on` instead. `tailnet-dns.sh` refuses to set the nameservers while the relay does not answer, so `dotfiles stacks dns-forward-install` must run before `adguard up`.
 
 ## When the bridged VM IP changes
 
