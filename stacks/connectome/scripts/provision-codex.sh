@@ -26,7 +26,7 @@ auth=$(A="$account_id" jq -c '.tokens.account_id = env.A' <<<"$stub") \
 jq -e '.tokens.access_token=="onecli-managed" and .tokens.refresh_token=="onecli-managed"' <<<"$auth" >/dev/null \
     || { echo "provision-codex: stub carries non-placeholder tokens; refusing" >&2; exit 3; }
 
-docker --context colima-agents compose -f "${stack_dir}/compose.yaml" run --rm --no-deps -T \
+"${stack_dir}/scripts/compose.sh" run --rm --no-deps -T \
     --entrypoint sh connectome -c '
         umask 077
         mkdir -p /agent/state/codex

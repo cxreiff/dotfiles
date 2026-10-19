@@ -80,7 +80,7 @@ Images are built from local clones in `~/Developer/connectome/` at the SHAs in
 | `heartbeat-mcpl` | anima-research/heartbeat-mcpl | `local` |
 | `voice-kit` | anima-research/voice-kit | `main` |
 
-Local patches (11 commits; `grep '^patch' sources.lock` is authoritative). Three
+Local patches (12 commits; `grep '^patch' sources.lock` is authoritative). Four
 functional changes, the rest are follow-up fixes and tests to them:
 
 - **heartbeat-mcpl** (2): reminders below a 900 s floor are refused, not
@@ -89,15 +89,23 @@ functional changes, the rest are follow-up fixes and tests to them:
   checked on the opened file descriptor (symlinks, `/proc`, `..`, FIFOs and
   directories refused), read with a bounded loop so a growing file cannot pass
   the 25 MiB cap; plus test hardening. Worth proposing upstream.
-- **connectome-host** (3): `modules.subagents` accepts `maxDepth` and
+- **connectome-host** (4): `modules.subagents` accepts `maxDepth` and
   `maxExecutionMs` from the recipe; empty optional spawn/fork inputs
   (`model: ""`, `maxTokens: 0`, `tools: []`, …) mean "not given", so the recipe
-  defaults apply (`tools: []` therefore means all tools, not none).
+  defaults apply (`tools: []` therefore means all tools, not none). The WebUI
+  cross-site guard (`WebUI rejects same-site and cross-site requests`): agent
+  pages on `cxagents.faun-fir.ts.net` are same-site with the WebUI (ts.net is on
+  the Public Suffix List), so every WebUI request with `Sec-Fetch-Site:
+  same-site` or `cross-site`, or an `Origin` outside `allowedOrigins`, gets 403
+  before basic auth and routing. Same-origin use from the allowed origin and
+  requests without `Origin` are unchanged.
 
 On a fresh device, clone each upstream, create `local` from the base SHA in
 `sources.lock`, and re-apply the patches by hand (cherry-pick from a backup of
-the old clones, or re-implement from the subjects). `build` refuses to run on
-dirty clones.
+the old clones, or re-implement from the subjects). The WebUI guard is a
+`crossSiteBlocked(req)` method in `src/modules/web-ui-module.ts`, called first in
+`handleHttp`, with its tests at the end of `test/web-ui-module.test.ts`.
+`build` refuses to run on dirty clones.
 
 ## Usage caps (calibration)
 
@@ -243,6 +251,8 @@ Networks:
 - `connectome` (this project's bridge): connectome to `shell:3100` for
   term-sessions. The api, web and postgres of onecli are not on either
   network.
+- `cxagents` (optional; the network of the `cxagents` stack): only `shell` joins it, through the overlay `compose.cxagents.yaml`. Through it the tailnet node relays flows to the shell, so an agent server the shell listens on is reachable at `https://cxagents.faun-fir.ts.net:<port>` (see `stacks/cxagents/README.md`). `scripts/compose.sh` adds the overlay whenever the network exists, for every compose call, so `up`, `down` and the rest use the same file set. Without the network, `up` warns and starts without agent previews: the overlay is a soft opt-in, and connectome's only hard dependency is onecli.
+  To turn previews on, run `dotfiles stacks cxagents up`, then `dotfiles stacks connectome up` (`up -d` recreates `shell` with the overlay).
 
 ## Provisioning
 
@@ -267,7 +277,7 @@ another `provision-codex`.
 
 ## Security invariants
 
-Ten invariants from the design. `dotfiles stacks doctor` runs the static ones
+Twelve invariants from the design (11 is the cxagents WebUI origin pin; 12 is the cxagents overlay, which no lint checks yet). `dotfiles stacks doctor` runs the static ones
 (`lint.sh`, which reads tracked files and `.env` key names only); the others
 are checked by the image build, `image-test` or `smoke`.
 
@@ -283,9 +293,11 @@ are checked by the image build, `image-test` or `smoke`.
 | 8 | Discord DM/guild allowlists fixed in the recipe; no `DISCORD_FILTERS_FILE`; `filters_update`, `create_text_channel`, `delete_channel` disabled | `lint.sh` invariant 8, `smoke` AC7.3 |
 | 9 | `OBSERVERS_FILE` (last assignment in the Dockerfile) is `/agent/recipes/observers.json` on the read-only recipes mount, not overridden | `lint.sh` invariant 9, `smoke` AC8.3 |
 | 10 | The discord-mcpl attachment patch is applied: attachments outside `DISCORD_ATTACHMENT_ROOT`, `/proc/*`, symlinks out of the root and FIFOs are refused | In-build `attachment-root` tests (Dockerfile, `--test-timeout`), `image-test` AC7.5 row |
+| 11 | The WebUI `allowedOrigins` (`recipes/agent.json` `modules.webui`) is exactly `https://cxmini.<tailnet suffix>:<serve_port>`: an empty list admits every Origin, a missing key falls back to localhost-only, `*` admits any site. The agent's `systemPrompt` names `cxagents.<tailnet suffix>` (the operator's URL) | `lint.sh` invariant 11 (both checks) |
+| 12 | Only `shell` joins the `cxagents` network: `compose.cxagents.yaml` names that one service, and `scripts/compose.sh` is the only place the overlay is added | Overlay file content (no lint check). Live: `cxagents` smoke AC8.1 checks that the forwarder cannot reach `connectome:18768` |
 
 `dotfiles stacks connectome lint-test` proves each lint fails on a fixture
-that violates exactly its invariant (34 fixtures, including the
+that violates exactly its invariant (39 fixtures, including the
 sub-conditions above).
 
 ## Known exposures (accepted)
@@ -316,6 +328,11 @@ sub-conditions above).
   `stacks/*/.env` and the host onecli CLI's operator API key, which together
   open the vault. Same-UID compromise is vault compromise (see
   `stacks/onecli/README.md`, Threat model).
+
+- **The WebUI is same-site with agent pages.** Agent pages on `cxagents.faun-fir.ts.net` share the site `faun-fir.ts.net` with the WebUI (`ts.net` is on the Public Suffix List), so the browser treats them as same-site. The cross-site guard (see "Sources and local patches") answers 403 to every WebUI request with `Sec-Fetch-Site: same-site` or `cross-site`, or with an `Origin` outside `allowedOrigins`, before basic auth. Residual exposures:
+  - A browser that sends no `Sec-Fetch-Site` (Safari before 16.4) can make a no-cors GET with no `Origin` and pass the guard. That request reaches only the read-only GET routes, and the page gets an opaque response it cannot read. The WebSocket, the mutation channel, always carries `Origin`, so it stays blocked.
+  - Following a link to the WebUI from another site (Discord, an agent page) now returns 403. Type the URL or use a bookmark.
+- **Agent servers are reachable from the operator's devices on every allowed port.** Through the `cxagents` node, any server the shell listens on is reachable from the tailnet members the policy grants, on every port in `stacks/cxagents/routes` (1024-65535 except the 3100 term-sessions port). See `stacks/cxagents/README.md`, Accepted exposures.
 
 ## Future: persona fleet children
 

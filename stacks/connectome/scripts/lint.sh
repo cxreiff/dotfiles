@@ -1,8 +1,9 @@
 #!/bin/bash
 # stacks/connectome/scripts/lint.sh
 # Static lints for the connectome security invariants (design Phase 2,
-# invariants 1, 2, 4, 6, 7, 8, 9). Reads the tracked recipe / compose files /
-# Dockerfile and the KEY NAMES of .env files — never .env values.
+# invariants 1, 2, 4, 6, 7, 8, 9; cxagents Phase 6, invariant 11). Reads the
+# tracked recipe / compose files / Dockerfile and the KEY NAMES of .env files
+# — never .env values.
 # Used by `dotfiles stacks doctor`; fixture paths are overridable for tests.
 #
 # Usage: lint.sh [--recipe F] [--compose F] [--dockerfile F] [--env F]
@@ -146,6 +147,29 @@ if [ "$obs_file" = /agent/recipes/observers.json ] \
     pass "invariant 9: OBSERVERS_FILE points at the read-only /agent/recipes mount"
 else
     fail "invariant 9: OBSERVERS_FILE overridden or /agent/recipes not mounted read-only"
+fi
+
+# 11 — WebUI allowedOrigins is exactly the cxmini tailnet origin (AC9.5). An
+# empty list admits every Origin (checkOrigin allows all), a missing key falls
+# back to localhost-only defaults, a wildcard admits any site. The origin is
+# built from tailscale/tailnet.conf (TAILNET_DNS_SUFFIX) and the justfile's
+# serve_port; either one unreadable fails closed.
+suffix=$( (. "${repo_root}/tailscale/scripts/lib/conf.sh" && printf '%s' "${TAILNET_DNS_SUFFIX:-}") 2>/dev/null )
+port=$(sed -n 's/^serve_port := "\([0-9][0-9]*\)"$/\1/p' "${stack_dir}/justfile" 2>/dev/null | head -1)
+want_origin=""
+if [ -n "$suffix" ] && [ -n "$port" ]; then want_origin="https://cxmini.${suffix}:${port}"; fi
+if [ -n "$want_origin" ] && jq -e --arg o "$want_origin" '.modules.webui.allowedOrigins == [$o]' "$recipe" >/dev/null 2>&1; then
+    pass "invariant 11: WebUI allowedOrigins is exactly [${want_origin}]"
+else
+    fail "invariant 11: webui.allowedOrigins is not exactly [${want_origin:-origin unavailable}] (empty, missing, wildcard or other origin; ${recipe})"
+fi
+# 11 (systemPrompt) — the agent's prompt gives the operator the cxagents URL
+# (https://cxagents.<suffix>:<port>). A stale tailnet suffix there is silent: nothing
+# else reads the prompt. Fails closed when the suffix is unreadable.
+if [ -n "$suffix" ] && jq -e --arg h "cxagents.${suffix}" '(.agent.systemPrompt // "") | contains($h)' "$recipe" >/dev/null 2>&1; then
+    pass "invariant 11: agent.systemPrompt names cxagents.${suffix}"
+else
+    fail "invariant 11: agent.systemPrompt does not name cxagents.${suffix:-<suffix unavailable>} (update the cxagents host in ${recipe})"
 fi
 
 [ "$__check_failed" -eq 0 ] || exit 1

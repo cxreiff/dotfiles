@@ -114,6 +114,7 @@ if [ -f "$lock" ] \
    && grep -qx 'npm term-sessions-mcp 1.6.0' "$lock" \
    && grep -q '^patch connectome-host local: recipe-configurable subagent' "$lock" \
    && grep -q '^patch connectome-host local: empty optional subagent' "$lock" \
+   && grep -q '^patch connectome-host local: WebUI rejects same-site' "$lock" \
    && grep -qx 'patch heartbeat-mcpl local: refuse reminders below a 900 s floor' "$lock" \
    && grep -q '^patch discord-mcpl local: confine attachments' "$lock" \
    && ! grep -qE '^[-+][^-+]' "$lock"; then

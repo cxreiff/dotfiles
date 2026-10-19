@@ -306,6 +306,19 @@ expect_only inv9-comment-only 'invariant 9:' --dockerfile "$tmpdir/Df-obs-commen
 { cat "$tmpdir/Dockerfile"; echo '# GATE_TELEMETRY stays unset (invariant 7)'; } > "$tmpdir/Df-tel-comment"
 expect_none inv7-comment-ignored --dockerfile "$tmpdir/Df-tel-comment"
 
+# Invariant 11: webui.allowedOrigins is exactly the cxmini tailnet origin.
+mk w-empty recipe.json '.modules.webui.allowedOrigins = []'
+expect_only inv11-empty-origins 'invariant 11:' --recipe "$tmpdir/w-empty"
+mk w-missing recipe.json 'del(.modules.webui.allowedOrigins)'
+expect_only inv11-missing-origins 'invariant 11:' --recipe "$tmpdir/w-missing"
+mk w-star recipe.json '.modules.webui.allowedOrigins = ["*"]'
+expect_only inv11-wildcard-origin 'invariant 11:' --recipe "$tmpdir/w-star"
+# Invariant 11 (systemPrompt): the prompt names cxagents.<suffix> (the operator's URL)
+mk w-prompt-host recipe.json '.agent.systemPrompt |= gsub("cxagents[.]faun-fir[.]ts[.]net"; "cxagents.example.ts.net")'
+expect_only inv11-prompt-other-tailnet 'invariant 11:' --recipe "$tmpdir/w-prompt-host"
+mk w-prompt-missing recipe.json 'del(.agent.systemPrompt)'
+expect_only inv11-prompt-missing 'invariant 11:' --recipe "$tmpdir/w-prompt-missing"
+
 if [ "$failures" -gt 0 ]; then
     echo "FAIL: $failures fixture(s) failed" >&2
     exit 1

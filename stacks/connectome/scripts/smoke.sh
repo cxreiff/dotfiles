@@ -182,7 +182,7 @@ check_ac5_6_wait() {
     local before_time after_time elapsed output
     before_time=$(date +%s)
     local rc
-    output=$(D compose -f "$stack_dir/compose.yaml" run --rm --no-deps -e GATEWAY_WAIT_SECONDS=6 connectome 2>&1) && rc=0 || rc=$?
+    output=$("$stack_dir/scripts/compose.sh" run --rm --no-deps -e GATEWAY_WAIT_SECONDS=6 connectome 2>&1) && rc=0 || rc=$?
     after_time=$(date +%s)
     elapsed=$((after_time - before_time))
 

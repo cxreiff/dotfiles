@@ -1,0 +1,12 @@
+# Optional overlay (added by scripts/compose.sh only when the `cxagents`
+# network exists): the agent's shell joins the cxagents node's network so
+# servers it runs are reachable at https://cxagents.faun-fir.ts.net:<port>
+# (stacks/cxagents). Only `shell` joins — never the connectome container.
+services:
+  shell:
+    networks:
+      - cxagents
+
+networks:
+  cxagents:
+    external: true
