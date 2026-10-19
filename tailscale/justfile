@@ -1,0 +1,38 @@
+default:
+    @just --list
+
+# Write the live tailnet policy to policy.hujson (refuses if it exists, unless --force)
+policy-pull *args:
+    @./scripts/policy.sh pull {{args}}
+
+# Unified diff live -> repo; exit 0 and no output when identical
+policy-diff:
+    @./scripts/policy.sh diff
+
+# Lint -> API validate (runs policy tests) -> diff -> confirm -> push with If-Match (--init: new tailnet)
+policy-push *args:
+    @./scripts/policy.sh push {{args}}
+
+# in-sync / drift (repo SHA-256 vs live ETag)
+policy-status:
+    @./scripts/policy.sh status
+
+# Static invariants on policy.hujson (also run by `dotfiles stacks doctor`)
+lint:
+    @./scripts/lint.sh
+
+# Prove each lint fails on a fixture violating exactly its invariant
+lint-test:
+    @./scripts/lint-test.sh
+
+# Live checks against the tailnet (never changes the live policy)
+smoke:
+    @./scripts/smoke.sh
+
+# Prove each doctor tailnet FAIL/WARN path with fixtures (read-only against live)
+doctor-test:
+    @./scripts/doctor-test.sh
+
+# Print one single-use, pre-authorized, non-ephemeral auth key for TAG (expires in 10 min)
+authkey tag:
+    @./scripts/authkey.sh {{quote(tag)}}

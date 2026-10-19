@@ -1,0 +1,133 @@
+// Tailnet access policy for cxreiff.github (members only; see grants and tests below).
+{
+	// Source of truth: tailscale/policy.hujson in the dotfiles repo. Edit there and
+	// push with `dotfiles tailscale policy-push`; admin-console edits show as drift in doctor.
+
+	// cxmini's node IP; update after a node-IP change (see CLAUDE.md).
+	"hosts": {"cxmini": "100.70.208.32"},
+
+	// Declare static groups of users. Use autogroups for all users or users with a specific role.
+	// "groups": {
+	//      "group:example": ["alice@example.com", "bob@example.com"],
+	// },
+
+	// Define the tags which can be applied to devices and by which users.
+	// "tagOwners": {
+	//      "tag:example": ["autogroup:admin"],
+	// },
+	// The agent-preview node (stacks/cxagents). Only admins may assign it.
+	"tagOwners": {"tag:cxagents": ["autogroup:admin"]},
+
+	// Define grants that govern access for users, groups, autogroups, tags,
+	// Tailscale IP addresses, and subnet ranges.
+	"grants": [
+		// Members reach each other on all ports (today's behaviour). No grant has *, a tag or autogroup:tagged as source (lint).
+		{"src": ["autogroup:member"], "dst": ["autogroup:member"], "ip": ["*"]},
+
+		// Members reach agent servers on cxagents (stacks/cxagents/routes is the
+		// master: these ranges are its range minus its deny ports; the cxagents
+		// lint cross-checks them). Nothing grants tag:cxagents as a source.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:cxagents"],
+			"ip":  ["tcp:1024-3099", "tcp:3101-65535"],
+		},
+
+		// Taildrive: allow your devices read/write access to shares on your own devices.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["autogroup:self"],
+			"app": {
+				"tailscale.com/cap/drive": [{
+					"shares": ["*"],
+					"access": "rw",
+				}],
+			},
+		},
+	],
+
+	// Enable Taildrive: let member nodes share directories and access shares.
+	"nodeAttrs": [
+		{
+			"target": ["autogroup:member"],
+			"attr":   ["drive:share", "drive:access"],
+		},
+	],
+
+	// Define postures that will be applied to all rules without any specific
+	// srcPosture definition.
+	// "defaultSrcPosture": [
+	//      "posture:anyMac",
+	// ],
+
+	// Define device posture rules requiring devices to meet
+	// certain criteria to access parts of your system.
+	// "postures": {
+	//      // Require devices running macOS, a stable Tailscale
+	//      // version and auto update enabled for Tailscale.
+	//     "posture:autoUpdateMac": [
+	//         "node:os == 'macos'",
+	//         "node:tsReleaseTrack == 'stable'",
+	//         "node:tsAutoUpdate",
+	//     ],
+	//      // Require devices running macOS and a stable
+	//      // Tailscale version.
+	//     "posture:anyMac": [
+	//         "node:os == 'macos'",
+	//         "node:tsReleaseTrack == 'stable'",
+	//     ],
+	// },
+
+	// Define users and devices that can use Tailscale SSH.
+	"ssh": [
+		// Non-root logins: every device on this tailnet is trusted, so accept
+		// without periodic re-authentication.
+		{
+			"action": "accept",
+			"src":    ["autogroup:member"],
+			"dst":    ["autogroup:self"],
+			"users":  ["autogroup:nonroot"],
+		},
+		// Root logins still require check mode (periodic SSO re-auth).
+		{
+			"action": "check",
+			"src":    ["autogroup:member"],
+			"dst":    ["autogroup:self"],
+			"users":  ["root"],
+		},
+	],
+
+	// Lockout guards: validate rejects any push that breaks these.
+	"tests": [
+		{
+			"src":   "cxreiff@github",
+			"proto": "tcp",
+			"accept": [
+				"cxmini:22",
+				"cxmini:53",
+				"cxmini:8189",
+				"cxmini:8689",
+				"cxmini:8765",
+				"cxmini:8766",
+				"cxmini:8767",
+				"cxmini:8768",
+			],
+		},
+		{
+			"src":    "cxreiff@github",
+			"proto":  "udp",
+			"accept": ["cxmini:53"],
+		},
+		{
+			"src":    "cxreiff@github",
+			"proto":  "tcp",
+			"accept": ["tag:cxagents:5173"],
+			"deny":   ["tag:cxagents:3100", "tag:cxagents:80"],
+		},
+		{
+			// tag:cxagents reaches nothing on cxmini.
+			"src":  "tag:cxagents",
+			"deny": ["cxmini:22", "cxmini:53", "cxmini:8768"],
+		},
+	],
+}
