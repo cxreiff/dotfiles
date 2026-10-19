@@ -67,3 +67,6 @@ tailnet-dns-off:
 
 tailnet-dns-status:
     @./scripts/tailnet-dns.sh status
+
+tailnet-dns-test:
+    @./scripts/tailnet-dns-test.sh

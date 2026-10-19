@@ -92,21 +92,17 @@ dotfiles stacks adguard tailnet-dns-on       # set NS to this node's Tailscale I
 dotfiles stacks adguard tailnet-dns-off      # set NS to TAILNET_DNS_FALLBACK
 ```
 
-Setup:
+Credentials:
 
-1. Generate a Tailscale PAT at
-   <https://login.tailscale.com/admin/settings/keys>
-   (90-day max expiry; the token inherits your account's tailnet permissions,
-   which on a tailnet you own/admin includes DNS read+write — the key UI
-   has no per-scope selector). **The token silently expires after 90
-   days.** When it does, `adguard up` fails at the `tailnet-dns on` step
-   with `API GET failed: … 401`, Global NS is left wherever it was, and
-   `doctor` only emits `[WARN] tailnet-dns status unavailable` — easy to
-   miss. Symptom seen 2026-08-24 after a reboot: tailnet Global NS empty,
-   nobody on the tailnet using AGH. Fix: regenerate the token, update
-   `.env`, run `dotfiles stacks adguard tailnet-dns-on`. Set a reminder
-   for ~80 days after each rotation (last rotated 2026-08-24).
-2. `cp .env.example .env && chmod 600 .env`; paste the PAT.
+`tailnet-dns.sh` calls the Tailscale API through
+`tailscale/scripts/api.sh --client admin`: the `dotfiles-admin` OAuth client
+(non-expiring; its scopes are declared in `tailscale/clients.conf`). Its
+secret lives in `tailscale/.env` (mode 0600, escrowed in the password
+manager). Setup and rotation are in `tailscale/README.md`; there is no
+per-stack token to renew.
+
+`stacks/adguard/.env` is optional. It holds only `TAILNET_DNS_FALLBACK`
+(see `.env.example`); the script's default is `1.1.1.1`.
 
 Why the API and not Tailscale's multi-resolver fallback: Tailscale's
 client-side fallback ordering is unreliable on macOS
@@ -116,8 +112,8 @@ binary state. The CLI doesn't support this configuration
 ([tailscale#5430](https://github.com/tailscale/tailscale/issues/5430)),
 so the API is the only path.
 
-If `tailnet-dns` ever leaves the tailnet pointed at a dead AGH (PAT
-expired, API outage), recover manually at
+If `tailnet-dns` ever leaves the tailnet pointed at a dead AGH (missing or
+invalid `tailscale/.env` credentials, API outage), recover manually at
 <https://login.tailscale.com/admin/dns>.
 
 ### First-time wizard
@@ -144,12 +140,13 @@ populated, polls `dig`, and flips Global NS to AGH normally.
 
 `down-all` brings stacks down in DNS-aware order (apps before adguard).
 If the adguard step fails because `tailnet-dns.sh off` can't reach the
-Tailscale API (revoked PAT, network outage), the recipe halts with a
-non-zero exit and AGH stays running — apps are already down. Recover:
+Tailscale API (missing `tailscale/.env` credentials, network outage), the
+recipe halts with a non-zero exit and AGH stays running — apps are already
+down. Recover:
 
 ```sh
 dotfiles stacks adguard tailnet-dns-status   # diagnose API reachability
-# either fix the PAT, or use the manual web-UI fallback at
+# either restore tailscale/.env (see tailscale/README.md), or use the manual web-UI fallback at
 # https://login.tailscale.com/admin/dns to set Global NS to 1.1.1.1
 dotfiles stacks adguard down                 # retry the down (now succeeds)
 ```

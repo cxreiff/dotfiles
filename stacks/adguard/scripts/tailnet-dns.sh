@@ -7,8 +7,11 @@
 #
 # Exit codes:
 #   0 — success (or no-op when state already matches target)
-#   2 — preflight failure (.env / VM / args)
-#   3 — Tailscale API failure
+#   2 — preflight failure (args / VM / node IP / tailscale/.env credentials)
+#   3 — Tailscale API failure, or the dns-forward relay not answering
+#
+# Auth: tailscale/scripts/api.sh --client admin (OAuth, tailscale/.env).
+# stacks/adguard/.env is optional and only supplies TAILNET_DNS_FALLBACK.
 set -euo pipefail
 
 cmd="${1:-}"
@@ -19,29 +22,29 @@ esac
 
 TAILSCALE="/opt/homebrew/bin/tailscale"
 
-# Source .env from the same dir as this script's parent (stacks/adguard/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-env_file="${SCRIPT_DIR}/../.env"
-if [ ! -f "$env_file" ]; then
-    echo "tailnet-dns: ${env_file} missing — copy .env.example, fill in TAILSCALE_PAT" >&2
-    exit 2
-fi
-set -a; source "$env_file"; set +a
+repo_root="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+ts_scripts="${repo_root}/tailscale/scripts"
+# shellcheck source=../../../tailscale/scripts/lib/conf.sh
+source "${ts_scripts}/lib/conf.sh"          # TAILNET
+# shellcheck source=lib/fallback.sh
+source "${SCRIPT_DIR}/lib/fallback.sh"      # tailnet_dns_fallback
 
-if [ -z "${TAILSCALE_PAT:-}" ] || [ "$TAILSCALE_PAT" = "tskey-api-CHANGE_ME" ]; then
-    echo "tailnet-dns: TAILSCALE_PAT not set in ${env_file}" >&2
-    exit 2
-fi
+[ -n "$TAILNET" ] || { echo "tailnet-dns: TAILNET missing in tailscale/tailnet.conf" >&2; exit 2; }
 
-api="https://api.tailscale.com/api/v2/tailnet/-/dns/nameservers"
-hdr=(-H "Authorization: Bearer ${TAILSCALE_PAT}" -H "Content-Type: application/json")
-
-# GET current Global NS — also serves as connectivity preflight
-current_json="$(curl -fsS "${hdr[@]}" "$api" 2>&1)" || {
-    echo "tailnet-dns: API GET failed: $current_json" >&2
+ns_path="/tailnet/${TAILNET}/dns/nameservers"
+api_fail() {   # $1 = api.sh exit code, $2 = verb
+    if [ "$1" -eq 2 ]; then
+        echo "tailnet-dns: Tailscale API credentials unavailable — restore tailscale/.env (see tailscale/README.md, Credentials)" >&2
+        exit 2
+    fi
+    echo "tailnet-dns: API $2 failed (see api.sh message above)" >&2
     echo "tailnet-dns: recover via https://login.tailscale.com/admin/dns (manual)" >&2
     exit 3
 }
+
+# GET current Global NS — also serves as connectivity preflight
+current_json="$("${ts_scripts}/api.sh" --client admin GET "$ns_path")" || api_fail $? GET
 current="$(echo "$current_json" | jq -r '.dns | @json')"
 
 # For 'on' subcommand, resolve vm_ip (where AGH listens) and node_ip (this
@@ -106,7 +109,15 @@ case "$cmd" in
         ;;
 
     off)
-        fallback="${TAILNET_DNS_FALLBACK:-1.1.1.1}"
+        # Fallback NS: the only value read from stacks/adguard/.env (not sourced).
+        # Read and validated only here, so an invalid entry cannot block `on`,
+        # `status`, or doctor's read-only probe. Garbage exits 2 before the POST.
+        env_file="${SCRIPT_DIR}/../.env"
+        fallback="1.1.1.1"
+        if [ -f "$env_file" ]; then
+            v="$(tailnet_dns_fallback "$env_file")" || exit 2
+            [ -n "$v" ] && fallback="$v"
+        fi
         target="[\"${fallback}\"]"
         ;;
 esac
@@ -118,9 +129,6 @@ fi
 
 echo "tailnet-dns: setting Global NS ${current} -> ${target}"
 body="{\"dns\":${target}}"
-resp="$(curl -fsS -X POST "${hdr[@]}" -d "$body" "$api" 2>&1)" || {
-    echo "tailnet-dns: API POST failed: $resp" >&2
-    echo "tailnet-dns: recover via https://login.tailscale.com/admin/dns (manual)" >&2
-    exit 3
-}
+resp="$("${ts_scripts}/api.sh" --client admin POST "$ns_path" \
+    -H 'Content-Type: application/json' -d "$body")" || api_fail $? POST
 echo "$resp" | jq -r '.dns | @json'
