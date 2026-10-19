@@ -22,3 +22,9 @@ Thumbs.db
 # connectome build staging (git archives of local clones + per-vault CA)
 stacks/connectome/build/src/
 stacks/connectome/build/gateway-ca.crt
+# cxagents: a stray local go build output
+stacks/cxagents/forwarder/tailnet-forwarder
+
+# Python bytecode caches (smoke servers and client run with -B; belt and braces)
+__pycache__/
+*.pyc
