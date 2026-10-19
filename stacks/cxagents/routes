@@ -1,0 +1,7 @@
+# stacks/cxagents/routes — port routing for the cxagents node (read-only bind
+# into the forwarder). The master for deny ports: tailscale/policy.hujson's
+# member -> tag:cxagents grant is this range minus these ports (cxagents lint).
+# target = a Docker container name (unique per daemon). Ranges must not
+# overlap; a new target splits a range. Ports < 1024 are never routed.
+# target            ports        deny
+connectome-shell    1024-65535   3100

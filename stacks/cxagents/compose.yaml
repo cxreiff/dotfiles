@@ -1,0 +1,54 @@
+name: cxagents
+
+# The cxagents tailnet node (tsnet; stacks/cxagents/forwarder). Owns network
+# `cxagents` (targets such as connectome-shell join it as external) and the
+# state volume (node keys + cert cache; disposable, not backed up — losing it
+# costs a re-login). No auth key ever appears here: `login` feeds it on stdin
+# to a one-shot container (scripts/login.sh).
+services:
+  forwarder:
+    image: tailnet-forwarder:local
+    container_name: cxagents-forwarder
+    hostname: cxagents-forwarder
+    platform: linux/arm64
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      FORWARDER_HOSTNAME: cxagents
+      FORWARDER_TAG: tag:cxagents
+      FORWARDER_ROUTES: /etc/forwarder/routes
+      FORWARDER_STATE_DIR: /state
+      FORWARDER_STATUS_PORT: "8080"
+      TS_NO_LOGS_NO_SUPPORT: "true"
+      TS_LOGS_DIR: /state/logs
+    volumes:
+      - state:/state
+      - ./routes:/etc/forwarder/routes:ro
+    networks:
+      - cxagents
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "/tailnet-forwarder", "check"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+volumes:
+  state:
+    name: cxagents_state
+
+networks:
+  # Not internal: the node needs egress to Tailscale control/DERP.
+  cxagents:
+    name: cxagents
+    driver: bridge

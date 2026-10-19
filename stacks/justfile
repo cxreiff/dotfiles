@@ -1,5 +1,6 @@
 mod adguard
 mod connectome
+mod cxagents
 mod freshrss
 mod homebridge
 mod onecli
@@ -8,15 +9,17 @@ mod wallabag
 default:
     @just --list
 
-# Continues past an individual stack's failure (e.g. an expired Tailscale PAT
-# failing `adguard up`) so onecli/connectome still start at boot. onecli
-# precedes connectome (connectome joins onecli's network).
+# Continues past an individual stack's failure (e.g. `adguard up` failing its
+# tailnet-DNS hookup because tailscale/.env is missing or Tailscale is not up
+# yet) so onecli/connectome still start at boot. onecli
+# precedes connectome (connectome joins onecli's network); cxagents precedes
+# connectome (connectome's shell joins the cxagents network when it exists).
 # Bring every stack up; prints a summary and exits non-zero if any failed.
 up-all:
     #!/usr/bin/env bash
     set -uo pipefail
     failed=()
-    for s in adguard freshrss homebridge onecli connectome wallabag; do
+    for s in adguard freshrss homebridge onecli cxagents connectome wallabag; do
         echo "=== ${s} up ==="
         # Module recipes run with cwd stacks/, so plain `just <stack> up`
         # resolves stacks/justfile (as the other aggregates do). Do NOT use
@@ -29,11 +32,12 @@ up-all:
     fi
     echo "up-all: all stacks up"
 
-# Apps before adguard; connectome before onecli (onecli owns the
-# onecli-agents network and refuses to go down under connectome).
+# Apps before adguard; connectome before cxagents and onecli: both own a
+# network connectome joins (onecli: onecli-agents; cxagents: cxagents).
 # DNS-aware shutdown of every stack.
 down-all:
     just connectome down
+    just cxagents down
     just onecli down
     just wallabag down
     just homebridge down
@@ -43,6 +47,7 @@ down-all:
 ps-all:
     just adguard ps
     just connectome ps
+    just cxagents ps
     just freshrss ps
     just homebridge ps
     just onecli ps
@@ -51,6 +56,7 @@ ps-all:
 pull-all:
     just adguard pull
     just connectome pull
+    just cxagents pull
     just freshrss pull
     just homebridge pull
     just onecli pull

@@ -1,0 +1,78 @@
+context := "colima-agents"
+
+default:
+    @just --list
+
+# Run the forwarder's tests in the pinned builder, build the image, write build.lock
+build:
+    @./scripts/build.sh
+
+# Static assertions against tailnet-forwarder:local
+image-test:
+    @./scripts/image-test.sh
+
+# go test ./... in the pinned builder (no Go on the host)
+test:
+    @./scripts/go.sh test -count=1 ./...
+
+# Register the node (mints a single-use auth key, piped; never stored)
+login:
+    @./scripts/login.sh
+
+# Refuses on a missing image or empty state (run login first)
+up:
+    @./scripts/up.sh
+
+# Refuses while targets (e.g. connectome-shell) still hold the cxagents network
+down:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    others=$(docker --context {{context}} network inspect cxagents -f '{{"{{"}}range .Containers{{"}}"}}{{"{{"}}.Name{{"}}"}} {{"{{"}}end{{"}}"}}' 2>/dev/null | tr ' ' '\n' | grep -vx 'cxagents-forwarder' | grep -v '^$' || true)
+    if [ -n "$others" ]; then
+        echo "cxagents: network cxagents still in use by: ${others//$'\n'/ } — run \`dotfiles stacks connectome down\` first" >&2
+        exit 1
+    fi
+    docker --context {{context}} compose down
+
+restart:
+    docker --context {{context}} compose restart
+
+ps:
+    docker --context {{context}} compose ps -a
+
+logs:
+    docker --context {{context}} compose logs -f --tail 100
+
+# Base images are pinned by digest (nothing to refresh): fetch any that are missing locally
+pull:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for ref in $(sed -n 's/^FROM \([^ ]*@sha256:[0-9a-f]*\).*/\1/p' forwarder/Dockerfile); do
+        docker --context {{context}} image inspect "$ref" >/dev/null 2>&1 || docker --context {{context}} pull "$ref"
+    done
+
+# Static lockdown invariants (also re-emitted by `dotfiles stacks doctor`, --- cxagents ---)
+lint:
+    @./scripts/lint.sh
+
+# Prove each lint fails on a fixture violating exactly its invariant
+lint-test:
+    @./scripts/lint-test.sh
+
+# Prove each doctor cxagents FAIL path with fixtures (never stops the real node)
+doctor-test:
+    @./scripts/doctor-test.sh
+
+# Login matrix with test seams (copies state into throwaway volumes)
+login-test:
+    @./scripts/login-test.sh
+
+# Live checks: packet filter, netns isolation, identity, then end-to-end through
+# the forwarder (https/http/wss/raw, deny ports, loopback, status, WebUI guard).
+# Restarts the forwarder and connectome. `--long` adds the 10-minute idle (~11 min).
+smoke *args:
+    @./scripts/smoke.sh {{ args }}
+
+# Prove the AC5.3 packet-filter verdict on fixture netmaps (no tailscale or docker)
+smoke-test:
+    @./scripts/smoke-test.sh
