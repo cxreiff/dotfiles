@@ -207,6 +207,24 @@ else
 fi
 
 echo
+echo "--- Tailnet ---"
+
+# Declared tailnet state (tailscale/): policy drift, OAuth client scopes,
+# identity, settings, credentials file. Key names only; never .env values.
+tailnet_lines=0
+while IFS= read -r line; do
+    tailnet_lines=$((tailnet_lines + 1))
+    case "$line" in
+        "[OK]"*)   pass "${line#\[OK\]   }" ;;
+        "[FAIL]"*) fail "${line#\[FAIL\] }" ;;
+        "[WARN]"*) warn "${line#\[WARN\] }" ;;
+        "[OFF]"*)  off  "${line#\[OFF\]  }" ;;
+        *)         [ -n "$line" ] && warn "tailnet: ${line}" ;;
+    esac
+done < <("${SCRIPT_DIR}/../../tailscale/scripts/doctor.sh" 2>&1)
+[ "$tailnet_lines" -gt 0 ] || warn "tailnet: tailscale/scripts/doctor.sh produced no output"
+
+echo
 echo "--- DNS failover ---"
 
 agh_state=$(docker --context colima-bridged inspect adguardhome \
@@ -227,7 +245,7 @@ fi
 # NOT the bridged VM IP — see "DNS forwarder" above and tailnet-dns.sh.
 on_target="[\"${node_ip}\"]"
 if [ -z "$ns_json" ]; then
-    warn "tailnet-dns status unavailable (PAT missing or API unreachable)"
+    warn "tailnet-dns status unavailable (tailscale/.env missing or API unreachable)"
 elif [ -z "$node_ip" ]; then
     warn "node Tailscale IP unreadable — cannot evaluate tailnet NS (is Tailscale up?)"
 elif [ "$agh_state" = "true" ] && [ "$ns_json" = "$on_target" ]; then
@@ -365,6 +383,24 @@ while IFS= read -r line; do
 done < <("${SCRIPT_DIR}/../connectome/scripts/lint.sh" 2>&1)
 
 echo
+echo "--- cxagents ---"
+
+# The cxagents tailnet node (stacks/cxagents): health, identity, cert, routes
+# targets, lockdown lints. Reads no .env value; the lint reads key names only.
+cxagents_lines=0
+while IFS= read -r line; do
+    cxagents_lines=$((cxagents_lines + 1))
+    case "$line" in
+        "[OK]"*)   pass "${line#\[OK\]   }" ;;
+        "[FAIL]"*) fail "${line#\[FAIL\] }" ;;
+        "[WARN]"*) warn "${line#\[WARN\] }" ;;
+        "[OFF]"*)  off  "${line#\[OFF\]  }" ;;
+        *)         [ -n "$line" ] && warn "cxagents: ${line}" ;;
+    esac
+done < <("${SCRIPT_DIR}/../cxagents/scripts/doctor.sh" 2>&1)
+[ "$cxagents_lines" -gt 0 ] || warn "cxagents: doctor produced no output"
+
+echo
 echo "--- Stack identity & env ---"
 
 # Check A: homebridge BRIDGE_USERNAME matches config.json bridge.username
@@ -398,7 +434,7 @@ for stack in adguard connectome freshrss homebridge onecli wallabag; do
         warn "${stack}/.env missing (run: cp .env.example .env && chmod 600 .env)"
         continue
     fi
-    mode=$(stat -f %Lp "$actual")
+    mode=$(stat -L -f %Lp "$actual")
     if [ "$mode" = 600 ]; then
         pass "${stack}/.env mode 0600"
     else
