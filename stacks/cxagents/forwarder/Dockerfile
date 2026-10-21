@@ -2,7 +2,7 @@
 # tailnet-forwarder — built only by stacks/cxagents/scripts/build.sh (writes
 # ../build.lock). Bumping a pin = edit a digest here or a version in go.mod,
 # then `dotfiles stacks cxagents build`.
-FROM golang:1.27.1-bookworm@sha256:8d48e12ec56735e9358640898b9d9b9fcca110612ed8a5567438c0a1baa24e66 AS build
+FROM golang:1.27.3-bookworm@sha256:21ade014faf952365b9ecbd8dbdb87176fbacb82fac9fb132d9f2a7b8cc3f132 AS build
 ENV GOTOOLCHAIN=local CGO_ENABLED=0 GOFLAGS=-mod=readonly
 WORKDIR /src
 COPY go.mod go.sum ./

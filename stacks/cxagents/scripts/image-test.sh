@@ -89,11 +89,12 @@ if docker --context "$ctx" create --name "$ext" "$img" >/dev/null 2>&1 \
     bin_sha=$(shasum -a 256 "$tmp/bin/tailnet-forwarder" | awk '{print $1}')
     lock_sha=$(sed -n 's/^binary sha256:\([0-9a-f]*\) .*/\1/p' "$lock" 2>/dev/null)
     ok=1; detail=""
-    for want in "build${tab}CGO_ENABLED=0" "build${tab}-trimpath=true" "go1.27.1" "tailscale.com${tab}v1.104.1"; do
+    lock_go=$(sed -n 's/^toolchain //p' "$lock" 2>/dev/null)
+    for want in "build${tab}CGO_ENABLED=0" "build${tab}-trimpath=true" "${lock_go:-toolchain-missing-from-build.lock}" "tailscale.com${tab}v1.104.1"; do
         grep -qF "$want" <<<"$info" || { ok=0; detail="$detail missing:${want}"; }
     done
     [ -n "$lock_sha" ] && [ "$bin_sha" = "$lock_sha" ] || { ok=0; detail="$detail sha=${bin_sha} lock=${lock_sha:-none}"; }
-    [ "$ok" = 1 ] && pass "AC8.4 static trimmed binary (CGO_ENABLED=0, -trimpath, go1.27.1, tailscale.com v1.104.1), sha matches build.lock" \
+    [ "$ok" = 1 ] && pass "AC8.4 static trimmed binary (CGO_ENABLED=0, -trimpath, ${lock_go}, tailscale.com v1.104.1), sha matches build.lock" \
         || fail "AC8.4 binary check:${detail}"
 else
     fail "AC8.4 cannot extract the binary from ${img}"
