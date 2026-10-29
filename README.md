@@ -7,7 +7,8 @@ dotfiles/
 ├── stow/       Stow packages — symlinked into $HOME for tools that read fixed paths
 ├── tools/      programs built from source into ~/.local/bin (dotfiles tools install)
 ├── docs/       migration-recovery and other operational references
-├── justfile    root justfile (mod stacks, mod stow)
+├── Brewfile    environment packages (dotfiles brew / dotfiles init)
+├── justfile    root justfile (init, brew; mod stacks, stow, tailscale, tools)
 └── .gitignore  secrets out, *.env.example in
 ```
 
@@ -23,13 +24,18 @@ alias dotfiles="just -f ~/Developer/dotfiles/justfile"
 Editor + shell config. This is the only stage most devices need.
 
 ```sh
-brew install just stow neovim zellij zsh-completions   # base tools
+brew install just                                      # needed to run init
 git clone <this-repo> ~/Developer/dotfiles
 cd ~/Developer/dotfiles
 
-dotfiles stow setup-base                               # stow base only
+just init                                              # brew bundle + stow base + tools install
 source ~/.zshrc                                        # load `dotfiles` alias
 ```
+
+`init` installs the root `Brewfile`, stows the `base` package and
+installs `tools/` into `~/.local/bin`. It deliberately leaves out Colima
+and the stacks (Stage 2 and 3). `dotfiles brew <args>` wraps
+`brew bundle` on the same `Brewfile` (e.g. `dotfiles brew check`).
 
 After Stage 1, your editor + shell config + the `dotfiles` alias are in
 place. Most devices stop here.

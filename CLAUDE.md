@@ -81,6 +81,8 @@ runtime churn:
 
 ```sh
 dotfiles                          # list root recipes
+dotfiles init                     # bootstrap the environment: brew bundle + stow setup-base + tools install (no Colima/stacks)
+dotfiles brew [args]              # brew bundle on the root Brewfile (e.g. check, cleanup)
 dotfiles stow setup               # both packages (base + colima)
 dotfiles stow setup-base          # editor + shell only (Stage 1)
 dotfiles stow setup-colima        # container support only (Stage 2)
