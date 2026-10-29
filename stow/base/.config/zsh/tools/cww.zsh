@@ -2,9 +2,10 @@
 #
 #   cww         go to $CX_WORKSPACE
 #   cww <repo>  go to $CX_WORKSPACE/<repo>. The directory counts as a match
-#               only if one of its remotes is also named <repo>. With no local
-#               match, HeartFlow/<repo> is cloned from GitHub into
-#               $CX_WORKSPACE/<repo>.
+#               only if one of its remotes is also named <repo>, or if it has
+#               no remotes (a local-only repository, named by its directory).
+#               With no local match, HeartFlow/<repo> is cloned from GitHub
+#               into $CX_WORKSPACE/<repo>.
 #
 # Inside herdr, the repository is opened as a workspace on its primary
 # worktree and focused, or its open workspace is focused, instead of cd-ing
@@ -32,10 +33,13 @@ cww() {
     return 2
   fi
 
-  # Succeeds if a remote of the repository at $1 is named $2.
+  # Succeeds if a remote of the repository at $1 is named $2, or if it has no
+  # remotes, since a local-only repository has no other name to check.
   _cww_remote_matches() {
     local remote url
-    for remote in ${(f)"$(git -C $1 remote)"}; do
+    local -a remotes=(${(f)"$(git -C $1 remote)"})
+    (( $#remotes )) || return 0
+    for remote in $remotes; do
       url=$(git -C $1 remote get-url $remote) || continue
       url=${${url%/}%.git}
       [[ ${url##*[/:]} == $2 ]] && return 0
