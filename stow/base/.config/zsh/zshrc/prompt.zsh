@@ -33,7 +33,8 @@ fi
 # --- layout -----------------------------------------------------------------
 _prompt_narrow_p() { (( COLUMNS < PROMPT_NARROW_COLS )) }
 
-_set_prompt() {
+# Build one layout into REPLY: $1 is 1 for the two-line (narrow) layout.
+_prompt_layout() {
   # Colored segments. The branch only renders when psvar[1] is set.
   local host="%F{$PROMPT_COLOR_HOST}${PROMPT_HOST_TEXT}%f "
   local branch="%(1V. %F{$PROMPT_COLOR_BRANCH}${PROMPT_BRANCH_OPEN}%1v${PROMPT_BRANCH_CLOSE}%f.)"
@@ -43,7 +44,7 @@ _set_prompt() {
   local hostname=${(%):-$PROMPT_HOST_TEXT}
   local -i host_width=$(( ${(m)#hostname} + 1 ))
   local -i branch_width=0 reserve=4
-  if _prompt_narrow_p; then
+  if (( $1 )); then
     caret=$'\n'"%F{$PROMPT_COLOR_HOST}${PROMPT_CARET}%f "
     reserve=1
   fi
@@ -62,10 +63,24 @@ _set_prompt() {
   # %<< ends truncation so only the beginning of the directory is removed.
   local dir="%F{$PROMPT_COLOR_DIR}%-${reserve}<${PROMPT_TRUNCATE}<${PROMPT_DIR_TEXT}%<<%f"
 
-  PROMPT="${host}${dir}${branch}${caret}"
-  (( COLUMNS < 3 )) && PROMPT=${PROMPT% }
-  (( COLUMNS < 2 )) && PROMPT=''
+  REPLY="${host}${dir}${branch}${caret}"
+  (( COLUMNS < 3 )) && REPLY=${REPLY% }
+  (( COLUMNS < 2 )) && REPLY=''
   return 0
+}
+
+# Build both layouts; PROMPT picks one each time it is expanded. zsh re-expands
+# PROMPT itself on SIGWINCH before TRAPWINCH runs, so the line/two-line choice
+# tracks COLUMNS even when a resize (e.g. herdr refitting a tab on focus) races
+# the trap.
+setopt prompt_subst
+typeset -ga _prompt_layouts
+PROMPT='${_prompt_layouts[COLUMNS < PROMPT_NARROW_COLS ? 2 : 1]}'
+
+_set_prompt() {
+  local REPLY
+  _prompt_layout 0; _prompt_layouts[1]=$REPLY
+  _prompt_layout 1; _prompt_layouts[2]=$REPLY
 }
 
 precmd() {
