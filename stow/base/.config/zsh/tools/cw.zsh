@@ -1,88 +1,208 @@
-typeset -g _CW_PREV_WORKTREE=""
+# cw [slug] — switch to a git worktree, creating the branch and worktree if needed.
+#
+#   cw          go to the repository's primary worktree
+#   cw <slug>   go to the worktree for branch $USER/<slug> (or <slug>),
+#               creating <root>/.worktrees/<dir> if it has none, where <dir>
+#               is <slug> with each "/" replaced by "+". A leading $USER/ in
+#               <slug> is ignored. A branch that exists only on a remote gets
+#               a local tracking branch. If no branch matches, $USER/<slug> is
+#               created from HEAD.
+#
+# cw stops with an error, without changing anything, if <dir> is already used
+# by another worktree or file, if the worktree that has the branch checked out
+# is missing from disk, or if the new local branch name is not valid or
+# conflicts with an existing branch.
+#
+# Inside herdr, the worktree is opened as a workspace grouped under the
+# repository's workspace and focused, instead of cd-ing the current shell.
 
 cw() {
-  local create_branch=false
-  if [[ "$1" == "-b" ]]; then
-    create_branch=true
-    shift
+  emulate -L zsh
+  setopt err_return no_unset pipe_fail
+
+  if (( $# > 1 )); then
+    print -u2 "usage: cw [slug]"
+    return 2
   fi
 
-  # No argument: cd to root of current worktree
-  if [[ -z "$1" ]]; then
-    local root
-    root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "cw: not in a git repo" >&2; return 1; }
-    cd "$root"
-    if [[ -n "$ZELLIJ_SESSION_NAME" ]]; then
-      zellij action rename-tab "$(git branch --show-current 2>/dev/null || basename "$root")"
-    fi
-    return
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    print -u2 "cw: not inside a git repository"
+    return 1
   fi
 
-  git rev-parse --git-common-dir &>/dev/null || { echo "cw: not in a git repo" >&2; return 1; }
+  local porcelain root
+  porcelain=$(git worktree list --porcelain)
+  root=${${(f)porcelain}[1]#worktree }
 
-  # "~": cd to main repo root
-  if [[ "$1" == "~" ]]; then
-    local git_common_dir main_root
-    git_common_dir="$(git rev-parse --git-common-dir)"
-    main_root="$(cd "$git_common_dir/.." && pwd)"
-    _CW_PREV_WORKTREE="$(git rev-parse --show-toplevel)"
-    cd "$main_root"
-    if [[ -n "$ZELLIJ_SESSION_NAME" ]]; then
-      zellij action rename-tab "$(git -C "$main_root" branch --show-current 2>/dev/null || basename "$main_root")"
-    fi
-    return
-  fi
+  local -a lines
+  lines=(${(f)porcelain})
 
-  # "-": switch to previous worktree
-  if [[ "$1" == "-" ]]; then
-    if [[ -z "$_CW_PREV_WORKTREE" ]]; then
-      echo "cw: no previous worktree" >&2
+  # Prints the path of the worktree that has refs/heads/$1 checked out, if any.
+  _cw_worktree_for_branch() {
+    local line wt=
+    for line in $lines; do
+      case $line in
+        worktree\ *) wt=${line#worktree } ;;
+        "branch refs/heads/$1") print -r -- $wt; return 0 ;;
+      esac
+    done
+    return 1
+  }
+
+  # Prints what the worktree registered at path $1 has checked out, if one is
+  # registered there.
+  _cw_worktree_at() {
+    local line here=0
+    for line in $lines; do
+      case $line in
+        worktree\ *)
+          here=0
+          if [[ ${${line#worktree }:A} == ${1:A} ]]; then
+            here=1
+          fi
+          ;;
+        branch\ refs/heads/*)
+          if (( here )); then
+            print -r -- "branch '${line#branch refs/heads/}'"
+            return 0
+          fi
+          ;;
+        detached)
+          if (( here )); then
+            print -r -- "a detached HEAD"
+            return 0
+          fi
+          ;;
+      esac
+    done
+    return 1
+  }
+
+  # Fails with a message if a new local branch named $1 cannot be created
+  # because an existing branch is a prefix of it, or it is a prefix of one.
+  _cw_check_new_branch() {
+    local branch=$1 prefix=$1
+    while [[ $prefix == */* ]]; do
+      prefix=${prefix%/*}
+      if git show-ref --verify --quiet "refs/heads/$prefix"; then
+        print -u2 "cw: cannot create branch '$branch' because branch '$prefix' exists"
+        return 1
+      fi
+    done
+    if [[ -n $(git for-each-ref --count=1 --format='%(refname)' "refs/heads/$branch/") ]]; then
+      print -u2 "cw: cannot create branch '$branch' because branches under '$branch/' exist"
       return 1
     fi
-    local prev="$_CW_PREV_WORKTREE"
-    _CW_PREV_WORKTREE="$(git rev-parse --show-toplevel)"
-    cd "$prev"
-    if [[ -n "$ZELLIJ_SESSION_NAME" ]]; then
-      zellij action rename-tab "$(git branch --show-current 2>/dev/null || basename "$prev")"
+  }
+
+  _cw_go() {
+    local target=$1
+    if [[ -n ${HERDR_ENV:-} ]] && (( $+commands[herdr] )); then
+      if herdr worktree open --cwd $root --path $target --focus >/dev/null; then
+        return 0
+      fi
+      print -u2 "cw: herdr could not open $target as a workspace; changing directory instead"
     fi
-    return
-  fi
+    cd -- $target
+    if [[ -n ${ZELLIJ:-} ]]; then
+      zellij action rename-tab ${target:t}
+    fi
+  }
 
-  local branch="$1"
+  {
+    if (( $# == 0 )); then
+      _cw_go $root
+      return
+    fi
 
-  # Check if worktree already exists for this branch
-  local target
-  target=$(git worktree list --porcelain | awk -v b="$branch" '
-    /^worktree / { path = substr($0, 10) }
-    /^branch /   { ref = substr($0, 8); sub("refs/heads/", "", ref); if (ref == b) print path }
-  ')
+    local slug=${1#$USER/}
+    if [[ -z $slug || $slug == -* ]] || ! git check-ref-format --branch "$USER/$slug" >/dev/null 2>&1; then
+      print -u2 "cw: '$1' is not a valid branch name"
+      return 2
+    fi
 
-  # Create worktree if it doesn't exist
-  if [[ -z "$target" ]]; then
-    local git_common_dir main_root dir_name
-    git_common_dir="$(git rev-parse --git-common-dir)"
-    main_root="$(cd "$git_common_dir/.." && pwd)"
-    dir_name="${branch//\//_}"
-    target="$main_root/.worktrees/$dir_name"
+    local branch= upstream= candidate remote wt what dest=$root/.worktrees/${slug//\//+}
+    local -a remotes
+    remotes=(${(f)"$(git remote)"})
+    # Check origin before any other remote.
+    remotes=(${(M)remotes:#origin} ${remotes:#origin})
 
-    if $create_branch; then
-      git worktree add -b "$branch" "$target" || return 1
+    for candidate in "$USER/$slug" "$slug"; do
+      if git show-ref --verify --quiet "refs/heads/$candidate"; then
+        branch=$candidate
+        break
+      fi
+      for remote in $remotes; do
+        if git show-ref --verify --quiet "refs/remotes/$remote/$candidate"; then
+          branch=$candidate upstream=$remote/$candidate
+          break 2
+        fi
+      done
+    done
+
+    local create=0
+    if [[ -z $branch ]]; then
+      branch="$USER/$slug" create=1
+    fi
+
+    if [[ -z $upstream ]] && (( ! create )) && wt=$(_cw_worktree_for_branch $branch); then
+      if [[ ! -d $wt ]]; then
+        print -u2 "cw: branch '$branch' is checked out in $wt, which is missing; if it was deleted, run 'git worktree prune'"
+        return 1
+      fi
+      _cw_go $wt
+      return
+    fi
+
+    if what=$(_cw_worktree_at $dest); then
+      if [[ -e $dest ]]; then
+        print -u2 "cw: $dest is already the worktree for $what, not for branch '$branch'"
+      else
+        print -u2 "cw: $dest is registered as the worktree for $what, but is missing; if it was deleted, run 'git worktree prune'"
+      fi
+      return 1
+    fi
+    if [[ -e $dest || -L $dest ]]; then
+      print -u2 "cw: $dest exists but is not a worktree; move or remove it first"
+      return 1
+    fi
+
+    if [[ -n $upstream ]] || (( create )); then
+      _cw_check_new_branch $branch || return 1
+    fi
+
+    if [[ -n $upstream ]]; then
+      git worktree add --track -b $branch -- $dest $upstream
+    elif (( create )); then
+      git worktree add -b $branch -- $dest HEAD
     else
-      git worktree add "$target" "$branch" || return 1
+      git worktree add -- $dest $branch
     fi
-  fi
 
-  _CW_PREV_WORKTREE="$(git rev-parse --show-toplevel)"
-  cd "$target"
-  if [[ -n "$ZELLIJ_SESSION_NAME" ]]; then
-    zellij action rename-tab "$branch"
-  fi
+    _cw_go $dest
+  } always {
+    unfunction _cw_worktree_for_branch _cw_worktree_at _cw_check_new_branch _cw_go 2>/dev/null
+  }
 }
 
+# Completes local and remote branch names as cw slugs, without the remote
+# name or the $USER/ prefix.
 _cw() {
-  git rev-parse --git-common-dir &>/dev/null || return
-  local branches
-  branches=(${(f)"$(git branch --format='%(refname:short)' 2>/dev/null)"})
-  _describe 'branch' branches
+  local expl
+  local -a refs slugs
+  refs=(${(f)"$(git for-each-ref --format='%(refname)' refs/heads refs/remotes 2>/dev/null)"})
+
+  local ref name
+  for ref in $refs; do
+    case $ref in
+      refs/heads/*) name=${ref#refs/heads/} ;;
+      refs/remotes/*/HEAD) continue ;;
+      refs/remotes/*) name=${${ref#refs/remotes/}#*/} ;;
+    esac
+    slugs+=(${name#$USER/})
+  done
+
+  slugs=(${(u)slugs})
+  (( CURRENT == 2 )) && _wanted slugs expl slug compadd -a slugs
 }
 compdef _cw cw
