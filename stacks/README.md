@@ -263,6 +263,27 @@ directory path (`~/.colima/_lima/colima-bridged/`). This means:
 The DHCP reservation will continue to work across `colima delete` cycles
 because the MAC is preserved.
 
+## When the bridged qemu idle-spins
+
+`doctor` WARNs `bridged qemu idle-spinning` when the bridged VM's qemu
+burns ≥50% host CPU while the guest's load is under 0.5. First seen
+2026-10-28 (qemu 11.1.2, HVF, Apple M4, after ~12 days up): both vCPUs
+pegged at ~195% with the guest at load 0.00. The root cause is unconfirmed;
+the suspect is HVF's WFI (idle halt) handling, since the guest's vCPUs
+should sleep in WFI and instead spun. The `vz` VMs (`shared`, `agents`)
+don't use qemu and are unaffected.
+
+1. **Capture before restarting** — the restart destroys the evidence.
+   qemu runs as you, so no sudo:
+   `sample "$(cat ~/.colima/_lima/colima-bridged/qemu.pid)" 10 -file ~/qemu-spin-$(date +%F).txt`
+   Also copy `~/.colima/_lima/colima-bridged/ha.stderr.log` and
+   `serial.log`, which `colima start` overwrites.
+2. **Restart in DNS-safe order:**
+   `dotfiles stacks homebridge down && dotfiles stacks adguard down &&
+   dotfiles stacks vm-bridged-down && dotfiles stacks vm-bridged-up &&
+   dotfiles stacks adguard up && dotfiles stacks homebridge up`.
+   `adguard down` moves tailnet DNS to the fallback first.
+
 ## Renaming a Colima profile
 
 **`limactl rename` is not viable in place.** It doesn't rewrite hardcoded

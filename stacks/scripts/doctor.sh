@@ -73,6 +73,24 @@ else
     fail "socket_vmnet daemon not running (bridged-profile networking will fail)"
 fi
 
+# 3b. Bridged qemu idle spin. Seen 2026-10-28 (qemu 11.1.2, HVF, M4): both
+# vCPUs pegged on the host (~195%) while the guest sat at load 0.00, after
+# ~12 days up; a VM restart cleared it. Root cause unconfirmed (suspect HVF
+# WFI halting), so this only detects it. ps %cpu is a decaying average, so
+# one read is enough. WARN, not FAIL: DNS and HomeKit keep working.
+qemu_pid=$(cat "$HOME/.colima/_lima/colima-bridged/qemu.pid" 2>/dev/null || true)
+if [ -n "$qemu_pid" ] && kill -0 "$qemu_pid" 2>/dev/null; then
+    host_cpu=$(ps -o %cpu= -p "$qemu_pid" | awk '{printf "%d", $1}')
+    guest_load=$(colima ssh -p bridged -- cut -d' ' -f1 /proc/loadavg 2>/dev/null || true)
+    if [ -z "$guest_load" ]; then
+        warn "bridged qemu at ${host_cpu}% host CPU; guest load unreadable (colima ssh failed)"
+    elif [ "$host_cpu" -ge 50 ] && awk -v l="$guest_load" 'BEGIN {exit !(l < 0.5)}'; then
+        warn "bridged qemu idle-spinning: ${host_cpu}% host CPU, guest load ${guest_load}. Capture first: sample ${qemu_pid} 10 -file ~/qemu-spin-\$(date +%F).txt; then down homebridge+adguard, vm-bridged-down/up, up adguard+homebridge (see stacks/README.md)"
+    else
+        pass "bridged qemu ${host_cpu}% host CPU, guest load ${guest_load}"
+    fi
+fi
+
 # 4. just version
 if command -v just >/dev/null 2>&1; then
     just_version=$(just --version | awk '{print $2}')
