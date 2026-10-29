@@ -666,3 +666,7 @@ show_startup_tips false
 // typically work best. Set to 0 to use the number of (physical) CPU cores.
 // Note: This only applies to web clients at the moment.
 // client_async_worker_tasks 4
+
+// Allow programs in panes (including remote nvim over ssh) to read the clipboard via OSC 52.
+// Needed for nvim paste through nested zellij sessions. Requires zellij >= 0.45 on every hop.
+dangerously_enable_paste_buffer_read true
