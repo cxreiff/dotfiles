@@ -19,7 +19,7 @@ alias cxcachy='ssh cxcachy'
 alias cachy='cxcachy'
 
 alias dotfiles="just -f $CX_WORKSPACE/dotfiles/justfile"
-alias df='dotfiles'
+alias dot='dotfiles'
 
 alias zz='zellij'
 alias zzh='zz --layout default'
@@ -34,6 +34,10 @@ alias hrc='$EDITOR ~/.config/herdr/config.toml && herdr server reload-config'
 alias grc='$EDITOR ~/.config/ghostty/config && pkill -USR2 -x ghostty'
 
 alias cc='claude'
+alias cch='claude --model haiku'
+alias ccs='claude --model sonnet'
+alias cco='claude --model opus'
+alias ccf='claude --model fable'
 
 alias sk='security unlock-keychain'
 alias adg='sudo /Applications/AdGuardHome/AdGuardHome -s'
