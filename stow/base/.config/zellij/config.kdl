@@ -129,6 +129,13 @@ keybinds clear-defaults=true {
         bind "Alt =" { Resize "Increase"; }
         bind "Alt m" { NewTab; }
         bind "Alt n" { NewPane; }
+        bind "Alt w" { CloseFocus; }
+        bind "Alt s" {
+            LaunchOrFocusPlugin "session-manager" {
+                floating true
+                move_to_focused_tab true
+            }
+        }
         bind "Ctrl x" { SwitchToMode "locked"; }
     }
     shared_except "normal" "locked" "entersearch" {
@@ -551,6 +558,7 @@ pane_frames false
 // Default: true (if the host terminal supports it)
 // 
 // support_kitty_keyboard_protocol false
+
 // Whether to make sure a local web server is running when a new Zellij session starts.
 // This web server will allow creating new sessions and attaching to existing ones that have
 // opted in to being shared in the browser.
@@ -566,7 +574,8 @@ pane_frames false
 // - false
 // Default: false
 // 
-web_server true
+// web_server false
+
 // Whether to allow sessions started in the terminal to be shared through a local web server, assuming one is
 // running (see the `web_server` option for more details).
 // (Requires restart)
@@ -580,7 +589,8 @@ web_server true
 // - "disabled" (do not allow web sharing and do not permit sessions started in the terminal to opt-in to it)
 // Default: "off"
 // 
-web_sharing "on"
+// web_sharing "off"
+
 // A path to a certificate file to be used when setting up the web client to serve the
 // connection over HTTPs
 // 
