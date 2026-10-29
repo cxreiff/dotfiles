@@ -28,3 +28,6 @@ stacks/cxagents/forwarder/tailnet-forwarder
 # Python bytecode caches (smoke servers and client run with -B; belt and braces)
 __pycache__/
 *.pyc
+
+# tools: cargo build output
+tools/*/target/

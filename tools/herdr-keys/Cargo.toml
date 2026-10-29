@@ -1,0 +1,17 @@
+[package]
+name = "herdr-keys"
+version = "0.1.0"
+edition = "2021"
+description = "Compound herdr maneuvers for keybindings (nav across panes/tabs/workspaces, directional new pane/tab/workspace)"
+publish = false
+
+[dependencies]
+serde_json = "1"
+
+# Spawned once per keypress: optimize for a small, fast, dependency-free binary.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

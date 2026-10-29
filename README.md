@@ -5,6 +5,7 @@ dotfiles/
 ├── archive/    legacy bare-repo dotfiles (frozen, unmanaged)
 ├── stacks/     Docker compose stacks — opt-in (see stacks/README.md)
 ├── stow/       Stow packages — symlinked into $HOME for tools that read fixed paths
+├── tools/      programs built from source into ~/.local/bin (dotfiles tools install)
 ├── docs/       migration-recovery and other operational references
 ├── justfile    root justfile (mod stacks, mod stow)
 └── .gitignore  secrets out, *.env.example in

@@ -1,0 +1,17 @@
+default:
+    @just --list
+
+# Build and install every tool into ~/.local/bin
+install:
+    @./herdr-keys/scripts/install.sh
+
+# Build (release) and install herdr-keys to ~/.local/bin for the herdr keybindings
+install-herdr-keys:
+    @./herdr-keys/scripts/install.sh
+
+# Run every tool's tests
+test:
+    cargo test --locked --manifest-path {{source_directory()}}/herdr-keys/Cargo.toml
+
+test-herdr-keys:
+    cargo test --locked --manifest-path {{source_directory()}}/herdr-keys/Cargo.toml
