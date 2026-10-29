@@ -149,7 +149,7 @@ All three profiles set `autoActivate: false` so `colima start -p X` does not ste
 
 | Package | Folding | Why |
 |---|---|---|
-| `base` | default (folder symlinks) | `~/.config/nvim`, `~/.config/zellij`, `~/.zshrc` — folder symlinks fine |
+| `base` | default (folder symlinks) | `~/.config/nvim`, `~/.config/zellij`, `~/.zshrc` — folder symlinks fine. Exception: `~/.config/herdr/` holds herdr's sockets, logs and session state, so the base recipes `mkdir -p ~/.config/herdr` first and stow links only `config.toml`. herdr's own config writes go through the symlink (`fs::write`), so settings changed in its UI show up in `git diff` |
 | `colima` | `--no-folding` (file-level symlinks) | `~/.colima/<profile>/` holds runtime state files; folder-level symlinking would suck them into the repo |
 
 When adding a new package, edit `stow/justfile` to add the package to **every aggregate recipe** (`setup`, `restow`, `unstow`, `status`) AND add **per-package recipes** (`setup-<name>`, `restow-<name>`, `unstow-<name>`, `status-<name>`) mirroring the existing pattern — there's no loop, every recipe lists each package explicitly. Use `--no-folding` if the target dir holds runtime state.

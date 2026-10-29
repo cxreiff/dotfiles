@@ -1,0 +1,108 @@
+onboarding = false
+
+[ui]
+agent_panel_sort = "spaces"
+prompt_new_tab_name = false
+
+[ui.toast]
+delivery = "system"
+
+[ui.sidebar.spaces]
+row_gap = 1
+
+[theme]
+name = "nord"
+auto_switch = false
+
+[keys]
+prefix = "alt+z"
+goto = "alt+x"
+new_tab = "alt+n"
+new_workspace = "alt+m"
+previous_agent = "alt+shift+tab"
+next_agent = "alt+tab"
+toggle_sidebar = "alt+a"
+
+[[keys.command]]
+key = "alt+left"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys nav left"
+description = "focus pane or tab to the left"
+
+[[keys.command]]
+key = "alt+right"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys nav right"
+description = "focus pane or tab to the right"
+
+[[keys.command]]
+key = "alt+up"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys nav up"
+description = "focus pane or workspace above"
+
+[[keys.command]]
+key = "alt+down"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys nav down"
+description = "focus pane or workspace below"
+
+[[keys.command]]
+key = "alt+shift+left"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new pane left"
+description = "new pane to the left"
+
+[[keys.command]]
+key = "alt+shift+right"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new pane right"
+description = "new pane to the right"
+
+[[keys.command]]
+key = "alt+shift+up"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new pane up"
+description = "new pane above"
+
+[[keys.command]]
+key = "alt+shift+down"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new pane down"
+description = "new pane below"
+
+[[keys.command]]
+key = "ctrl+alt+left"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new tab left"
+description = "new tab to the left"
+
+[[keys.command]]
+key = "ctrl+alt+right"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new tab right"
+description = "new tab to the right"
+
+[[keys.command]]
+key = "ctrl+alt+up"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new workspace up"
+description = "new workspace above"
+
+[[keys.command]]
+key = "ctrl+alt+down"
+type = "shell"
+command = "$HOME/.local/bin/herdr-keys new workspace down"
+description = "new workspace below"
+
+[[keys.command]]
+key = "alt+p"
+type = "popup"
+command = "$HOME/.local/bin/herdr-annotate-menu"
+width = 40
+height = 16
+description = "annotate menu"
+
+[experimental]
+pane_history = true
+

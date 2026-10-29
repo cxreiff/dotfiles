@@ -28,6 +28,9 @@ alias zars='zz action rename-session'
 alias zart='zz action rename-tab'
 alias zarp='zz action rename-pane'
 
+alias hh='herdr'
+alias hrc='$EDITOR ~/.config/herdr/config.toml && herdr server reload-config'
+
 alias cc='claude'
 
 alias sk='security unlock-keychain'

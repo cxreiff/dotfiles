@@ -3,10 +3,12 @@ default:
 
 # Stow all active packages onto a fresh device
 setup:
+    mkdir -p ~/.config/herdr  # real dir: herdr keeps sockets/logs beside config.toml, so link the file, never fold the dir
     stow -d {{source_directory()}} -t ~ base
     stow --no-folding -d {{source_directory()}} -t ~ colima
 
 setup-base:
+    mkdir -p ~/.config/herdr  # real dir: herdr keeps sockets/logs beside config.toml, so link the file, never fold the dir
     stow -d {{source_directory()}} -t ~ base
 
 setup-colima:
@@ -14,10 +16,12 @@ setup-colima:
 
 # Re-link everything (run after adding files to packages)
 restow:
+    mkdir -p ~/.config/herdr  # real dir: herdr keeps sockets/logs beside config.toml, so link the file, never fold the dir
     stow -R -d {{source_directory()}} -t ~ base
     stow -R --no-folding -d {{source_directory()}} -t ~ colima
 
 restow-base:
+    mkdir -p ~/.config/herdr  # real dir: herdr keeps sockets/logs beside config.toml, so link the file, never fold the dir
     stow -R -d {{source_directory()}} -t ~ base
 
 restow-colima:
