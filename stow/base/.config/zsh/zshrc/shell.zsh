@@ -34,6 +34,13 @@ export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
+# Rootshell herdr fork (kitknox/herdr, adds control-stream mode) SHADOWS the
+# Homebrew herdr while this dir exists. Delete this line (or the dir) and
+# restart the herdr server to go back to mainline herdr; brew's stays
+# installed. Installed by the fork's install.sh, which appends this line to
+# ~/.zshrc: on a rerun, delete that copy. Upgrade with `herdr update`.
+[[ -d $HOME/.local/opt/herdr-rootshell/bin ]] && export PATH="$HOME/.local/opt/herdr-rootshell/bin:$PATH" # rootshell-herdr
+
 # tool setup
 
 ## fnm
