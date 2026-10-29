@@ -31,6 +31,8 @@ alias zarp='zz action rename-pane'
 alias hh='herdr'
 alias hrc='$EDITOR ~/.config/herdr/config.toml && herdr server reload-config'
 
+alias grc='$EDITOR ~/.config/ghostty/config && pkill -USR2 -x ghostty'
+
 alias cc='claude'
 
 alias sk='security unlock-keychain'

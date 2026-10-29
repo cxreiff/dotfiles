@@ -1,0 +1,31 @@
+theme = karasu night
+font-size = 12
+
+cursor-style = block
+cursor-style-blink = false
+shell-integration-features = no-cursor,ssh-terminfo,ssh-env
+progress-style = false
+
+window-padding-x = 8
+window-padding-y = 8
+
+macos-option-as-alt = true
+keybind = global:alt+space=toggle_quick_terminal
+keybind = alt+left=unbind
+keybind = alt+right=unbind
+keybind = ctrl+alt+super+left=unbind
+keybind = ctrl+alt+super+right=unbind
+keybind = ctrl+alt+super+up=unbind
+keybind = ctrl+alt+super+down=unbind
+keybind = ctrl+alt+super+shift+left=unbind
+keybind = ctrl+alt+super+shift+right=unbind
+keybind = ctrl+alt+super+shift+up=unbind
+keybind = ctrl+alt+super+shift+down=unbind
+keybind = ctrl+alt+super+f=unbind
+keybind = ctrl+alt+super+shift+f=unbind
+
+quick-terminal-position = bottom
+quick-terminal-animation-duration = 0
+quick-terminal-autohide = false
+
+fullscreen = true
