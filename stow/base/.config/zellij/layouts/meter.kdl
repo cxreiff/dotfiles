@@ -1,10 +1,6 @@
-// token-meter zellij layout: the built-in compact bar replaced by zjstatus,
-// with event-driven Claude and Codex usage segments and the session name
-// on the bottom right.
-//
-// install.sh copies this layout to
-// ~/.config/zellij/layouts/meter.kdl, selected via `default_layout "meter"`
-// in ~/.config/zellij/config.kdl. Colors mirror the "custom" theme there.
+// zellij layout: the built-in compact bar replaced by zjstatus, with the
+// session name on the bottom right. Selected via `default_layout "meter"` in
+// ~/.config/zellij/config.kdl. Colors mirror the "custom" theme there.
 layout {
     default_tab_template {
         children
@@ -24,10 +20,10 @@ layout {
 
                 format_left   "{mode}#[bg=$bg] {tabs}"
                 format_center ""
-                // Usage badges, a bar-colored gap (matching the mode/tabs gap on
-                // the left), then the session name pinned to the far right on a
-                // grey block so it reads apart from the badges and tabs.
-                format_right  "{pipe_claude}{pipe_codex}#[bg=$bg] #[fg=$black,bg=$dim] {session} "
+                // A bar-colored gap (matching the mode/tabs gap on the left), then
+                // the session name pinned to the far right on a grey block so it
+                // reads apart from the tabs.
+                format_right  "#[bg=$bg] #[fg=$black,bg=$dim] {session} "
                 format_space  "#[bg=$bg]"
                 format_hide_on_overlength "true"
                 format_precedence "lrc"
@@ -59,13 +55,6 @@ layout {
                 tab_sync_indicator      "<> "
                 tab_fullscreen_indicator "[] "
                 tab_floating_indicator  "~ "
-
-                // No commands, timers, or cache readers. Empty until a client
-                // lifecycle / usage event pushes a complete styled segment.
-                pipe_claude_format     "{output}"
-                pipe_claude_rendermode "dynamic"
-                pipe_codex_format      "{output}"
-                pipe_codex_rendermode  "dynamic"
             }
         }
     }

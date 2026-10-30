@@ -6,7 +6,6 @@ source $HOME/.config/zsh/zshrc/aliases.zsh
 source $HOME/.config/zsh/tools/ww.zsh
 source $HOME/.config/zsh/tools/cw.zsh
 source $HOME/.config/zsh/tools/cww.zsh
-source $HOME/.config/zsh/tools/token-meter.zsh
 source $HOME/.config/zsh/tools/boxclaude.zsh
 source $HOME/.config/zsh/tools/svr.zsh
 

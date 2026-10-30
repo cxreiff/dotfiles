@@ -38,6 +38,7 @@ alias cch='claude --model haiku'
 alias ccs='claude --model sonnet'
 alias cco='claude --model opus'
 alias ccf='claude --model fable'
+alias ccr='claude remote-control'
 
 alias sk='security unlock-keychain'
 alias adg='sudo /Applications/AdGuardHome/AdGuardHome -s'
