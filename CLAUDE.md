@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-10-18.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Last updated: 2026-11-07.
 
 ## Repo shape
 
@@ -13,6 +13,7 @@ Four independent areas, intentionally not unified:
 - `tailscale/` — the tailnet, declared: `policy.hujson` (the access policy, with its `tests`; source of truth), `tailnet.conf` (tailnet name, DNS suffix and this node's device name), `clients.conf` (the expected OAuth clients), `.env` (both OAuth client credentials, 0600, escrowed; only `scripts/api.sh` reads its values). Tailnet-global, and the dependency runs one way: stacks call into it (`scripts/api.sh`, `scripts/authkey.sh`, `scripts/lib/conf.sh`), and nothing in it calls into a stack. It does declare the tailnet-level facts stacks rely on (`tag:cxagents`, its grant and policy tests, the `authkeys` client's tag), reuses `stacks/scripts/lib/check.sh` for its [OK]/[FAIL] output, and its doctor scans `stacks/*/.env` key names (never values) for retired or misplaced Tailscale credentials. Recipes: `dotfiles tailscale policy-pull|policy-diff|policy-push [--init]|policy-status|authkey tag:<name>|lint|lint-test|doctor-test|smoke`. Not stowed, and no containers.
 - `tools/` — small programs built from source and installed to `~/.local/bin` (`dotfiles tools install`, or `install-<tool>`). Not stowed: the build output is a binary, not a config file. `herdr-keys/` is a Rust crate that the herdr `[[keys.command]]` bindings in `stow/base/.config/herdr/config.toml` call. It handles directional nav that crosses panes, tabs and workspaces in sidebar order, plus directional new pane, tab and workspace. See its README for the semantics and the latency constraints (the binary runs once per keypress). Install by rename, never `cp` over the old binary (`scripts/install.sh` explains why).
 - herdr itself comes from the `herdr` Homebrew formula, but on this host the Rootshell fork (`kitknox/herdr`, which adds control-stream mode) shadows it. The fork lives in `~/.local/opt/herdr-rootshell/bin`, and a guarded PATH line in `stow/base/.config/zsh/zshrc/shell.zsh` puts it ahead of Homebrew. It's installed by the fork's own `install.sh` and upgraded with `herdr update`. Removing that line (or the directory) and restarting the herdr server restores mainline herdr. Keep `brew "herdr"` in the Brewfile as the rollback.
+- `rex/` — remote access to this host's Rex server through its own tailnet node (Tailscale Serve on `:443` → a `tailnet-serve://` socket), replacing Rex.app's built-in `<host>-rex` tsnet device. A user LaunchAgent (`com.cxreiff.dotfiles.rex`, `gui/<uid>`, the same domain Rex.app launches its own server in, so it needs a GUI login just as the app does) runs the server with the listener, and Rex.app attaches to it. Rex.app's automatic server restart is turned off; restart with `dotfiles rex restart`, never the app's button. See `rex/README.md`. Not stowed.
 - `docs/` — operational references: `docs/migration-recovery.md` (clean-slate rebuild procedure), `docs/design-plans/` and `docs/implementation-plans/` (planning artifacts).
 
 The `dotfiles` shell alias (defined in `stow/base/.config/zsh/zshrc/aliases.zsh`; `CX_WORKSPACE` is set in `params.zsh`) is the entry point for everything:
@@ -21,7 +22,7 @@ The `dotfiles` shell alias (defined in `stow/base/.config/zsh/zshrc/aliases.zsh`
 alias dotfiles="just -f $CX_WORKSPACE/dotfiles/justfile"
 ```
 
-The root `justfile` only does `mod stacks` / `mod stow` / `mod tailscale`; all real recipes live in `stacks/justfile`, `stow/justfile`, `tailscale/justfile`, and per-stack `stacks/<name>/justfile`. Use `dotfiles` (or `just -f …`) rather than invoking `docker compose` / `stow` / `tailscale serve` by hand — the justfiles encode the right context, ports, and ordering.
+The root `justfile` only does `mod stacks` / `mod stow` / `mod tailscale` / `mod tools` / `mod rex`; all real recipes live in `stacks/justfile`, `stow/justfile`, `tailscale/justfile`, and per-stack `stacks/<name>/justfile`. Use `dotfiles` (or `just -f …`) rather than invoking `docker compose` / `stow` / `tailscale serve` by hand — the justfiles encode the right context, ports, and ordering.
 
 ## Setup is staged (universal → container → per-stack)
 
@@ -111,6 +112,7 @@ dotfiles stacks <stack> backup|restore <tarball>
 dotfiles stacks connectome build|provision-codex|smoke|lint  # agent-specific recipes
 dotfiles stacks cxagents build|image-test|test|login|up|down|restart|ps|logs|pull|smoke|smoke-test|lint|lint-test|login-test|doctor-test  # tailnet node (smoke takes --long; no shell, serve or backup recipes: its state is disposable)
 dotfiles tailscale policy-pull|policy-diff|policy-push [--init]|policy-status|authkey tag:<name>|lint|lint-test|doctor-test|smoke  # tailnet policy and clients
+dotfiles rex install|serve|status|restart|logs|unserve|uninstall  # Rex server via this node's Tailscale Serve (install/restart end all programs in Rex)
 dotfiles stacks adguard tailnet-dns-on|tailnet-dns-off|tailnet-dns-status|tailnet-dns-test
 ```
 

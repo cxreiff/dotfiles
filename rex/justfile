@@ -1,0 +1,38 @@
+tailscale := "/opt/homebrew/bin/tailscale"
+label := "com.cxreiff.dotfiles.rex"
+serve_sock := env_var("HOME") / ".local/state/rex/serve.sock"
+
+default:
+    @just --list
+
+# Cut the Rex server over to our LaunchAgent with a tailnet-serve listener (stops the server; run from SSH, outside Rex)
+install *args:
+    @./scripts/install.sh {{args}}
+
+# Publish Rex at https://<this node>.<tailnet>.ts.net via Tailscale Serve (sudo: Serve to a Unix socket needs root)
+serve:
+    sudo {{tailscale}} serve --bg --https=443 unix:{{serve_sock}}
+
+# Remove the Tailscale Serve entry for Rex
+unserve:
+    sudo {{tailscale}} serve --https=443 off
+
+# Read-only checks: agent loaded and owning the server, built-in node off, serve socket and Serve entry present
+status:
+    @./scripts/status.sh
+
+# Restart the server from the LaunchAgent (ends every program running in Rex; picks up a Rex.app update)
+restart:
+    {{env_var("HOME")}}/Library/Application\ Support/com.superlogical.rex/RexServer/Versions/Current/Rex\ Server.app/Contents/MacOS/rex --autostart=false server stop || true
+    launchctl kickstart -k gui/$(id -u)/{{label}}
+
+# Unload the LaunchAgent and hand the server back to Rex.app (re-enable Serve over Tailscale in the app if wanted)
+uninstall:
+    launchctl bootout gui/$(id -u)/{{label}} 2>/dev/null || true
+    rm -f {{env_var("HOME")}}/Library/LaunchAgents/{{label}}.plist
+    defaults write com.superlogical.rex rex.server.automatic-restart-enabled -bool true
+    @echo "Agent removed. Rex.app launches its own server next time it starts; run 'dotfiles rex unserve' to drop the Serve entry."
+
+# Follow the server log
+logs:
+    tail -f {{env_var("HOME")}}/Library/Logs/{{label}}.log

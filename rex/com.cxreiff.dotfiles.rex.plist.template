@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cxreiff.dotfiles.rex</string>
+
+  <!-- LaunchAgent (gui/<uid> domain), the same domain and context the Rex app
+       launches its own server job in (login keychain, TCC grants, pasteboard),
+       so programs in Rex terminals behave as before. Like the app's server, it
+       runs only while cxreiff has a GUI login session. See rex/README.md.
+
+       The arguments mirror the ones Rex.app passes its bundled server, plus the
+       one flag the app has no setting for: the tailnet-serve listener that
+       `tailscale serve` forwards https://<node>.<tailnet>.ts.net to. -->
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__REX_BIN__</string>
+    <string>server</string>
+    <string>run</string>
+    <string>--listen</string>
+    <string>__LISTEN__</string>
+    <string>--extra-listen</string>
+    <string>tailnet-serve://__SERVE_SOCK__</string>
+    <string>--websocket-origin-pattern</string>
+    <string>https://rex.superlogical.com</string>
+    <string>--log-max-size</string>
+    <string>50MiB</string>
+    <string>--log-format</string>
+    <string>text</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>__HOME__</string>
+    <key>USER</key>
+    <string>__USER__</string>
+    <key>LOGNAME</key>
+    <string>__USER__</string>
+    <key>SHELL</key>
+    <string>__SHELL__</string>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>__HOME__</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <!-- Relaunch only after a crash. A clean exit (`rex server stop`, the app's
+       Restart button) stays stopped, so this job never fights the app for the
+       socket; `dotfiles rex restart` brings it back. -->
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>__LOGDIR__/com.cxreiff.dotfiles.rex.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOGDIR__/com.cxreiff.dotfiles.rex.log</string>
+</dict>
+</plist>

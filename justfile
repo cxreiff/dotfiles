@@ -2,6 +2,7 @@ mod stacks
 mod stow
 mod tailscale
 mod tools
+mod rex
 
 default:
     @just --list
